@@ -1,0 +1,76 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: pricelens_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pricelens
+      POSTGRES_PASSWORD: pricelens_dev_password
+      POSTGRES_DB: pricelens_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pricelens -d pricelens_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: pricelens_redis
+    restart: unless-stopped
+    command: redis-server --requirepass pricelens_redis_dev --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "pricelens_redis_dev", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.6
+    container_name: pricelens_meilisearch
+    restart: unless-stopped
+    environment:
+      MEILI_MASTER_KEY: pricelens_meili_dev_key
+      MEILI_ENV: development
+    ports:
+      - "7700:7700"
+    volumes:
+      - meili_data:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Uncomment to run API in Docker during development
+  # api:
+  #   build:
+  #     context: .
+  #     dockerfile: docker/Dockerfile.api
+  #   container_name: pricelens_api
+  #   restart: unless-stopped
+  #   env_file: apps/api/.env
+  #   ports:
+  #     - "3001:3001"
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #     meilisearch:
+  #       condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:
+  meili_data:
