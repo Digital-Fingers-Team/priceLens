@@ -263,3 +263,42 @@ If you are continuing the project, fill those pieces in before treating the prod
 7. Start the API with `npm run dev`
 8. Open `http://localhost:3001/docs`
 
+
+## End-to-End Commands (Fresh Setup → Production Ready)
+
+Use this exact command sequence from a clean clone to a production-ready build and run:
+
+```bash
+# 1) Install dependencies
+npm install
+
+# 2) Start required local infrastructure (PostgreSQL, Redis, Meilisearch)
+npm run docker:up
+
+# 3) Create API env file (first time only)
+cp apps/api/.env.example apps/api/.env.local
+# If .env.example is empty in your snapshot, open apps/api/.env.local and fill values from this README.
+
+# 4) Prepare database
+npm run db:generate
+npm run db:migrate
+npm run db:seed
+
+# 5) Run quality gates
+npm run lint
+npm run typecheck
+npm run test
+
+# 6) Build production artifacts
+npm run build
+
+# 7) Start in production mode
+npm run start
+```
+
+Optional shutdown/reset commands:
+
+```bash
+npm run docker:down   # stop infra
+npm run docker:reset  # stop infra + delete volumes
+```
