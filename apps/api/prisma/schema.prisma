@@ -1,0 +1,385 @@
+// pricelens/apps/api/prisma/schema.prisma
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions", "tracing"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [uuidOssp(map: "uuid-ossp"), vector, pgTrgm(map: "pg_trgm")]
+}
+
+// ─── Enums ──────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+enum MatchStatus {
+  ACCEPTED      // confidence >= HIGH_THRESHOLD
+  PENDING       // confidence in [MED_THRESHOLD, HIGH_THRESHOLD)
+  REJECTED      // confidence < LOW_THRESHOLD
+  MANUAL_ACCEPT // human approved in review queue
+  MANUAL_REJECT // human rejected in review queue
+}
+
+enum AlertType {
+  PRICE_DROP_ABSOLUTE   // e.g. drop by $10
+  PRICE_DROP_PERCENT    // e.g. drop by 10%
+  PRICE_TARGET          // e.g. below $299
+}
+
+enum AlertStatus {
+  ACTIVE
+  TRIGGERED
+  DISABLED
+}
+
+enum ScrapingJobStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum ConnectorType {
+  PLAYWRIGHT    // browser automation
+  HTTP_API      // direct API integration
+  RSS_FEED      // RSS/Atom ingestion
+  MANUAL_IMPORT // CSV / manual upload
+}
+
+enum ProductTier {
+  // Used for category constraints in matching
+  BUDGET
+  MID_RANGE
+  PREMIUM
+  ULTRA_PREMIUM
+}
+
+// ─── Users & Auth ───────────────────────────────────────────────────────────
+
+model User {
+  id             String    @id @default(uuid())
+  email          String    @unique
+  username       String    @unique @db.VarChar(32)
+  passwordHash   String    @map("password_hash")
+  role           UserRole  @default(USER)
+  emailVerified  Boolean   @default(false) @map("email_verified")
+  avatarUrl      String?   @map("avatar_url")
+  displayName    String?   @map("display_name") @db.VarChar(64)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  lastLoginAt    DateTime? @map("last_login_at")
+  deletedAt      DateTime? @map("deleted_at") // soft delete
+
+  sessions        Session[]
+  watchlistItems  WatchlistItem[]
+  priceAlerts     PriceAlert[]
+  reviewDecisions ReviewDecision[]
+
+  @@index([email])
+  @@index([username])
+  @@map("users")
+}
+
+model Session {
+  id           String    @id @default(uuid())
+  userId       String    @map("user_id")
+  refreshToken String    @unique @map("refresh_token") @db.VarChar(512)
+  userAgent    String?   @map("user_agent")
+  ipAddress    String?   @map("ip_address")
+  expiresAt    DateTime  @map("expires_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  revokedAt    DateTime? @map("revoked_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([refreshToken])
+  @@map("sessions")
+}
+
+// ─── Categories ─────────────────────────────────────────────────────────────
+
+model Category {
+  id          String   @id @default(uuid())
+  slug        String   @unique @db.VarChar(128)
+  name        String   @db.VarChar(128)
+  parentId    String?  @map("parent_id")
+  level       Int      @default(0)
+  searchTerms String[] @map("search_terms")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+  products CanonicalProduct[]
+
+  @@index([parentId])
+  @@index([slug])
+  @@map("categories")
+}
+
+// ─── Platforms / Connectors ─────────────────────────────────────────────────
+
+model Platform {
+  id            String        @id @default(uuid())
+  slug          String        @unique @db.VarChar(64)
+  name          String        @db.VarChar(128)
+  baseUrl       String        @map("base_url")
+  logoUrl       String?       @map("logo_url")
+  connectorType ConnectorType @map("connector_type")
+  isActive      Boolean       @default(true) @map("is_active")
+  rateLimit     Int           @default(60) @map("rate_limit")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  sourceListings SourceListing[]
+  scrapingJobs   ScrapingJob[]
+
+  @@map("platforms")
+}
+
+// ─── Canonical Products ──────────────────────────────────────────────────────
+
+model CanonicalProduct {
+  id              String      @id @default(uuid())
+  categoryId      String      @map("category_id")
+  slug            String      @unique
+  title           String
+  normalizedTitle String      @map("normalized_title")
+  brand           String?
+  model           String?
+  sku             String?
+  gtin            String?     @unique
+  upc             String?     @unique
+  ean             String?     @unique
+  mpn             String?
+
+  attributes    Json    @default("{}")
+  imageUrl      String? @map("image_url")
+  thumbnailUrl  String? @map("thumbnail_url")
+
+  titleEmbedding Unsupported("vector(1536)")? @map("title_embedding")
+
+  tier        ProductTier @default(MID_RANGE)
+  isVerified  Boolean     @default(false) @map("is_verified")
+  searchBoost Float       @default(1.0) @map("search_boost")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  category       Category        @relation(fields: [categoryId], references: [id])
+  sourceListings SourceListing[]
+  priceHistory   PriceHistory[]
+  watchlistItems WatchlistItem[]
+  priceAlerts    PriceAlert[]
+  reviewQueues   ReviewQueue[]
+
+  @@index([categoryId])
+  @@index([brand, model])
+  @@index([gtin])
+  @@index([normalizedTitle])
+  @@map("canonical_products")
+}
+
+// ─── Source Listings ─────────────────────────────────────────────────────────
+
+model SourceListing {
+  id                 String  @id @default(uuid())
+  platformId         String  @map("platform_id")
+  canonicalProductId String? @map("canonical_product_id")
+  externalId         String  @map("external_id")
+  externalUrl        String  @map("external_url")
+
+  rawTitle      String   @map("raw_title")
+  rawPrice      Decimal? @map("raw_price") @db.Decimal(12, 2)
+  rawCurrency   String   @default("USD") @map("raw_currency") @db.VarChar(3)
+  rawBrand      String?  @map("raw_brand")
+  rawImageUrl   String?  @map("raw_image_url")
+  rawAttributes Json     @default("{}") @map("raw_attributes")
+  rawCategory   String?  @map("raw_category")
+
+  normalizedTitle     String?  @map("normalized_title")
+  extractedGtin       String?  @map("extracted_gtin")
+  extractedUpc        String?  @map("extracted_upc")
+  extractedEan        String?  @map("extracted_ean")
+  extractedMpn        String?  @map("extracted_mpn")
+  extractedBrand      String?  @map("extracted_brand")
+  extractedModel      String?  @map("extracted_model")
+  extractedAttributes Json     @default("{}") @map("extracted_attributes")
+  priceUsd            Decimal? @map("price_usd") @db.Decimal(12, 2)
+  inStock             Boolean? @map("in_stock")
+  rating              Float?
+  reviewCount         Int?     @map("review_count")
+
+  matchStatus     MatchStatus @default(PENDING) @map("match_status")
+  matchConfidence Float?      @map("match_confidence")
+  matchedAt       DateTime?   @map("matched_at")
+  matchVersion    Int         @default(1) @map("match_version")
+
+  firstSeenAt   DateTime  @default(now()) @map("first_seen_at")
+  lastSeenAt    DateTime  @default(now()) @map("last_seen_at")
+  lastScrapedAt DateTime? @map("last_scraped_at")
+
+  platform         Platform          @relation(fields: [platformId], references: [id])
+  canonicalProduct CanonicalProduct? @relation(fields: [canonicalProductId], references: [id])
+  priceHistory     PriceHistory[]
+  matchDecisions   MatchDecision[]
+  reviewQueues     ReviewQueue[]
+
+  @@unique([platformId, externalId])
+  @@index([canonicalProductId])
+  @@index([matchStatus])
+  @@index([normalizedTitle])
+  @@index([extractedGtin])
+  @@map("source_listings")
+}
+
+// ─── Price History ───────────────────────────────────────────────────────────
+
+model PriceHistory {
+  id                 String   @id @default(uuid())
+  canonicalProductId String   @map("canonical_product_id")
+  sourceListingId    String   @map("source_listing_id")
+  priceUsd           Decimal  @map("price_usd") @db.Decimal(12, 2)
+  currency           String   @default("USD") @db.VarChar(3)
+  originalPrice      Decimal? @map("original_price") @db.Decimal(12, 2)
+  inStock            Boolean  @default(true) @map("in_stock")
+  recordedAt         DateTime @default(now()) @map("recorded_at")
+
+  canonicalProduct CanonicalProduct @relation(fields: [canonicalProductId], references: [id])
+  sourceListing    SourceListing    @relation(fields: [sourceListingId], references: [id])
+
+  @@index([canonicalProductId, recordedAt])
+  @@index([sourceListingId, recordedAt])
+  @@map("price_history")
+}
+
+// ─── Match Decision Audit Trail ──────────────────────────────────────────────
+
+model MatchDecision {
+  id              String      @id @default(uuid())
+  sourceListingId String      @map("source_listing_id")
+  candidateId     String?     @map("candidate_id")
+  status          MatchStatus
+  confidence      Float
+  engineVersion   String      @map("engine_version")
+  scores          Json
+  reasoning       String      @db.Text
+  flags           String[]
+  processingMs    Int?        @map("processing_ms")
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  sourceListing SourceListing @relation(fields: [sourceListingId], references: [id])
+
+  @@index([sourceListingId])
+  @@index([candidateId])
+  @@map("match_decisions")
+}
+
+// ─── Review Queue ────────────────────────────────────────────────────────────
+
+model ReviewQueue {
+  id                 String       @id @default(uuid())
+  sourceListingId    String       @map("source_listing_id")
+  canonicalProductId String?      @map("canonical_product_id")
+  confidence         Float
+  scores             Json
+  priority           Int          @default(0)
+  resolvedAt         DateTime?    @map("resolved_at")
+  resolvedBy         String?      @map("resolved_by")
+  resolution         MatchStatus?
+  notes              String?      @db.Text
+  createdAt          DateTime     @default(now()) @map("created_at")
+
+  sourceListing    SourceListing     @relation(fields: [sourceListingId], references: [id])
+  canonicalProduct CanonicalProduct? @relation(fields: [canonicalProductId], references: [id])
+  reviewDecisions  ReviewDecision[]
+
+  @@index([resolvedAt])
+  @@index([priority])
+  @@map("review_queue")
+}
+
+model ReviewDecision {
+  id          String      @id @default(uuid())
+  queueItemId String      @map("queue_item_id")
+  userId      String      @map("user_id")
+  decision    MatchStatus
+  notes       String?     @db.Text
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  queueItem ReviewQueue @relation(fields: [queueItemId], references: [id])
+  user      User        @relation(fields: [userId], references: [id])
+
+  @@map("review_decisions")
+}
+
+// ─── Scraping Jobs ───────────────────────────────────────────────────────────
+
+model ScrapingJob {
+  id           String            @id @default(uuid())
+  platformId   String            @map("platform_id")
+  query        String?
+  jobType      String            @map("job_type")
+  status       ScrapingJobStatus @default(QUEUED)
+  priority     Int               @default(0)
+  attempts     Int               @default(0)
+  maxAttempts  Int               @default(3) @map("max_attempts")
+  payload      Json              @default("{}")
+  result       Json?
+  error        String?           @db.Text
+  startedAt    DateTime?         @map("started_at")
+  completedAt  DateTime?         @map("completed_at")
+  scheduledFor DateTime?         @map("scheduled_for")
+  createdAt    DateTime          @default(now()) @map("created_at")
+
+  platform Platform @relation(fields: [platformId], references: [id])
+
+  @@index([platformId, status])
+  @@index([status, scheduledFor])
+  @@map("scraping_jobs")
+}
+
+// ─── Watchlist & Alerts ──────────────────────────────────────────────────────
+
+model WatchlistItem {
+  id                 String   @id @default(uuid())
+  userId             String   @map("user_id")
+  canonicalProductId String   @map("canonical_product_id")
+  note               String?
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  canonicalProduct CanonicalProduct @relation(fields: [canonicalProductId], references: [id])
+
+  @@unique([userId, canonicalProductId])
+  @@index([userId])
+  @@map("watchlist_items")
+}
+
+model PriceAlert {
+  id                 String      @id @default(uuid())
+  userId             String      @map("user_id")
+  canonicalProductId String      @map("canonical_product_id")
+  alertType          AlertType   @map("alert_type")
+  thresholdValue     Decimal     @map("threshold_value") @db.Decimal(12, 2)
+  status             AlertStatus @default(ACTIVE)
+  lastCheckedAt      DateTime?   @map("last_checked_at")
+  triggeredAt        DateTime?   @map("triggered_at")
+  triggeredPrice     Decimal?    @map("triggered_price") @db.Decimal(12, 2)
+  createdAt          DateTime    @default(now()) @map("created_at")
+  updatedAt          DateTime    @updatedAt @map("updated_at")
+
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  canonicalProduct CanonicalProduct @relation(fields: [canonicalProductId], references: [id])
+
+  @@index([userId])
+  @@index([canonicalProductId, status])
+  @@map("price_alerts")
+}
