@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { formatRelativeTime } from '@/lib/utils/format';
 
-const STATUS_VARIANT: Record<string, any> = {
+const STATUS_VARIANT: Record<string, 'success' | 'info' | 'warning' | 'danger' | 'default'> = {
   COMPLETED: 'success',
   RUNNING: 'info',
   QUEUED: 'warning',
@@ -39,7 +39,7 @@ export function RecentJobsTable() {
                   {job.platform.name} — {job.jobType}
                 </p>
                 {job.query && (
-                  <p className="text-xs text-ink-500 truncate">"{job.query}"</p>
+                  <p className="text-xs text-ink-500 truncate">&quot;{job.query}&quot;</p>
                 )}
               </div>
               <div className="flex items-center gap-3 shrink-0">

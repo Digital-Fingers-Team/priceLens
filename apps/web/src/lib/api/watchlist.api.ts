@@ -4,12 +4,8 @@ import type { ApiResponse } from '@/types/api.types';
 
 export const watchlistApi = {
   getWatchlist: async (): Promise<WatchlistItem[]> => {
-    try {
-      const res = await apiClient.get<ApiResponse<WatchlistItem[]>>('/watchlist');
-      return res.data.data;
-    } catch {
-      return [];
-    }
+    const res = await apiClient.get<ApiResponse<WatchlistItem[]>>('/watchlist');
+    return res.data.data;
   },
 
   add: async (productId: string, note?: string): Promise<WatchlistItem> => {
@@ -25,12 +21,8 @@ export const watchlistApi = {
   },
 
   getAlerts: async (): Promise<PriceAlert[]> => {
-    try {
-      const res = await apiClient.get<ApiResponse<PriceAlert[]>>('/watchlist/alerts');
-      return res.data.data;
-    } catch {
-      return [];
-    }
+    const res = await apiClient.get<ApiResponse<PriceAlert[]>>('/watchlist/alerts');
+    return res.data.data;
   },
 
   createAlert: async (

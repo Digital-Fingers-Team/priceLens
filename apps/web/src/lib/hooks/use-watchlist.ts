@@ -20,7 +20,6 @@ export function useIsWatched(productId: string) {
 export function useToggleWatchlist() {
   const queryClient = useQueryClient();
   const addToast = useUiStore((s) => s.addToast);
-  const { data: watchlist } = useWatchlist();
 
   return useMutation({
     mutationFn: async ({
@@ -43,7 +42,7 @@ export function useToggleWatchlist() {
       const previous = queryClient.getQueryData(QUERY_KEYS.watchlist());
 
       if (isWatched) {
-        queryClient.setQueryData(QUERY_KEYS.watchlist(), (old: any[]) =>
+        queryClient.setQueryData(QUERY_KEYS.watchlist(), (old: { canonicalProductId: string }[] | undefined) =>
           old?.filter((item) => item.canonicalProductId !== productId),
         );
       }

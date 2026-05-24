@@ -24,7 +24,7 @@ export default function ProductError({
         <div className="space-y-2">
           <h1 className="text-2xl font-bold text-ink-100">Something went wrong</h1>
           <p className="text-ink-400">
-            We couldn't load this product page. It may have been removed or there's a temporary issue.
+            We couldn&apos;t load this product page. It may have been removed or there&apos;s a temporary issue.
           </p>
           {process.env.NODE_ENV === 'development' && (
             <p className="text-xs font-mono text-red-400/70 mt-2">{error.message}</p>

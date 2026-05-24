@@ -9,7 +9,6 @@ import {
   getConfidenceLabel,
   isBestDeal,
 } from '@/lib/utils/price';
-import { MATCH_STATUS_LABELS } from '@/config/constants';
 import { cn } from '@/lib/utils/cn';
 
 interface ListingTableProps {

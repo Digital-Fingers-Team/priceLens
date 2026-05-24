@@ -114,14 +114,13 @@ npm run db:generate
 # Run migrations (creates all tables, indexes, extensions)
 npm run db:migrate
 
-# Seed with categories, platforms, and sample products
+# Seed with categories, platforms, and admin users
 npm run db:seed
 ```
 
 Seed creates:
 - **Categories**: Electronics → Laptops, Graphics Cards, Smartphones
 - **Platforms**: Amazon, Newegg, Best Buy, B&H Photo, Walmart
-- **Sample products**: RTX 4090, MacBook Pro M3, Galaxy S24 Ultra
 - **Users**: `admin@pricelens.dev` / `admin_dev_password_change_me`
 
 ### 6. Start development servers

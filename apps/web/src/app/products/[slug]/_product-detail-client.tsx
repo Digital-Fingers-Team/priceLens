@@ -54,7 +54,7 @@ export function ProductDetailClient({ slug }: ProductDetailClientProps) {
           <div className="space-y-2">
             <h1 className="text-2xl font-bold text-ink-100">Product unavailable</h1>
             <p className="text-ink-400">
-              We couldn't load this product. It may have been removed or there may be a temporary issue.
+              We couldn&apos;t load this product. It may have been removed or there may be a temporary issue.
             </p>
           </div>
           <div className="flex gap-3">

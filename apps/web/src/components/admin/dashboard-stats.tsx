@@ -1,4 +1,5 @@
 'use client';
+import type { LucideIcon } from 'lucide-react';
 import { Package, Store, ClipboardList, Users, TrendingUp, RefreshCw } from 'lucide-react';
 import { useDashboardStats } from '@/lib/hooks/use-admin';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -11,7 +12,7 @@ function StatCard({
   sub,
   color,
 }: {
-  icon: any;
+  icon: LucideIcon;
   label: string;
   value: string | number;
   sub?: string;

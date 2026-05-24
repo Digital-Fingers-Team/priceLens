@@ -9,7 +9,6 @@ import {
   CartesianGrid,
   Tooltip,
   ReferenceLine,
-  Legend,
 } from 'recharts';
 import { usePriceHistory } from '@/lib/hooks/use-price-history';
 import { PriceChartSkeleton } from './price-chart-skeleton';
@@ -27,17 +26,32 @@ const CHART_COLORS = {
   avg: '#3B82F6',
 };
 
-function CustomTooltip({ active, payload, label }: any) {
+type TooltipPayloadEntry = {
+  dataKey?: string;
+  name?: string;
+  color?: string;
+  value?: number | string | null;
+};
+
+function CustomTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: TooltipPayloadEntry[];
+  label?: string;
+}) {
   if (!active || !payload?.length) return null;
 
   return (
     <div className="rounded-xl border border-ink-700 bg-ink-900 shadow-2xl px-4 py-3 text-sm">
       <p className="text-ink-400 mb-2 text-xs">{formatDate(label)}</p>
-      {payload.map((entry: any) => (
+      {payload.map((entry) => (
         <div key={entry.dataKey} className="flex items-center justify-between gap-6">
           <span className="text-ink-400 capitalize">{entry.name}</span>
           <span className="font-semibold" style={{ color: entry.color }}>
-            {formatCurrency(entry.value)}
+            {formatCurrency(typeof entry.value === 'number' ? entry.value : null)}
           </span>
         </div>
       ))}
@@ -71,8 +85,6 @@ export function PriceChart({ productId }: PriceChartProps) {
     );
   }
 
-  const minValue = Math.min(...chartData.map((d) => d.min ?? Infinity));
-  const maxValue = Math.max(...chartData.map((d) => d.max ?? -Infinity));
   const avgValue = data.summary.avgPrice;
 
   return (

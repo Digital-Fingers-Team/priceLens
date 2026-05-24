@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
+import type { AxiosError } from 'axios';
 import { useRouter } from 'next/navigation';
 import { authApi } from '@/lib/api/auth.api';
 import { useAuthStore } from '@/lib/store/auth.store';
@@ -17,7 +18,7 @@ export function useLogin() {
       addToast(`Welcome back, ${data.user.displayName ?? data.user.username}!`, 'success');
       router.push('/');
     },
-    onError: (err: any) => {
+    onError: (err: AxiosError<{ error?: { message?: string } }>) => {
       const msg = err?.response?.data?.error?.message ?? 'Login failed';
       addToast(msg, 'error');
     },
@@ -36,7 +37,7 @@ export function useRegister() {
       addToast('Account created!', 'success');
       router.push('/');
     },
-    onError: (err: any) => {
+    onError: (err: AxiosError<{ error?: { message?: string } }>) => {
       const msg = err?.response?.data?.error?.message ?? 'Registration failed';
       addToast(msg, 'error');
     },

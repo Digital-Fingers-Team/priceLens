@@ -19,8 +19,6 @@ export function ReviewCard({ item }: ReviewCardProps) {
   const { mutate: resolve, isPending } = useResolveQueueItem();
 
   const confidenceLevel = getConfidenceLevel(item.confidence);
-  const confidencePct = `${(item.confidence * 100).toFixed(1)}%`;
-
   const scoreEntries = Object.entries(item.scores);
 
   function handleResolve(decision: 'ACCEPT' | 'REJECT') {
@@ -36,16 +34,16 @@ export function ReviewCard({ item }: ReviewCardProps) {
 
   return (
     <div className="rounded-xl border border-ink-700 bg-ink-900 overflow-hidden">
-      {/* Header row */}
       <div className="p-4 flex items-start gap-4">
-        {/* Confidence indicator */}
         <div className="shrink-0 flex flex-col items-center gap-1">
-          <div className={cn(
-            'w-14 h-14 rounded-xl flex items-center justify-center text-xl font-black border-2',
-            confidenceLevel === 'high' && 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400',
-            confidenceLevel === 'medium' && 'border-amber-500/40 bg-amber-500/10 text-amber-400',
-            confidenceLevel === 'low' && 'border-red-500/40 bg-red-500/10 text-red-400',
-          )}>
+          <div
+            className={cn(
+              'w-14 h-14 rounded-xl flex items-center justify-center text-xl font-black border-2',
+              confidenceLevel === 'high' && 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400',
+              confidenceLevel === 'medium' && 'border-amber-500/40 bg-amber-500/10 text-amber-400',
+              confidenceLevel === 'low' && 'border-red-500/40 bg-red-500/10 text-red-400',
+            )}
+          >
             {(item.confidence * 100).toFixed(0)}
           </div>
           <span className="text-[9px] text-ink-500 uppercase tracking-wider font-semibold">
@@ -53,15 +51,16 @@ export function ReviewCard({ item }: ReviewCardProps) {
           </span>
         </div>
 
-        {/* Source listing info */}
         <div className="flex-1 min-w-0 space-y-1.5">
           <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="outline">{item.sourceListing.platform.name}</Badge>
             <Badge
               variant={
-                confidenceLevel === 'high' ? 'success'
-                  : confidenceLevel === 'medium' ? 'warning'
-                  : 'danger'
+                confidenceLevel === 'high'
+                  ? 'success'
+                  : confidenceLevel === 'medium'
+                    ? 'warning'
+                    : 'danger'
               }
             >
               {confidenceLevel} confidence
@@ -99,7 +98,6 @@ export function ReviewCard({ item }: ReviewCardProps) {
           </div>
         </div>
 
-        {/* Action buttons */}
         <div className="flex items-center gap-2 shrink-0">
           <Button
             variant="danger"
@@ -128,7 +126,6 @@ export function ReviewCard({ item }: ReviewCardProps) {
         </div>
       </div>
 
-      {/* Expanded score breakdown */}
       {expanded && (
         <div className="border-t border-ink-800 p-4 space-y-4">
           <h4 className="text-xs font-semibold text-ink-500 uppercase tracking-wider">
@@ -143,29 +140,31 @@ export function ReviewCard({ item }: ReviewCardProps) {
                     {key.replace(/([A-Z])/g, ' $1').trim()}
                   </p>
                 </div>
-                {/* Score bar */}
                 <div className="flex-1 h-1.5 rounded-full bg-ink-700 overflow-hidden">
                   <div
                     className={cn(
                       'h-full rounded-full transition-all',
-                      step.score >= 0.8 ? 'bg-emerald-500'
-                        : step.score >= 0.6 ? 'bg-amber-500'
-                        : 'bg-red-500',
+                      step.score >= 0.8
+                        ? 'bg-emerald-500'
+                        : step.score >= 0.6
+                          ? 'bg-amber-500'
+                          : 'bg-red-500',
                     )}
                     style={{ width: `${step.score * 100}%` }}
                   />
                 </div>
-                <span className={cn(
-                  'text-xs font-mono w-10 text-right shrink-0',
-                  getConfidenceColor(getConfidenceLevel(step.score)),
-                )}>
+                <span
+                  className={cn(
+                    'text-xs font-mono w-10 text-right shrink-0',
+                    getConfidenceColor(getConfidenceLevel(step.score)),
+                  )}
+                >
                   {(step.score * 100).toFixed(0)}%
                 </span>
               </div>
             ))}
           </div>
 
-          {/* Notes input */}
           <div className="pt-2">
             <label className="text-xs text-ink-500 block mb-1.5">
               Notes (optional)
@@ -174,7 +173,7 @@ export function ReviewCard({ item }: ReviewCardProps) {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              placeholder="Add context about your decision…"
+              placeholder="Add context about your decision..."
               className="w-full px-3 py-2 rounded-lg text-sm bg-ink-800 border border-ink-700 text-ink-200 placeholder:text-ink-600 focus:outline-none focus:border-signal/50 resize-none"
             />
           </div>

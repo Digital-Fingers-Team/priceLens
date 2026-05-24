@@ -1,6 +1,6 @@
 'use client';
 import Image from 'next/image';
-import { ShieldCheck, Heart, Bell, Store, Tag, ExternalLink } from 'lucide-react';
+import { ShieldCheck, Heart, Bell, Store, Tag } from 'lucide-react';
 import type { CanonicalProduct } from '@/types/product.types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

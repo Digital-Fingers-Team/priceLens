@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, X, Loader2 } from 'lucide-react';
 import { useSuggest } from '@/lib/hooks/use-search';
@@ -66,7 +66,6 @@ export function SearchBar({
     }
   }
 
-  // Close on outside click
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (!containerRef.current?.contains(e.target as Node)) setIsOpen(false);
@@ -81,36 +80,42 @@ export function SearchBar({
     <div ref={containerRef} className={cn('relative', className)}>
       <form onSubmit={handleSubmit}>
         <div className="relative flex items-center">
-          <Search className={cn(
-            'absolute left-4 text-ink-500 pointer-events-none',
-            isHero ? 'w-5 h-5' : 'w-4 h-4',
-          )} />
+          <Search
+            className={cn(
+              'absolute left-4 text-ink-500 pointer-events-none',
+              isHero ? 'w-5 h-5' : 'w-4 h-4',
+            )}
+          />
 
           <input
             ref={inputRef}
             type="search"
             value={query}
-            onChange={(e) => { setQuery(e.target.value); setIsOpen(true); setHighlightedIdx(-1); }}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setIsOpen(true);
+              setHighlightedIdx(-1);
+            }}
             onFocus={() => query.length >= 2 && setIsOpen(true)}
             onKeyDown={handleKeyDown}
-            placeholder="Search products, brands, models…"
+            placeholder="Search products, brands, models..."
             autoComplete="off"
             className={cn(
               'w-full rounded-xl border bg-ink-800 text-ink-100',
               'placeholder:text-ink-500 transition-all duration-150',
               'focus:outline-none focus:border-signal/60 focus:ring-2 focus:ring-signal/15',
               'border-ink-600',
-              isHero
-                ? 'h-14 pl-12 pr-14 text-base'
-                : 'h-10 pl-10 pr-10 text-sm',
+              isHero ? 'h-14 pl-12 pr-14 text-base' : 'h-10 pl-10 pr-10 text-sm',
             )}
           />
 
-          {/* Clear button */}
           {query && (
             <button
               type="button"
-              onClick={() => { setQuery(''); inputRef.current?.focus(); }}
+              onClick={() => {
+                setQuery('');
+                inputRef.current?.focus();
+              }}
               className={cn(
                 'absolute right-12 text-ink-500 hover:text-ink-300 transition-colors',
                 isHero ? 'right-14' : 'right-10',
@@ -120,7 +125,6 @@ export function SearchBar({
             </button>
           )}
 
-          {/* Search submit button */}
           <button
             type="submit"
             className={cn(
@@ -130,21 +134,21 @@ export function SearchBar({
               isHero ? 'h-10 w-10' : 'h-6 w-6',
             )}
           >
-            {isFetching
-              ? <Loader2 className={cn('animate-spin', isHero ? 'w-4 h-4' : 'w-3 h-3')} />
-              : <Search className={isHero ? 'w-4 h-4' : 'w-3 h-3'} />
-            }
+            {isFetching ? (
+              <Loader2 className={cn('animate-spin', isHero ? 'w-4 h-4' : 'w-3 h-3')} />
+            ) : (
+              <Search className={isHero ? 'w-4 h-4' : 'w-3 h-3'} />
+            )}
           </button>
         </div>
       </form>
 
-      {/* Suggestions dropdown */}
       {showDropdown && (
         <div className="absolute top-full mt-2 left-0 right-0 z-50 rounded-xl border border-ink-700 bg-ink-900 shadow-2xl overflow-hidden">
           {isFetching && suggestions.length === 0 ? (
             <div className="flex items-center gap-2 px-4 py-3 text-sm text-ink-400">
               <Loader2 className="w-4 h-4 animate-spin" />
-              Searching…
+              Searching...
             </div>
           ) : (
             <ul>
@@ -165,9 +169,7 @@ export function SearchBar({
                     <Search className="w-3.5 h-3.5 text-ink-500 shrink-0" />
                     <div>
                       <p className="font-medium">{s.title}</p>
-                      {s.brand && (
-                        <p className="text-xs text-ink-500 mt-0.5">{s.brand}</p>
-                      )}
+                      {s.brand && <p className="text-xs text-ink-500 mt-0.5">{s.brand}</p>}
                     </div>
                   </button>
                 </li>

@@ -63,7 +63,7 @@ export default function SearchPage() {
       {filters.q && (
         <div className="flex items-center gap-2 text-sm">
           <span className="text-ink-500">Results for</span>
-          <span className="font-semibold text-ink-100">"{filters.q}"</span>
+          <span className="font-semibold text-ink-100">&quot;{filters.q}&quot;</span>
           {data && !isLoading && (
             <span className="text-ink-500">
               — {data.total.toLocaleString()} product{data.total !== 1 ? 's' : ''}

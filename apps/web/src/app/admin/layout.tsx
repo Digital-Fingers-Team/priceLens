@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, redirect } from 'next/navigation';
-import { LayoutDashboard, ClipboardList, Layers, Settings } from 'lucide-react';
+import { LayoutDashboard, ClipboardList } from 'lucide-react';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { cn } from '@/lib/utils/cn';
 

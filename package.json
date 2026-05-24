@@ -7,7 +7,9 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "turbo run build",
+    "build": "npm run build:api && npm run build:web",
+    "build:web": "npm run -w apps/web build",
+    "build:api": "npm run -w apps/api build",
     "dev": "turbo run dev --parallel",
     "prestart": "npm run -w apps/api build",
     "start": "npm run -w apps/api start",

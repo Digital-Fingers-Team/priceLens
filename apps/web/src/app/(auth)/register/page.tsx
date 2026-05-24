@@ -40,7 +40,7 @@ export default function RegisterPage() {
     formState: { errors },
   } = useForm<RegisterForm>({ resolver: zodResolver(registerSchema) });
 
-  function onSubmit({ confirmPassword, ...data }: RegisterForm) {
+  function onSubmit(data: RegisterForm) {
     register_(data);
   }
 

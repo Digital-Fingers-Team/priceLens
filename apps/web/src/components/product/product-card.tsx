@@ -4,7 +4,6 @@ import Image from 'next/image';
 import { Heart, ExternalLink, ShieldCheck, Store } from 'lucide-react';
 import type { SearchHit } from '@/types/search.types';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils/format';
 import { TIER_LABELS } from '@/config/constants';
 import { useIsWatched, useToggleWatchlist } from '@/lib/hooks/use-watchlist';

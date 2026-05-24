@@ -63,3 +63,22 @@ export interface ResolveDecision {
   canonicalProductId?: string;
   notes?: string;
 }
+
+export interface LiveIngestionSummary {
+  platformSlug: string;
+  platformName: string;
+  jobId: string;
+  queriesRun: number;
+  listingsDiscovered: number;
+  listingsUpserted: number;
+  canonicalProductsCreated: number;
+  canonicalProductsMatched: number;
+  priceHistoryEntries: number;
+}
+
+export interface LiveIngestionReport {
+  startedAt: string;
+  finishedAt: string;
+  platforms: LiveIngestionSummary[];
+  skippedPlatforms: Array<{ slug: string; reason: string }>;
+}

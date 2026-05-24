@@ -1,11 +1,10 @@
 'use client';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Heart, Bell, Trash2, ExternalLink, Store, BellOff } from 'lucide-react';
-import { useWatchlist, useToggleWatchlist, useDeleteAlert } from '@/lib/hooks/use-watchlist';
+import { Heart, Bell, Trash2, Store } from 'lucide-react';
+import { useWatchlist, useToggleWatchlist } from '@/lib/hooks/use-watchlist';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, formatRelativeTime } from '@/lib/utils/format';
 import { useUiStore } from '@/lib/store/ui.store';
@@ -30,9 +29,20 @@ export default function WatchlistPage() {
 }
 
 function WatchlistContent() {
-  const { data: items, isLoading } = useWatchlist();
-  const { mutate: toggleWatchlist, isPending: removingId } = useToggleWatchlist();
+  const { data: items, isLoading, isError } = useWatchlist();
+  const { mutate: toggleWatchlist } = useToggleWatchlist();
   const openAlertModal = useUiStore((s) => s.openAlertModal);
+
+  if (isError) {
+    return (
+      <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-6 text-center">
+        <h2 className="text-lg font-semibold text-red-300">Watchlist unavailable</h2>
+        <p className="text-sm text-ink-400 mt-1">
+          The backend could not load your real watchlist data right now.
+        </p>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

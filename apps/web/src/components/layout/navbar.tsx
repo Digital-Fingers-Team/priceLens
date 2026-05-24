@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Search, Heart, User, LogOut, Shield, Menu, X, TrendingUp } from 'lucide-react';
 import { useAuthStore } from '@/lib/store/auth.store';
@@ -10,7 +10,6 @@ import { cn } from '@/lib/utils/cn';
 
 export function Navbar() {
   const router = useRouter();
-  const pathname = usePathname();
   const { user, isAuthenticated } = useAuthStore();
   const { mutate: logout, isPending: loggingOut } = useLogout();
   const [mobileOpen, setMobileOpen] = useState(false);

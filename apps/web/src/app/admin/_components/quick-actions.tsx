@@ -1,15 +1,13 @@
 'use client';
 import { useState } from 'react';
-import { RefreshCw, Search, RotateCcw } from 'lucide-react';
+import { DatabaseZap, RefreshCw, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { useUiStore } from '@/lib/store/ui.store';
 import { adminApi } from '@/lib/api/admin.api';
 
 export function QuickActions() {
-  const [scrapeQuery, setScrapeQuery] = useState('');
   const [isReindexing, setIsReindexing] = useState(false);
-  const [isScraping, setIsScraping] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [isRematching, setIsRematching] = useState(false);
   const addToast = useUiStore((s) => s.addToast);
 
@@ -25,18 +23,23 @@ export function QuickActions() {
     }
   }
 
-  async function handleScrape(e: React.FormEvent) {
-    e.preventDefault();
-    if (!scrapeQuery.trim()) return;
-    setIsScraping(true);
+  async function handleLiveSync() {
+    setIsSyncing(true);
     try {
-      await adminApi.triggerScrape(scrapeQuery.trim());
-      addToast(`Scraping started for "${scrapeQuery}"`, 'success');
-      setScrapeQuery('');
+      const report = await adminApi.triggerLiveIngestion(['bestbuy'], 25);
+      const summary = report.platforms[0];
+      if (summary) {
+        addToast(
+          `Live sync finished: ${summary.listingsUpserted} listings from ${summary.platformName}`,
+          'success',
+        );
+      } else {
+        addToast('Live sync finished with no listings returned', 'info');
+      }
     } catch {
-      addToast('Scrape trigger failed', 'error');
+      addToast('Live sync failed', 'error');
     } finally {
-      setIsScraping(false);
+      setIsSyncing(false);
     }
   }
 
@@ -58,27 +61,25 @@ export function QuickActions() {
         <h2 className="font-semibold text-ink-100 text-sm">Quick Actions</h2>
       </div>
       <div className="p-5 space-y-5">
-
-        {/* Trigger scrape */}
         <div className="space-y-2">
           <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider">
-            Scrape Query
+            Live Store Sync
           </p>
-          <form onSubmit={handleScrape} className="flex gap-2">
-            <Input
-              value={scrapeQuery}
-              onChange={(e) => setScrapeQuery(e.target.value)}
-              placeholder="RTX 4090, iPhone 15…"
-              leftIcon={<Search className="w-3.5 h-3.5" />}
-              className="h-9 text-xs"
-            />
-            <Button type="submit" variant="primary" size="sm" loading={isScraping}>
-              Go
-            </Button>
-          </form>
+          <Button
+            variant="primary"
+            size="sm"
+            className="w-full"
+            loading={isSyncing}
+            leftIcon={<DatabaseZap className="w-4 h-4" />}
+            onClick={handleLiveSync}
+          >
+            Sync Best Buy catalog
+          </Button>
+          <p className="text-[11px] text-ink-500">
+            Pulls real listings from the live Best Buy API and upserts them into the catalog.
+          </p>
         </div>
 
-        {/* Rematch */}
         <div className="space-y-2">
           <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider">
             Re-run Matching
@@ -95,7 +96,6 @@ export function QuickActions() {
           </Button>
         </div>
 
-        {/* Reindex */}
         <div className="space-y-2">
           <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider">
             Search Index
