@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { LiveIngestionService } from '../scraping/live-ingestion.service';
 import type { CanonicalProduct, SourceListing } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 
@@ -6,6 +7,7 @@ type SortBy = 'minPriceUsd' | 'maxPriceUsd' | 'listingCount' | 'updatedAt';
 type SortDir = 'asc' | 'desc';
 
 interface SearchProductsOptions {
+  liveFetch?: boolean;
   q?: string;
   brand?: string;
   categoryId?: string;
@@ -107,7 +109,10 @@ export interface PriceHistoryResponse {
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly liveIngestionService: LiveIngestionService,
+  ) {}
 
   async searchProducts(options: SearchProductsOptions) {
     const {
@@ -121,6 +126,7 @@ export class ProductsService {
       limit = 20,
       sortBy = 'minPriceUsd',
       sortDir = 'asc',
+      liveFetch = true,
     } = options;
 
     const products = await this.prisma.canonicalProduct.findMany({
@@ -141,7 +147,7 @@ export class ProductsService {
     });
 
     const normalizedQuery = q.trim().toLowerCase();
-    const filtered = products.filter((product) => {
+    let filtered = products.filter((product) => {
       const searchText = [
         product.title,
         product.brand ?? '',
@@ -173,6 +179,63 @@ export class ProductsService {
 
       return true;
     });
+
+
+    if (liveFetch && normalizedQuery && filtered.length === 0) {
+      await this.liveIngestionService.runLiveIngestion({
+        platformSlugs: ['bestbuy', 'amazon'],
+        limitPerQuery: 12,
+      });
+
+      const refreshed = await this.prisma.canonicalProduct.findMany({
+        where: {
+          sourceListings: {
+            some: {
+              priceUsd: { not: null },
+            },
+          },
+        },
+        include: {
+          category: true,
+          sourceListings: {
+            include: { platform: true },
+          },
+        },
+      });
+
+      filtered = refreshed.filter((product) => {
+        const searchText = [
+          product.title,
+          product.brand ?? '',
+          product.model ?? '',
+          product.slug,
+          product.category.name,
+          ...(product.category.searchTerms ?? []),
+        ]
+          .join(' ')
+          .toLowerCase();
+
+        const hasQuery =
+          !normalizedQuery ||
+          searchText.includes(normalizedQuery) ||
+          normalizedQuery.split(/\s+/).every((term) => searchText.includes(term));
+
+        if (!hasQuery) return false;
+        if (brand && product.brand?.toLowerCase() !== brand.toLowerCase()) return false;
+        if (categoryId && product.categoryId !== categoryId) return false;
+        if (tier && product.tier !== tier) return false;
+
+        const stats = this.getProductStats(product as ProductWithRelations);
+        if (minPrice != null && (stats.minPriceUsd == null || stats.minPriceUsd < minPrice)) {
+          return false;
+        }
+        if (maxPrice != null && (stats.maxPriceUsd == null || stats.maxPriceUsd > maxPrice)) {
+          return false;
+        }
+
+        return true;
+      });
+    }
 
     const sorted = filtered.sort((a, b) => {
       const aStats = this.getProductStats(a as ProductWithRelations);
