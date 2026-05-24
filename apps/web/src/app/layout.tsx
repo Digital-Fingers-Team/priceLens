@@ -16,6 +16,9 @@ export const metadata: Metadata = {
   description:
     'Compare prices across Amazon, Newegg, Best Buy, and more. Find the best deal in seconds.',
   keywords: ['price comparison', 'best price', 'price tracker', 'deal finder'],
+  icons: {
+    icon: '/favicon.svg',
+  },
   openGraph: {
     type: 'website',
     siteName: 'PriceLens',

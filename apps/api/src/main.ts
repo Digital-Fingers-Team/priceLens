@@ -59,8 +59,25 @@ async function bootstrap() {
   app.use(compression());
 
   // ─── CORS ────────────────────────────────────────────────────────────────
+  const configuredOrigins = (process.env.FRONTEND_URL ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  const defaultOrigins = ['http://localhost:3000', 'http://127.0.0.1:3000'];
+  const allowedOrigins = Array.from(new Set([...defaultOrigins, ...configuredOrigins]));
+
   app.enableCors({
-    origin: process.env.FRONTEND_URL ?? 'http://localhost:3000',
+    origin: (origin, callback) => {
+      if (configuredOrigins.includes('*')) {
+        callback(null, true);
+        return;
+      }
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error(`Origin "${origin}" is not allowed by CORS`));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
@@ -134,12 +151,19 @@ async function bootstrap() {
   // ─── Graceful Shutdown ────────────────────────────────────────────────────
   app.enableShutdownHooks();
 
-  const port = process.env.PORT ?? 3001;
+  const port = Number(process.env.PORT ?? 3001);
   await app.listen(port);
   logger.log(`PriceLens API running on port ${port} in ${process.env.NODE_ENV} mode`);
 }
 
 bootstrap().catch((err) => {
+  if (err?.code === 'EADDRINUSE') {
+    console.error(
+      `Fatal bootstrap error: Port ${err?.port ?? process.env.PORT ?? 3001} is already in use. ` +
+      'Stop the conflicting process and restart the API.',
+    );
+    process.exit(1);
+  }
   console.error('Fatal bootstrap error:', err);
   process.exit(1);
 });

@@ -2,12 +2,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { watchlistApi } from '@/lib/api/watchlist.api';
 import { QUERY_KEYS } from '@/config/constants';
 import { useUiStore } from '@/lib/store/ui.store';
+import { useAuthStore } from '@/lib/store/auth.store';
+import { getStoredTokens } from '@/lib/api/client';
 import type { AlertType } from '@/types/product.types';
 
 export function useWatchlist() {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const hasAccessToken = !!getStoredTokens().access;
+
   return useQuery({
     queryKey: QUERY_KEYS.watchlist(),
     queryFn: watchlistApi.getWatchlist,
+    enabled: isAuthenticated && hasAccessToken,
     staleTime: 2 * 60 * 1000,
   });
 }

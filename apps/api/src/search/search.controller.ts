@@ -1,10 +1,12 @@
 import { Controller, Get, Query } from '@nestjs/common';
+import { Public } from '../common/decorators';
 import { ProductsService } from '../products/products.service';
 
 @Controller('search')
 export class SearchController {
   constructor(private readonly productsService: ProductsService) {}
 
+  @Public()
   @Get()
   search(
     @Query('q') q?: string,
@@ -32,6 +34,7 @@ export class SearchController {
     });
   }
 
+  @Public()
   @Get('suggest')
   suggest(@Query('q') q = '', @Query('limit') limit?: string) {
     return this.productsService.suggest(q, limit != null && limit !== '' ? Number(limit) : 6);

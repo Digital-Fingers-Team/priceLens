@@ -1,5 +1,5 @@
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
+  process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:3001/api/v1';
 
 export const QUERY_KEYS = {
   search: (filters: unknown) => ['search', filters] as const,
