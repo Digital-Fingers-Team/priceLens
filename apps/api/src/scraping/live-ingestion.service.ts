@@ -3,7 +3,14 @@ import { ConfigService } from '@nestjs/config';
 import { MatchStatus, ProductTier, Prisma, ScrapingJobStatus, Platform, Category } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { NormalizerService } from '../matching/normalizer.service';
-import { BestBuyConnector, RetailerListing } from './bestbuy.connector';
+import { BestBuyConnector } from './bestbuy.connector';
+import { AmazonConnector } from './connectors/amazon.connector';
+import { AlibabaConnector } from './connectors/alibaba.connector';
+import { NoonConnector } from './connectors/noon.connector';
+import { JumiaConnector } from './connectors/jumia.connector';
+import { CarrefourConnector } from './connectors/carrefour.connector';
+import { RetailerConnector } from './interfaces/retailer-connector.interface';
+import { RetailerListing } from './interfaces/retailer-listing.interface';
 
 export interface LiveIngestionOptions {
   platformSlugs?: string[];
@@ -32,20 +39,36 @@ export interface IngestionReport {
 @Injectable()
 export class LiveIngestionService {
   private readonly logger = new Logger(LiveIngestionService.name);
-  private readonly supportedPlatforms = new Set(['bestbuy']);
+  private readonly connectorsBySlug: Map<string, RetailerConnector>;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly normalizer: NormalizerService,
     private readonly bestBuyConnector: BestBuyConnector,
+    private readonly amazonConnector: AmazonConnector,
+    private readonly alibabaConnector: AlibabaConnector,
+    private readonly noonConnector: NoonConnector,
+    private readonly jumiaConnector: JumiaConnector,
+    private readonly carrefourConnector: CarrefourConnector,
     private readonly configService: ConfigService,
-  ) {}
+  ) {
+    const connectors: RetailerConnector[] = [
+      this.bestBuyConnector,
+      this.amazonConnector,
+      this.alibabaConnector,
+      this.noonConnector,
+      this.jumiaConnector,
+      this.carrefourConnector,
+    ];
+    this.connectorsBySlug = new Map(connectors.map((connector) => [connector.slug, connector]));
+  }
 
   async runLiveIngestion(options: LiveIngestionOptions = {}): Promise<IngestionReport> {
     const startedAt = new Date();
+    const availableConnectorSlugs = Array.from(this.connectorsBySlug.keys());
     const requestedPlatforms = options.platformSlugs?.length
       ? options.platformSlugs.map((slug) => slug.toLowerCase())
-      : ['bestbuy'];
+      : availableConnectorSlugs;
 
     const limitPerQuery = Math.max(
       1,
@@ -66,7 +89,7 @@ export class LiveIngestionService {
     const summaries: IngestionSummary[] = [];
 
     for (const requestedSlug of requestedPlatforms) {
-      if (!this.supportedPlatforms.has(requestedSlug)) {
+      if (!this.connectorsBySlug.has(requestedSlug)) {
         skippedPlatforms.push({ slug: requestedSlug, reason: 'unsupported_platform' });
       } else if (!foundSlugs.has(requestedSlug)) {
         skippedPlatforms.push({ slug: requestedSlug, reason: 'platform_not_found_or_inactive' });
@@ -74,13 +97,21 @@ export class LiveIngestionService {
     }
 
     for (const platform of platforms) {
-      if (!this.supportedPlatforms.has(platform.slug)) {
+      const connector = this.connectorsBySlug.get(platform.slug);
+      if (!connector) {
         skippedPlatforms.push({ slug: platform.slug, reason: 'connector_not_implemented' });
         continue;
       }
+      if (!connector.isEnabled) {
+        skippedPlatforms.push({ slug: platform.slug, reason: 'connector_disabled' });
+        continue;
+      }
 
-      if (platform.slug === 'bestbuy') {
-        summaries.push(await this.ingestBestBuyPlatform(platform, limitPerQuery));
+      try {
+        summaries.push(await this.ingestPlatform(platform, connector, limitPerQuery));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        skippedPlatforms.push({ slug: platform.slug, reason: `ingestion_failed:${message}` });
       }
     }
 
@@ -94,11 +125,11 @@ export class LiveIngestionService {
     };
   }
 
-  private async ingestBestBuyPlatform(platform: Platform, limitPerQuery: number): Promise<IngestionSummary> {
-    if (!this.bestBuyConnector.isEnabled) {
-      throw new Error('BESTBUY_API_KEY is not configured');
-    }
-
+  private async ingestPlatform(
+    platform: Platform,
+    connector: RetailerConnector,
+    limitPerQuery: number,
+  ): Promise<IngestionSummary> {
     const categories = await this.prisma.category.findMany({
       where: { level: { gt: 0 } },
       orderBy: [{ level: 'asc' }, { name: 'asc' }],
@@ -111,7 +142,7 @@ export class LiveIngestionService {
         status: ScrapingJobStatus.RUNNING,
         priority: 10,
         payload: this.toJson({
-          connector: 'bestbuy',
+          connector: connector.slug,
           limitPerQuery,
           categoryCount: categories.length,
         }),
@@ -140,7 +171,7 @@ export class LiveIngestionService {
         for (const query of queries) {
           summary.queriesRun += 1;
 
-          const listings = await this.bestBuyConnector.searchListings(query, limitPerQuery);
+          const listings = await connector.searchListings(query, limitPerQuery);
 
           for (const listing of listings) {
             if (seenExternalIds.has(listing.externalId)) {
@@ -150,7 +181,7 @@ export class LiveIngestionService {
             seenExternalIds.add(listing.externalId);
             summary.listingsDiscovered += 1;
 
-            const result = await this.persistBestBuyListing(platform, category, listing);
+            const result = await this.persistListing(platform, category, listing, connector.slug);
             summary.listingsUpserted += 1;
             summary.priceHistoryEntries += result.priceHistoryCreated ? 1 : 0;
             summary.canonicalProductsCreated += result.createdCanonicalProduct ? 1 : 0;
@@ -170,7 +201,7 @@ export class LiveIngestionService {
 
       return summary;
     } catch (error) {
-      this.logger.error(`Best Buy ingestion failed for platform ${platform.slug}`, error as Error);
+      this.logger.error(`Ingestion failed for platform ${platform.slug}`, error as Error);
 
       await this.prisma.scrapingJob.update({
         where: { id: job.id },
@@ -198,10 +229,11 @@ export class LiveIngestionService {
     return Array.from(new Set(terms)).slice(0, 3);
   }
 
-  private async persistBestBuyListing(
+  private async persistListing(
     platform: Platform,
     category: Category,
     listing: RetailerListing,
+    sourceSlug: string,
   ): Promise<{
     createdCanonicalProduct: boolean;
     matchedExistingCanonicalProduct: boolean;
@@ -241,7 +273,7 @@ export class LiveIngestionService {
         rawCurrency: listing.currency,
         rawBrand: listing.brand,
         rawImageUrl: listing.imageUrl,
-        rawAttributes: this.toJson(this.buildRawAttributes(listing)),
+        rawAttributes: this.toJson(this.buildRawAttributes(listing, sourceSlug)),
         rawCategory: category.name,
         normalizedTitle: normalized.normalized,
         extractedGtin: listing.identifiers.gtin,
@@ -269,7 +301,7 @@ export class LiveIngestionService {
         rawCurrency: listing.currency,
         rawBrand: listing.brand,
         rawImageUrl: listing.imageUrl,
-        rawAttributes: this.toJson(this.buildRawAttributes(listing)),
+        rawAttributes: this.toJson(this.buildRawAttributes(listing, sourceSlug)),
         rawCategory: category.name,
         normalizedTitle: normalized.normalized,
         extractedGtin: listing.identifiers.gtin,
@@ -300,9 +332,10 @@ export class LiveIngestionService {
         candidateId: canonicalProduct.id,
         status: MatchStatus.ACCEPTED,
         confidence: matchedExistingCanonicalProduct ? 1 : 0.98,
-        engineVersion: 'live-ingestion-v1',
+        engineVersion: `live-ingestion-${sourceSlug}-v1`,
         scores: this.toJson({
           strategy: matchedExistingCanonicalProduct ? 'exact-match' : 'new-canonical-product',
+          source: sourceSlug,
         }),
         reasoning: matchedExistingCanonicalProduct
           ? 'Matched by exact identifier or conservative canonical title comparison.'
@@ -473,9 +506,9 @@ export class LiveIngestionService {
     return ProductTier.ULTRA_PREMIUM;
   }
 
-  private buildRawAttributes(listing: RetailerListing): Record<string, unknown> {
+  private buildRawAttributes(listing: RetailerListing, source: string): Record<string, unknown> {
     return {
-      source: 'bestbuy',
+      source,
       brand: listing.brand,
       model: listing.model,
       identifiers: listing.identifiers,

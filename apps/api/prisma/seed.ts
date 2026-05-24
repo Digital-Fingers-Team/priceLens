@@ -55,12 +55,17 @@ async function main() {
 
   await prisma.platform.upsert({
     where: { slug: 'amazon' },
-    update: {},
+    update: {
+      name: 'Amazon',
+      baseUrl: 'https://www.amazon.com',
+      connectorType: ConnectorType.HTTP_API,
+      rateLimit: 30,
+    },
     create: {
       slug: 'amazon',
       name: 'Amazon',
       baseUrl: 'https://www.amazon.com',
-      connectorType: ConnectorType.PLAYWRIGHT,
+      connectorType: ConnectorType.HTTP_API,
       rateLimit: 30,
     },
   });
@@ -79,7 +84,12 @@ async function main() {
 
   await prisma.platform.upsert({
     where: { slug: 'bestbuy' },
-    update: {},
+    update: {
+      name: 'Best Buy',
+      baseUrl: 'https://www.bestbuy.com',
+      connectorType: ConnectorType.HTTP_API,
+      rateLimit: 60,
+    },
     create: {
       slug: 'bestbuy',
       name: 'Best Buy',
@@ -108,6 +118,74 @@ async function main() {
       slug: 'walmart',
       name: 'Walmart',
       baseUrl: 'https://www.walmart.com',
+      connectorType: ConnectorType.HTTP_API,
+      rateLimit: 60,
+    },
+  });
+
+  await prisma.platform.upsert({
+    where: { slug: 'alibaba' },
+    update: {
+      name: 'Alibaba',
+      baseUrl: 'https://www.alibaba.com',
+      connectorType: ConnectorType.HTTP_API,
+      rateLimit: 60,
+    },
+    create: {
+      slug: 'alibaba',
+      name: 'Alibaba',
+      baseUrl: 'https://www.alibaba.com',
+      connectorType: ConnectorType.HTTP_API,
+      rateLimit: 60,
+    },
+  });
+
+  await prisma.platform.upsert({
+    where: { slug: 'noon' },
+    update: {
+      name: 'Noon',
+      baseUrl: 'https://www.noon.com',
+      connectorType: ConnectorType.HTTP_API,
+      rateLimit: 60,
+    },
+    create: {
+      slug: 'noon',
+      name: 'Noon',
+      baseUrl: 'https://www.noon.com',
+      connectorType: ConnectorType.HTTP_API,
+      rateLimit: 60,
+    },
+  });
+
+  await prisma.platform.upsert({
+    where: { slug: 'jumia' },
+    update: {
+      name: 'Jumia',
+      baseUrl: 'https://www.jumia.com.eg',
+      connectorType: ConnectorType.HTTP_API,
+      rateLimit: 60,
+    },
+    create: {
+      slug: 'jumia',
+      name: 'Jumia',
+      baseUrl: 'https://www.jumia.com.eg',
+      connectorType: ConnectorType.HTTP_API,
+      rateLimit: 60,
+    },
+  });
+
+  await prisma.platform.upsert({
+    where: { slug: 'carrefour' },
+    update: {
+      name: 'Carrefour',
+      baseUrl: 'https://www.carrefouruae.com',
+      connectorType: ConnectorType.HTTP_API,
+      rateLimit: 60,
+    },
+    create: {
+      slug: 'carrefour',
+      name: 'Carrefour',
+      baseUrl: 'https://www.carrefouruae.com',
       connectorType: ConnectorType.HTTP_API,
       rateLimit: 60,
     },

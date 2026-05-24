@@ -124,6 +124,14 @@ export class ProductsService {
     } = options;
 
     const products = await this.prisma.canonicalProduct.findMany({
+      where: {
+        // Only return products backed by real observed listings/prices.
+        sourceListings: {
+          some: {
+            priceUsd: { not: null },
+          },
+        },
+      },
       include: {
         category: true,
         sourceListings: {
@@ -212,6 +220,13 @@ export class ProductsService {
     if (query.length < 2) return [];
 
     const products = await this.prisma.canonicalProduct.findMany({
+      where: {
+        sourceListings: {
+          some: {
+            priceUsd: { not: null },
+          },
+        },
+      },
       include: { category: true },
     });
 

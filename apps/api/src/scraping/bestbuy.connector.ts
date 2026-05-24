@@ -1,31 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
-
-export interface RetailerListing {
-  externalId: string;
-  externalUrl: string;
-  title: string;
-  priceUsd: number | null;
-  currency: string;
-  brand: string | null;
-  model: string | null;
-  imageUrl: string | null;
-  inStock: boolean | null;
-  rating: number | null;
-  reviewCount: number | null;
-  identifiers: {
-    gtin: string | null;
-    upc: string | null;
-    ean: string | null;
-    mpn: string | null;
-  };
-  raw: Record<string, unknown>;
-}
+import { RetailerConnector } from './interfaces/retailer-connector.interface';
+import { RetailerListing } from './interfaces/retailer-listing.interface';
 
 @Injectable()
-export class BestBuyConnector {
+export class BestBuyConnector implements RetailerConnector {
   private readonly logger = new Logger(BestBuyConnector.name);
+  readonly slug = 'bestbuy';
   private readonly apiKey: string;
   private readonly baseUrl: string;
 

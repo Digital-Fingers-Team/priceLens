@@ -305,3 +305,8 @@ Optional shutdown/reset commands:
 npm run docker:down   # stop infra
 npm run docker:reset  # stop infra + delete volumes
 ```
+```bash
+if the port is busy in backend :
+
+Get-NetTCPConnection -LocalPort 3001 -State Listen | Select-Object -Expand OwningProcess | ForEach-Object { Stop-Process -Id $_ -Force }
+```
