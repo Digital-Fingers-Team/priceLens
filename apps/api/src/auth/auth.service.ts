@@ -3,7 +3,6 @@ import {
   Injectable,
   UnauthorizedException,
   ConflictException,
-  BadRequestException,
   Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -12,7 +11,7 @@ import { PrismaService } from '../database/prisma.service';
 import { User, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
-import { RegisterDto } from './dto/register.dto';
+import { RegisterDto } from './dto/auth.dto';
 import { TokenPayload, AuthTokens } from './interfaces/auth.interfaces';
 
 @Injectable()
@@ -142,10 +141,12 @@ export class AuthService {
     ip?: string,
     userAgent?: string,
   ): Promise<AuthTokens> {
+    const sessionId = uuidv4();
     const payload: TokenPayload = {
       sub: user.id,
       email: user.email,
       role: user.role,
+      jti: sessionId,
     };
 
     const accessToken = this.jwtService.sign(payload);

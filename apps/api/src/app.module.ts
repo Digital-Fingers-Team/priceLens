@@ -4,7 +4,6 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { CacheModule } from '@nestjs/cache-manager';
 import { BullModule } from '@nestjs/bull';
-import { createClient } from 'ioredis';
 
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './auth/auth.module';

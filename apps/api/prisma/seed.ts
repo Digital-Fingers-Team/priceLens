@@ -1,5 +1,5 @@
 // apps/api/prisma/seed.ts
-import { PrismaClient, ConnectorType, ProductTier, UserRole } from '@prisma/client';
+import { PrismaClient, ConnectorType, MatchStatus, ProductTier, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -58,7 +58,7 @@ async function main() {
 
   // ─── Platforms ──────────────────────────────────────────────────────────
 
-  await prisma.platform.upsert({
+  const amazon = await prisma.platform.upsert({
     where: { slug: 'amazon' },
     update: {},
     create: {
@@ -70,7 +70,7 @@ async function main() {
     },
   });
 
-  await prisma.platform.upsert({
+  const newegg = await prisma.platform.upsert({
     where: { slug: 'newegg' },
     update: {},
     create: {
@@ -82,7 +82,7 @@ async function main() {
     },
   });
 
-  await prisma.platform.upsert({
+  const bestbuy = await prisma.platform.upsert({
     where: { slug: 'bestbuy' },
     update: {},
     create: {
@@ -94,7 +94,7 @@ async function main() {
     },
   });
 
-  await prisma.platform.upsert({
+  const bhphotovideo = await prisma.platform.upsert({
     where: { slug: 'bhphotovideo' },
     update: {},
     create: {
@@ -106,7 +106,7 @@ async function main() {
     },
   });
 
-  await prisma.platform.upsert({
+  const walmart = await prisma.platform.upsert({
     where: { slug: 'walmart' },
     update: {},
     create: {
@@ -120,7 +120,7 @@ async function main() {
 
   // ─── Canonical Products ──────────────────────────────────────────────────
 
-  await prisma.canonicalProduct.upsert({
+  const rtx4090 = await prisma.canonicalProduct.upsert({
     where: { slug: 'nvidia-rtx-4090-founders-edition' },
     update: {},
     create: {
@@ -142,7 +142,7 @@ async function main() {
     },
   });
 
-  await prisma.canonicalProduct.upsert({
+  const macbookPro = await prisma.canonicalProduct.upsert({
     where: { slug: 'apple-macbook-pro-14-m3-pro' },
     update: {},
     create: {
@@ -164,7 +164,7 @@ async function main() {
     },
   });
 
-  await prisma.canonicalProduct.upsert({
+  const galaxyS24 = await prisma.canonicalProduct.upsert({
     where: { slug: 'samsung-galaxy-s24-ultra-256gb' },
     update: {},
     create: {
@@ -184,6 +184,178 @@ async function main() {
       },
       tier: ProductTier.ULTRA_PREMIUM,
       isVerified: true,
+    },
+  });
+
+  // â”€â”€â”€ Sample Listings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  await prisma.sourceListing.upsert({
+    where: {
+      platformId_externalId: {
+        platformId: amazon.id,
+        externalId: 'rtx4090-amazon',
+      },
+    },
+    update: {},
+    create: {
+      platformId: amazon.id,
+      canonicalProductId: rtx4090.id,
+      externalId: 'rtx4090-amazon',
+      externalUrl: 'https://www.amazon.com/dp/B0B123RTX4090',
+      rawTitle: 'NVIDIA GeForce RTX 4090 Founders Edition',
+      rawPrice: 1799.99,
+      rawCurrency: 'USD',
+      rawBrand: 'NVIDIA',
+      rawImageUrl: null,
+      rawAttributes: { vram: '24GB' },
+      rawCategory: 'Graphics Cards',
+      normalizedTitle: 'nvidia geforce rtx 4090 founders edition',
+      extractedBrand: 'NVIDIA',
+      extractedModel: 'RTX 4090 FE',
+      extractedAttributes: { vram: '24GB' },
+      priceUsd: 1799.99,
+      inStock: true,
+      rating: 4.8,
+      reviewCount: 1248,
+      matchStatus: MatchStatus.ACCEPTED,
+      matchConfidence: 0.98,
+      matchedAt: new Date(),
+    },
+  });
+
+  await prisma.sourceListing.upsert({
+    where: {
+      platformId_externalId: {
+        platformId: newegg.id,
+        externalId: 'rtx4090-newegg',
+      },
+    },
+    update: {},
+    create: {
+      platformId: newegg.id,
+      canonicalProductId: rtx4090.id,
+      externalId: 'rtx4090-newegg',
+      externalUrl: 'https://www.newegg.com/p/N82E16814932580',
+      rawTitle: 'NVIDIA GeForce RTX 4090 Founders Edition',
+      rawPrice: 1749.99,
+      rawCurrency: 'USD',
+      rawBrand: 'NVIDIA',
+      rawImageUrl: null,
+      rawAttributes: { vram: '24GB' },
+      rawCategory: 'Graphics Cards',
+      normalizedTitle: 'nvidia geforce rtx 4090 founders edition',
+      extractedBrand: 'NVIDIA',
+      extractedModel: 'RTX 4090 FE',
+      extractedAttributes: { vram: '24GB' },
+      priceUsd: 1749.99,
+      inStock: true,
+      rating: 4.7,
+      reviewCount: 842,
+      matchStatus: MatchStatus.ACCEPTED,
+      matchConfidence: 0.97,
+      matchedAt: new Date(),
+    },
+  });
+
+  await prisma.sourceListing.upsert({
+    where: {
+      platformId_externalId: {
+        platformId: bestbuy.id,
+        externalId: 'macbookpro14-bestbuy',
+      },
+    },
+    update: {},
+    create: {
+      platformId: bestbuy.id,
+      canonicalProductId: macbookPro.id,
+      externalId: 'macbookpro14-bestbuy',
+      externalUrl: 'https://www.bestbuy.com/site/apple-macbook-pro-14',
+      rawTitle: 'Apple MacBook Pro 14-inch M3 Pro 512GB',
+      rawPrice: 2399.99,
+      rawCurrency: 'USD',
+      rawBrand: 'Apple',
+      rawImageUrl: null,
+      rawAttributes: { storage: '512GB SSD' },
+      rawCategory: 'Laptops',
+      normalizedTitle: 'apple macbook pro 14 m3 pro 512gb',
+      extractedBrand: 'Apple',
+      extractedModel: 'MacBook Pro 14 M3 Pro',
+      extractedAttributes: { storage: '512GB SSD' },
+      priceUsd: 2399.99,
+      inStock: true,
+      rating: 4.9,
+      reviewCount: 406,
+      matchStatus: MatchStatus.ACCEPTED,
+      matchConfidence: 0.99,
+      matchedAt: new Date(),
+    },
+  });
+
+  await prisma.sourceListing.upsert({
+    where: {
+      platformId_externalId: {
+        platformId: bhphotovideo.id,
+        externalId: 'galaxys24-bh',
+      },
+    },
+    update: {},
+    create: {
+      platformId: bhphotovideo.id,
+      canonicalProductId: galaxyS24.id,
+      externalId: 'galaxys24-bh',
+      externalUrl: 'https://www.bhphotovideo.com/c/product/1800000-REG/samsung_galaxy_s24_ultra.html',
+      rawTitle: 'Samsung Galaxy S24 Ultra 256GB',
+      rawPrice: 1199.99,
+      rawCurrency: 'USD',
+      rawBrand: 'Samsung',
+      rawImageUrl: null,
+      rawAttributes: { storage: '256GB' },
+      rawCategory: 'Smartphones',
+      normalizedTitle: 'samsung galaxy s24 ultra 256gb',
+      extractedBrand: 'Samsung',
+      extractedModel: 'Galaxy S24 Ultra',
+      extractedAttributes: { storage: '256GB' },
+      priceUsd: 1199.99,
+      inStock: true,
+      rating: 4.8,
+      reviewCount: 932,
+      matchStatus: MatchStatus.ACCEPTED,
+      matchConfidence: 0.98,
+      matchedAt: new Date(),
+    },
+  });
+
+  await prisma.sourceListing.upsert({
+    where: {
+      platformId_externalId: {
+        platformId: walmart.id,
+        externalId: 'galaxys24-walmart',
+      },
+    },
+    update: {},
+    create: {
+      platformId: walmart.id,
+      canonicalProductId: galaxyS24.id,
+      externalId: 'galaxys24-walmart',
+      externalUrl: 'https://www.walmart.com/ip/Samsung-Galaxy-S24-Ultra',
+      rawTitle: 'Samsung Galaxy S24 Ultra 256GB',
+      rawPrice: 1149.99,
+      rawCurrency: 'USD',
+      rawBrand: 'Samsung',
+      rawImageUrl: null,
+      rawAttributes: { storage: '256GB' },
+      rawCategory: 'Smartphones',
+      normalizedTitle: 'samsung galaxy s24 ultra 256gb',
+      extractedBrand: 'Samsung',
+      extractedModel: 'Galaxy S24 Ultra',
+      extractedAttributes: { storage: '256GB' },
+      priceUsd: 1149.99,
+      inStock: true,
+      rating: 4.6,
+      reviewCount: 518,
+      matchStatus: MatchStatus.ACCEPTED,
+      matchConfidence: 0.97,
+      matchedAt: new Date(),
     },
   });
 

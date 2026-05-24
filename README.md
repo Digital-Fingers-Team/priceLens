@@ -279,6 +279,9 @@ npm run docker:up
 cp apps/api/.env.example apps/api/.env.local
 # If .env.example is empty in your snapshot, open apps/api/.env.local and fill values from this README.
 
+# make this if first time for database
+# cd apps/api
+# npx prisma migrate dev --name init
 # 4) Prepare database
 npm run db:generate
 npm run db:migrate

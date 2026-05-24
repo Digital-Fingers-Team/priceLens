@@ -14,7 +14,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto, RefreshDto } from './dto/auth.dto';
+import { RegisterDto, RefreshDto } from './dto/auth.dto';
 import { CurrentUser } from '../common/decorators/index';
 import { Public } from '../common/decorators/index';
 import { User } from '@prisma/client';
@@ -76,6 +76,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Get current user profile' })
   async me(@CurrentUser() user: User) {
     const { passwordHash, ...safeUser } = user;
+    void passwordHash;
     return safeUser;
   }
 }

@@ -2,8 +2,8 @@
 import { NestFactory, Reflector } from '@nestjs/core';
 import { ValidationPipe, ClassSerializerInterceptor, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import helmet from 'helmet';
-import compression from 'compression';
+const helmet: any = require('helmet');
+const compression: any = require('compression');
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
@@ -17,6 +17,29 @@ async function bootstrap() {
   });
 
   const logger = new Logger('Bootstrap');
+  const httpServer: any = app.getHttpAdapter().getInstance();
+
+  httpServer.get('/', (_req: any, res: any) => {
+    res.status(200).json({
+      success: true,
+      data: {
+        service: 'PriceLens API',
+        status: 'ok',
+        docs: '/docs',
+        health: '/health',
+        apiPrefix: process.env.API_PREFIX ?? 'api/v1',
+      },
+    });
+  });
+
+  httpServer.get('/health', (_req: any, res: any) => {
+    res.status(200).json({
+      success: true,
+      data: {
+        status: 'ok',
+      },
+    });
+  });
 
   // ─── Security ───────────────────────────────────────────────────────────
   app.use(

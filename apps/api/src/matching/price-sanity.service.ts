@@ -1,7 +1,6 @@
 // apps/api/src/matching/price-sanity.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import Decimal from 'decimal.js';
 
 // Expected price range multipliers by product tier
 const TIER_RANGE: Record<string, { minMultiplier: number; maxMultiplier: number }> = {
@@ -62,9 +61,6 @@ export class PriceSanityService {
       .sort((a, b) => a - b);
 
     const median = this.median(prices);
-    const p10 = prices[Math.floor(prices.length * 0.1)];
-    const p90 = prices[Math.floor(prices.length * 0.9)];
-
     const tierRange = TIER_RANGE[productTier] ?? TIER_RANGE.MID_RANGE;
 
     const minExpected = median * tierRange.minMultiplier;

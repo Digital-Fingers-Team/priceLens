@@ -10,6 +10,7 @@ coverage/
 .next/
 **/.next/
 .turbo/
+.package-lock.json
 
 # Environment files
 .env

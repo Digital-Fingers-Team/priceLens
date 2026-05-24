@@ -99,9 +99,9 @@ export class FuzzyMatcherService {
    */
   detectVariantConflict(titleA: string, titleB: string): string | null {
     const VARIANT_PATTERNS: Array<{ name: string; pattern: RegExp }> = [
-      { name: 'variant_suffix', pattern: /\b(Ti|Super|XT|XTX|GRE|XT X)\b/i },
-      { name: 'pro_tier', pattern: /\b(Pro|Pro Max|Max|Ultra|Plus)\b/i },
-      { name: 'mini_se', pattern: /\b(Mini|SE|Lite)\b/i },
+      { name: 'variant_suffix', pattern: /\b(XT X|XTX|Super|Ti|GRE|XT)\b/i },
+      { name: 'pro_tier', pattern: /\b(Pro Max|Ultra|Plus|Pro|Max)\b/i },
+      { name: 'mini_se', pattern: /\b(Mini|Lite|SE)\b/i },
     ];
 
     for (const { name, pattern } of VARIANT_PATTERNS) {
@@ -139,13 +139,20 @@ export class FuzzyMatcherService {
   }
 
   private normalizeStorage(val: string): string {
+    const normalized = this.storageToGb(val);
+    if (normalized === null) return val.trim().toLowerCase();
+    return `${normalized}GB`;
+  }
+
+  private storageToGb(val: string): number | null {
     const m = /(\d+(?:\.\d+)?)\s*(TB|GB|MB)/i.exec(val);
-    if (!m) return val.toLowerCase();
+    if (!m) return null;
+
     const num = parseFloat(m[1]);
     const unit = m[2].toUpperCase();
-    // Normalize to GB for comparison
-    if (unit === 'TB') return `${num * 1000}GB`;
-    if (unit === 'MB') return `${num / 1000}GB`;
-    return `${num}GB`;
+
+    if (unit === 'TB') return num * 1000;
+    if (unit === 'MB') return num / 1000;
+    return num;
   }
 }
