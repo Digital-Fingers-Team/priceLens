@@ -2,21 +2,18 @@
   "name": "pricelens",
   "version": "1.0.0",
   "private": true,
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
+  "packageManager": "pnpm@11.4.0",
   "scripts": {
-    "build": "npm run build:api && npm run build:web",
-    "build:web": "npm run -w apps/web build",
-    "build:api": "npm run -w apps/api build",
+    "build": "pnpm run build:api && pnpm run build:web",
+    "build:web": "pnpm --filter @pricelens/web build",
+    "build:api": "pnpm --filter @pricelens/api build",
     "dev": "turbo run dev --parallel",
-    "dev:api": "npm run -w apps/api dev",
-    "dev:web": "npm run -w apps/web dev",
-    "prestart": "npm run build",
+    "dev:api": "pnpm --filter @pricelens/api dev",
+    "dev:web": "pnpm --filter @pricelens/web dev",
+    "prestart": "pnpm run build",
     "start": "turbo run start --parallel",
-    "start:api": "npm run -w apps/api start",
-    "start:web": "npm run -w apps/web start",
+    "start:api": "pnpm --filter @pricelens/api start",
+    "start:web": "pnpm --filter @pricelens/web start",
     "test": "turbo run test",
     "test:unit": "turbo run test:unit",
     "test:integration": "turbo run test:integration",
@@ -24,10 +21,10 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "clean": "turbo run clean && rm -rf node_modules",
-    "db:migrate": "cd apps/api && npx prisma migrate deploy",
-    "db:generate": "cd apps/api && npx prisma generate",
-    "db:seed": "cd apps/api && npx ts-node prisma/seed.ts",
-    "db:studio": "cd apps/api && npx prisma studio",
+    "db:migrate": "pnpm --dir apps/api exec prisma migrate deploy",
+    "db:generate": "pnpm --dir apps/api exec prisma generate",
+    "db:seed": "pnpm --dir apps/api exec ts-node prisma/seed.ts",
+    "db:studio": "pnpm --dir apps/api exec prisma studio",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "docker:reset": "docker compose down -v && docker compose up -d"
@@ -42,6 +39,6 @@
   },
   "engines": {
     "node": ">=20.0.0",
-    "npm": ">=10.0.0"
+    "pnpm": ">=11.4.0"
   }
 }

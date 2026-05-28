@@ -39,7 +39,7 @@ pricelens/
 | Tool | Version |
 |------|---------|
 | Node.js | ≥ 20.0 |
-| npm | ≥ 10.0 |
+| pnpm | 11.4.0 |
 | Docker + Docker Compose | Latest |
 | Git | Any |
 
@@ -52,7 +52,7 @@ pricelens/
 ```bash
 git clone https://github.com/your-org/pricelens.git
 cd pricelens
-npm install
+pnpm install
 ```
 
 ### 2. Start infrastructure services
@@ -109,13 +109,13 @@ NEXT_PUBLIC_API_URL=http://localhost:3001/api/v1
 
 ```bash
 # Generate Prisma client
-npm run db:generate
+pnpm db:generate
 
 # Run migrations (creates all tables, indexes, extensions)
-npm run db:migrate
+pnpm db:migrate
 
 # Seed with categories, platforms, and admin users
-npm run db:seed
+pnpm db:seed
 ```
 
 Seed creates:
@@ -126,7 +126,7 @@ Seed creates:
 ### 6. Start development servers
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 | Service | URL |
@@ -135,7 +135,7 @@ npm run dev
 | API | http://localhost:3001/api/v1 |
 | Swagger Docs | http://localhost:3001/docs |
 | Meilisearch | http://localhost:7700 |
-| Prisma Studio | `npm run db:studio` → http://localhost:5555 |
+| Prisma Studio | `pnpm db:studio` → http://localhost:5555 |
 
 ---
 
@@ -248,16 +248,16 @@ The pipeline runs on every ingested source listing:
 
 ```bash
 # All tests
-npm run test
+pnpm test
 
 # Unit tests only (matching engine, normalizer, fuzzy matcher)
-npm run test:unit
+pnpm test:unit
 
 # Integration tests (requires running DB)
-npm run test:integration
+pnpm test:integration
 
 # Watch mode during development
-cd apps/api && npx jest --watch
+pnpm --dir apps/api exec jest --watch
 ```
 
 ---
@@ -267,7 +267,7 @@ cd apps/api && npx jest --watch
 ### Build
 
 ```bash
-npm run build
+pnpm build
 ```
 
 ### Docker Production
@@ -285,7 +285,7 @@ docker compose -f docker-compose.prod.yml up -d
 
 3. Run migrations on the production DB:
 ```bash
-docker exec pricelens_api npx prisma migrate deploy
+docker exec pricelens_api pnpm exec prisma migrate deploy
 ```
 
 ### Environment Checklist Before Production
@@ -296,7 +296,7 @@ docker exec pricelens_api npx prisma migrate deploy
 - [ ] `NODE_ENV=production` is set on the API
 - [ ] CORS `FRONTEND_URL` points to your real domain
 - [ ] HTTPS is terminated at the load balancer / reverse proxy (Nginx/Caddy)
-- [ ] Prisma migrations have been applied: `npx prisma migrate deploy`
+- [ ] Prisma migrations have been applied: `pnpm exec prisma migrate deploy`
 - [ ] Search index is populated: `POST /api/v1/search/reindex` (admin)
 
 ---

@@ -23,7 +23,7 @@ This workspace currently contains the API app under `apps/api`.
 Install these before running the project:
 
 - Node.js 20 or newer
-- npm 10 or newer
+- pnpm 11.4.0 or newer (Corepack-enabled)
 - Docker Desktop or Docker Engine with Compose v2
 - PostgreSQL client tools are optional but useful for debugging
 
@@ -34,7 +34,7 @@ Install these before running the project:
 From the repository root:
 
 ```bash
-npm install
+pnpm install
 ```
 
 ### 2) Start local infrastructure
@@ -42,7 +42,7 @@ npm install
 Bring up PostgreSQL, Redis, and Meilisearch:
 
 ```bash
-npm run docker:up
+pnpm docker:up
 ```
 
 This uses `docker-compose.yml` and starts:
@@ -54,13 +54,13 @@ This uses `docker-compose.yml` and starts:
 If you want to stop the services later:
 
 ```bash
-npm run docker:down
+pnpm docker:down
 ```
 
 To reset the local volumes and start fresh:
 
 ```bash
-npm run docker:reset
+pnpm docker:reset
 ```
 
 ### 3) Create the API environment file
@@ -109,16 +109,16 @@ Notes:
 
 The repository includes Prisma scripts at the root:
 
-- `npm run db:generate`
-- `npm run db:migrate`
-- `npm run db:seed`
+- `pnpm db:generate`
+- `pnpm db:migrate`
+- `pnpm db:seed`
 
 Typical local order:
 
 ```bash
-npm run db:generate
-npm run db:migrate
-npm run db:seed
+pnpm db:generate
+pnpm db:migrate
+pnpm db:seed
 ```
 
 Important:
@@ -132,7 +132,7 @@ Important:
 Run the API in watch mode:
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 The server should be available at:
@@ -145,7 +145,7 @@ The server should be available at:
 ### 1) Build the workspace
 
 ```bash
-npm run build
+pnpm build
 ```
 
 ### 2) Run database migrations
@@ -153,13 +153,13 @@ npm run build
 Use the production-safe Prisma deploy command:
 
 ```bash
-npm run db:migrate
+pnpm db:migrate
 ```
 
 ### 3) Seed only if you need the built-in demo accounts
 
 ```bash
-npm run db:seed
+pnpm db:seed
 ```
 
 The seed script creates sample admin and moderator accounts:
@@ -174,7 +174,7 @@ Do not keep those passwords in a real deployment.
 In a bare-metal deployment, start the compiled API:
 
 ```bash
-npm run start
+pnpm start
 ```
 
 If you plan to use `docker-compose.prod.yml`, note the following:
@@ -187,39 +187,39 @@ If you plan to use `docker-compose.prod.yml`, note the following:
 
 From the repository root:
 
-- `npm run dev` - run all workspace apps in watch mode
-- `npm run build` - build all workspace apps
-- `npm run test` - run all tests
-- `npm run test:unit` - run unit tests
-- `npm run test:integration` - run integration tests
-- `npm run test:e2e` - run e2e tests
-- `npm run lint` - lint all workspace apps
-- `npm run typecheck` - run TypeScript type checking
-- `npm run clean` - remove build artifacts and root `node_modules`
-- `npm run db:generate` - generate Prisma client
-- `npm run db:migrate` - deploy Prisma migrations
-- `npm run db:seed` - seed the database
-- `npm run db:studio` - open Prisma Studio
-- `npm run docker:up` - start local infra services
-- `npm run docker:down` - stop local infra services
-- `npm run docker:reset` - stop local infra services and remove volumes
+- `pnpm dev` - run all workspace apps in watch mode
+- `pnpm build` - build all workspace apps
+- `pnpm test` - run all tests
+- `pnpm test:unit` - run unit tests
+- `pnpm test:integration` - run integration tests
+- `pnpm test:e2e` - run e2e tests
+- `pnpm lint` - lint all workspace apps
+- `pnpm typecheck` - run TypeScript type checking
+- `pnpm clean` - remove build artifacts and root `node_modules`
+- `pnpm db:generate` - generate Prisma client
+- `pnpm db:migrate` - deploy Prisma migrations
+- `pnpm db:seed` - seed the database
+- `pnpm db:studio` - open Prisma Studio
+- `pnpm docker:up` - start local infra services
+- `pnpm docker:down` - stop local infra services
+- `pnpm docker:reset` - stop local infra services and remove volumes
 
 ## Testing
 
 Recommended test sequence during development:
 
 ```bash
-npm run test:unit
-npm run test:integration
-npm run test
+pnpm test:unit
+pnpm test:integration
+pnpm test
 ```
 
 You can also run the broader checks before a release:
 
 ```bash
-npm run lint
-npm run typecheck
-npm run build
+pnpm lint
+pnpm typecheck
+pnpm build
 ```
 
 ## API Behavior
@@ -254,13 +254,13 @@ If you are continuing the project, fill those pieces in before treating the prod
 
 ## Suggested Local Workflow
 
-1. Start infra with `npm run docker:up`
+1. Start infra with `pnpm docker:up`
 2. Add `apps/api/.env.local`
 3. Restore or create the Prisma schema and migrations
-4. Run `npm run db:generate`
-5. Run `npm run db:migrate`
-6. Run `npm run db:seed`
-7. Start the API with `npm run dev`
+4. Run `pnpm db:generate`
+5. Run `pnpm db:migrate`
+6. Run `pnpm db:seed`
+7. Start the API with `pnpm dev`
 8. Open `http://localhost:3001/docs`
 
 
@@ -270,10 +270,10 @@ Use this exact command sequence from a clean clone to a production-ready build a
 
 ```bash
 # 1) Install dependencies
-npm install
+pnpm install
 
 # 2) Start required local infrastructure (PostgreSQL, Redis, Meilisearch)
-npm run docker:up
+pnpm docker:up
 
 # 3) Create API env file (first time only)
 cp apps/api/.env.example apps/api/.env.local
@@ -281,29 +281,29 @@ cp apps/api/.env.example apps/api/.env.local
 
 # make this if first time for database
 # cd apps/api
-# npx prisma migrate dev --name init
+# pnpm --dir apps/api exec prisma migrate dev --name init
 # 4) Prepare database
-npm run db:generate
-npm run db:migrate
-npm run db:seed
+pnpm db:generate
+pnpm db:migrate
+pnpm db:seed
 
 # 5) Run quality gates
-npm run lint
-npm run typecheck
-npm run test
+pnpm lint
+pnpm typecheck
+pnpm test
 
 # 6) Build production artifacts
-npm run build
+pnpm build
 
 # 7) Start in production mode
-npm run start
+pnpm start
 ```
 
 Optional shutdown/reset commands:
 
 ```bash
-npm run docker:down   # stop infra
-npm run docker:reset  # stop infra + delete volumes
+pnpm docker:down   # stop infra
+pnpm docker:reset  # stop infra + delete volumes
 ```
 ```bash
 if the port is busy in backend :
