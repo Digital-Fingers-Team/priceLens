@@ -1,0 +1,68 @@
+import { ConnectorType } from '@prisma/client';
+import type { StoreDefinition } from '../types';
+
+export const storeDefinitions: StoreDefinition[] = [
+  {
+    slug: 'amazon',
+    name: 'Amazon',
+    baseUrl: 'https://www.amazon.com',
+    connectorType: ConnectorType.HTTP_API,
+    rateLimit: 30,
+    priceModifier: 1.02,
+    titleStyle: 'clean',
+  },
+  {
+    slug: 'noon',
+    name: 'Noon',
+    baseUrl: 'https://www.noon.com',
+    connectorType: ConnectorType.HTTP_API,
+    rateLimit: 60,
+    priceModifier: 0.97,
+    titleStyle: 'dash',
+  },
+  {
+    slug: 'jumia',
+    name: 'Jumia',
+    baseUrl: 'https://www.jumia.com.eg',
+    connectorType: ConnectorType.HTTP_API,
+    rateLimit: 60,
+    priceModifier: 0.99,
+    titleStyle: 'compact',
+  },
+  {
+    slug: 'walmart',
+    name: 'Walmart',
+    baseUrl: 'https://www.walmart.com',
+    connectorType: ConnectorType.HTTP_API,
+    rateLimit: 60,
+    priceModifier: 1.0,
+    titleStyle: 'verbose',
+  },
+  {
+    slug: 'ebay',
+    name: 'eBay',
+    baseUrl: 'https://www.ebay.com',
+    connectorType: ConnectorType.HTTP_API,
+    rateLimit: 60,
+    priceModifier: 0.94,
+    titleStyle: 'marketplace',
+  },
+  {
+    slug: 'aliexpress',
+    name: 'AliExpress',
+    baseUrl: 'https://www.aliexpress.com',
+    connectorType: ConnectorType.HTTP_API,
+    rateLimit: 60,
+    priceModifier: 0.91,
+    titleStyle: 'compact',
+  },
+  {
+    slug: 'carrefour',
+    name: 'Carrefour',
+    baseUrl: 'https://www.carrefouruae.com',
+    connectorType: ConnectorType.HTTP_API,
+    rateLimit: 60,
+    priceModifier: 1.01,
+    titleStyle: 'dash',
+  },
+];

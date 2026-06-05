@@ -1,0 +1,41 @@
+import type { ProductModelDefinition } from '../types';
+
+export const consoleModels: ProductModelDefinition[] = [
+  {
+    categorySlug: 'gaming-consoles',
+    brand: 'Sony',
+    series: 'PlayStation',
+    models: ['PlayStation 5', 'PlayStation 5 Slim', 'PlayStation 5 Pro'],
+    variants: ['Disc Edition', 'Digital Edition', 'Bundle'],
+    storage: ['825GB', '1TB', '2TB'],
+    colors: ['White', 'Black'],
+    editions: ['Standard', 'Spider-Man Bundle', 'Call of Duty Bundle'],
+    basePrice: 399,
+    releaseYears: [2020, 2023, 2024, 2025],
+    searchBoost: 1.2,
+  },
+  {
+    categorySlug: 'gaming-consoles',
+    brand: 'Microsoft',
+    series: 'Xbox',
+    models: ['Xbox Series S', 'Xbox Series X'],
+    variants: ['Standard', 'Digital Edition', 'Bundle'],
+    storage: ['512GB', '1TB', '2TB'],
+    colors: ['White', 'Black'],
+    editions: ['Standard', 'Game Pass Bundle', 'Forza Bundle'],
+    basePrice: 299,
+    releaseYears: [2020, 2023, 2024, 2025],
+  },
+  {
+    categorySlug: 'gaming-consoles',
+    brand: 'Nintendo',
+    series: 'Switch',
+    models: ['Nintendo Switch', 'Nintendo Switch OLED', 'Nintendo Switch Lite'],
+    variants: ['Standard', 'Bundle', 'Special Edition'],
+    storage: ['32GB', '64GB', '128GB'],
+    colors: ['Neon Blue Red', 'White', 'Gray', 'Turquoise'],
+    editions: ['Mario Edition', 'Zelda Edition', 'Animal Crossing Edition'],
+    basePrice: 199,
+    releaseYears: [2019, 2021, 2023, 2024],
+  },
+];

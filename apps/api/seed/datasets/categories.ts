@@ -1,0 +1,87 @@
+import type { CategoryDefinition } from '../types';
+
+export const categories: CategoryDefinition[] = [
+  {
+    slug: 'electronics',
+    name: 'Electronics',
+    level: 0,
+    searchTerms: ['electronics', 'tech', 'gadgets'],
+  },
+  {
+    slug: 'smartphones',
+    name: 'Smartphones',
+    parentSlug: 'electronics',
+    level: 1,
+    searchTerms: ['phone', 'smartphone', 'mobile', 'cell phone', '5g phone'],
+  },
+  {
+    slug: 'laptops',
+    name: 'Laptops',
+    parentSlug: 'electronics',
+    level: 1,
+    searchTerms: ['laptop', 'notebook', 'ultrabook', 'chromebook'],
+  },
+  {
+    slug: 'graphics-cards',
+    name: 'Graphics Cards',
+    parentSlug: 'electronics',
+    level: 1,
+    searchTerms: ['gpu', 'graphics card', 'video card', 'gfx card'],
+  },
+  {
+    slug: 'processors',
+    name: 'CPUs',
+    parentSlug: 'electronics',
+    level: 1,
+    searchTerms: ['cpu', 'processor', 'desktop processor'],
+  },
+  {
+    slug: 'monitors',
+    name: 'Monitors',
+    parentSlug: 'electronics',
+    level: 1,
+    searchTerms: ['monitor', 'display', 'gaming monitor', 'computer screen'],
+  },
+  {
+    slug: 'televisions',
+    name: 'TVs',
+    parentSlug: 'electronics',
+    level: 1,
+    searchTerms: ['tv', 'television', 'smart tv', 'oled tv', 'qled tv'],
+  },
+  {
+    slug: 'headphones',
+    name: 'Headphones',
+    parentSlug: 'electronics',
+    level: 1,
+    searchTerms: ['headphones', 'earbuds', 'wireless headphones', 'noise cancelling'],
+  },
+  {
+    slug: 'tablets',
+    name: 'Tablets',
+    parentSlug: 'electronics',
+    level: 1,
+    searchTerms: ['tablet', 'ipad', 'android tablet', 'windows tablet'],
+  },
+  {
+    slug: 'smart-watches',
+    name: 'Smart Watches',
+    parentSlug: 'electronics',
+    level: 1,
+    searchTerms: ['smart watch', 'smartwatch', 'fitness watch', 'wearable'],
+  },
+  {
+    slug: 'gaming-consoles',
+    name: 'Gaming Consoles',
+    parentSlug: 'electronics',
+    level: 1,
+    searchTerms: ['console', 'gaming console', 'playstation', 'xbox', 'nintendo'],
+  },
+  {
+    slug: 'home-appliances',
+    name: 'Home Appliances',
+    parentSlug: 'electronics',
+    level: 1,
+    searchTerms: ['appliance', 'home appliance', 'washer', 'refrigerator', 'air fryer'],
+  },
+];

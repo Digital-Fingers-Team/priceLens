@@ -346,6 +346,40 @@ model ScrapingJob {
   @@map("scraping_jobs")
 }
 
+// Seed generation metadata
+model SeedRun {
+  id          String    @id @default(uuid())
+  profile     String    @db.VarChar(32)
+  seedVersion String    @map("seed_version") @db.VarChar(64)
+  status      String    @db.VarChar(32)
+  config      Json      @default("{}")
+  counts      Json      @default("{}")
+  error       String?   @db.Text
+  startedAt   DateTime  @default(now()) @map("started_at")
+  completedAt DateTime? @map("completed_at")
+
+  checkpoints SeedCheckpoint[]
+
+  @@index([profile, status])
+  @@index([startedAt])
+  @@map("seed_runs")
+}
+
+model SeedCheckpoint {
+  id           String   @id @default(uuid())
+  runId        String   @map("run_id")
+  stage        String   @db.VarChar(64)
+  cursor       Int      @default(0)
+  insertedRows BigInt   @default(0) @map("inserted_rows")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  run SeedRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, stage])
+  @@index([stage])
+  @@map("seed_checkpoints")
+}
+
 // ─── Watchlist & Alerts ──────────────────────────────────────────────────────
 
 model WatchlistItem {

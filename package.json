@@ -2,7 +2,7 @@
   "name": "pricelens",
   "version": "1.0.0",
   "private": true,
-  "packageManager": "pnpm@11.4.0",
+  "packageManager": "pnpm@10.14.0",
   "scripts": {
     "build": "pnpm run build:api && pnpm run build:web",
     "build:web": "pnpm --filter @pricelens/web build",
@@ -39,6 +39,6 @@
   },
   "engines": {
     "node": ">=20.0.0",
-    "pnpm": ">=11.4.0"
+    "pnpm": ">=10.14.0 <11"
   }
 }

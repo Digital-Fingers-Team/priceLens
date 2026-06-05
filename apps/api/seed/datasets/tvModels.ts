@@ -1,0 +1,48 @@
+import type { ProductModelDefinition } from '../types';
+
+export const tvModels: ProductModelDefinition[] = [
+  {
+    categorySlug: 'televisions',
+    brand: 'Samsung',
+    series: 'Samsung TV',
+    models: ['QN90C', 'QN90D', 'S90C', 'S95D', 'The Frame'],
+    displaySizes: ['43 inch', '55 inch', '65 inch', '75 inch', '85 inch'],
+    refreshRates: ['60Hz', '120Hz', '144Hz'],
+    editions: ['QLED', 'Neo QLED', 'OLED', '4K Smart TV'],
+    basePrice: 599,
+    releaseYears: [2022, 2023, 2024, 2025],
+  },
+  {
+    categorySlug: 'televisions',
+    brand: 'LG',
+    series: 'LG TV',
+    models: ['C3', 'C4', 'G3', 'G4', 'B4'],
+    displaySizes: ['42 inch', '48 inch', '55 inch', '65 inch', '77 inch', '83 inch'],
+    refreshRates: ['60Hz', '120Hz', '144Hz'],
+    editions: ['OLED evo', '4K Smart TV', 'Gallery Edition'],
+    basePrice: 799,
+    releaseYears: [2022, 2023, 2024, 2025],
+  },
+  {
+    categorySlug: 'televisions',
+    brand: 'Sony',
+    series: 'Bravia',
+    models: ['X90L', 'A80L', 'A95L', 'Bravia 7', 'Bravia 9'],
+    displaySizes: ['55 inch', '65 inch', '75 inch', '85 inch'],
+    refreshRates: ['60Hz', '120Hz'],
+    editions: ['Google TV', 'OLED', 'Mini LED', '4K HDR'],
+    basePrice: 699,
+    releaseYears: [2022, 2023, 2024, 2025],
+  },
+  {
+    categorySlug: 'televisions',
+    brand: 'TCL',
+    series: 'TCL TV',
+    models: ['QM8', 'QM7', 'Q7', 'S5'],
+    displaySizes: ['50 inch', '55 inch', '65 inch', '75 inch', '85 inch'],
+    refreshRates: ['60Hz', '120Hz', '144Hz'],
+    editions: ['QLED', 'Mini LED', 'Google TV', 'Roku TV'],
+    basePrice: 349,
+    releaseYears: [2022, 2023, 2024, 2025],
+  },
+];

@@ -1,0 +1,41 @@
+import type { ProductModelDefinition } from '../types';
+
+export const tabletModels: ProductModelDefinition[] = [
+  {
+    categorySlug: 'tablets',
+    brand: 'Apple',
+    series: 'iPad',
+    models: ['iPad 10th Gen', 'iPad Air', 'iPad mini', 'iPad Pro 11', 'iPad Pro 13'],
+    variants: ['Wi-Fi', 'Wi-Fi Cellular'],
+    storage: ['64GB', '128GB', '256GB', '512GB', '1TB', '2TB'],
+    colors: ['Silver', 'Space Gray', 'Blue', 'Pink', 'Purple'],
+    editions: ['Standard', 'Magic Keyboard Bundle', 'Pencil Bundle'],
+    basePrice: 349,
+    releaseYears: [2021, 2022, 2023, 2024, 2025],
+  },
+  {
+    categorySlug: 'tablets',
+    brand: 'Samsung',
+    series: 'Galaxy Tab',
+    models: ['Galaxy Tab S8', 'Galaxy Tab S9', 'Galaxy Tab S10', 'Galaxy Tab A9'],
+    variants: ['Wi-Fi', '5G', 'Plus', 'Ultra'],
+    storage: ['64GB', '128GB', '256GB', '512GB', '1TB'],
+    colors: ['Graphite', 'Silver', 'Beige'],
+    editions: ['S Pen', 'Keyboard Cover Bundle'],
+    basePrice: 249,
+    releaseYears: [2021, 2022, 2023, 2024, 2025],
+  },
+  {
+    categorySlug: 'tablets',
+    brand: 'Microsoft',
+    series: 'Surface',
+    models: ['Surface Pro 9', 'Surface Pro 10', 'Surface Go 4', 'Surface Laptop Studio 2'],
+    variants: ['Wi-Fi', '5G', 'Business'],
+    storage: ['128GB', '256GB', '512GB', '1TB'],
+    ram: ['8GB', '16GB', '32GB'],
+    colors: ['Platinum', 'Graphite', 'Sapphire'],
+    editions: ['Type Cover Bundle', 'Pen Bundle'],
+    basePrice: 449,
+    releaseYears: [2022, 2023, 2024, 2025],
+  },
+];

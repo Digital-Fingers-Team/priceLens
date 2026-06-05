@@ -1,0 +1,40 @@
+import type { ProductModelDefinition } from '../types';
+
+export const smartwatchModels: ProductModelDefinition[] = [
+  {
+    categorySlug: 'smart-watches',
+    brand: 'Apple',
+    series: 'Apple Watch',
+    models: ['Apple Watch SE', 'Apple Watch Series 8', 'Apple Watch Series 9', 'Apple Watch Series 10', 'Apple Watch Ultra 2'],
+    variants: ['GPS', 'GPS Cellular'],
+    displaySizes: ['40mm', '41mm', '44mm', '45mm', '49mm'],
+    colors: ['Midnight', 'Starlight', 'Silver', 'Titanium', 'Black'],
+    editions: ['Sport Band', 'Milanese Loop', 'Trail Loop'],
+    basePrice: 249,
+    releaseYears: [2022, 2023, 2024, 2025],
+  },
+  {
+    categorySlug: 'smart-watches',
+    brand: 'Samsung',
+    series: 'Galaxy Watch',
+    models: ['Galaxy Watch 5', 'Galaxy Watch 6', 'Galaxy Watch 7', 'Galaxy Watch Ultra'],
+    variants: ['Bluetooth', 'LTE', 'Classic'],
+    displaySizes: ['40mm', '44mm', '47mm'],
+    colors: ['Black', 'Silver', 'Graphite', 'Cream'],
+    editions: ['Sport Band', 'Classic Band'],
+    basePrice: 199,
+    releaseYears: [2022, 2023, 2024, 2025],
+  },
+  {
+    categorySlug: 'smart-watches',
+    brand: 'Garmin',
+    series: 'Garmin',
+    models: ['Forerunner 265', 'Forerunner 965', 'Fenix 7', 'Fenix 8', 'Venu 3'],
+    variants: ['Standard', 'Sapphire', 'Solar'],
+    displaySizes: ['42mm', '45mm', '47mm', '51mm'],
+    colors: ['Black', 'Silver', 'Slate Gray', 'White'],
+    editions: ['Sport', 'Outdoor', 'Premium'],
+    basePrice: 299,
+    releaseYears: [2022, 2023, 2024, 2025],
+  },
+];

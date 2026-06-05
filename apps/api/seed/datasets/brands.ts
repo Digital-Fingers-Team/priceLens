@@ -1,0 +1,32 @@
+export const brandAliases: Record<string, string[]> = {
+  Apple: ['AAPL', 'iPhone', 'MacBook'],
+  Samsung: ['Galaxy', 'Samsung Electronics'],
+  Sony: ['PlayStation', 'Bravia'],
+  Microsoft: ['Surface', 'Xbox'],
+  Nintendo: ['Switch'],
+  NVIDIA: ['GeForce', 'RTX'],
+  AMD: ['Ryzen', 'Radeon'],
+  Intel: ['Core', 'Arc'],
+  ASUS: ['AsusTek', 'ROG'],
+  Dell: ['Alienware', 'XPS'],
+  HP: ['Hewlett Packard', 'Omen'],
+  Lenovo: ['ThinkPad', 'Legion'],
+  LG: ['Life is Good'],
+  TCL: ['TCL Electronics'],
+  Xiaomi: ['Redmi', 'Mi'],
+  Bose: ['Bose Audio'],
+  Dyson: ['Dyson Appliances'],
+};
+
+export const commonColors = [
+  'Black',
+  'White',
+  'Silver',
+  'Blue',
+  'Graphite',
+  'Titanium',
+  'Natural Titanium',
+  'Midnight',
+  'Starlight',
+  'Green',
+];
