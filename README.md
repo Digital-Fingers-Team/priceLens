@@ -63,9 +63,13 @@ To reset the local volumes and start fresh:
 pnpm docker:reset
 ```
 
-### 3) Create the API environment file
+### 3) Create the environment file
 
-The checked-in `apps/api/.env.example` file is empty in this snapshot, so create `apps/api/.env.local` manually.
+Both `apps/api` and `apps/web` read from a single `.env` file at the repo root:
+
+```bash
+cp .env.example .env
+```
 
 Use values like these for local development:
 
@@ -245,7 +249,6 @@ The project is designed around canonical products and layered matching.
 
 This README reflects the repository as it exists in this workspace.
 
-- `apps/api/.env.example` is empty
 - `apps/api/prisma/schema.prisma` is empty
 - `docker-compose.prod.yml` references Dockerfiles that are not present in the repo
 - There is no frontend app checked into `apps/` yet
@@ -255,7 +258,7 @@ If you are continuing the project, fill those pieces in before treating the prod
 ## Suggested Local Workflow
 
 1. Start infra with `pnpm docker:up`
-2. Add `apps/api/.env.local`
+2. Add a root `.env` (copy from `.env.example`)
 3. Restore or create the Prisma schema and migrations
 4. Run `pnpm db:generate`
 5. Run `pnpm db:migrate`
@@ -275,9 +278,8 @@ pnpm install
 # 2) Start required local infrastructure (PostgreSQL, Redis, Meilisearch)
 pnpm docker:up
 
-# 3) Create API env file (first time only)
-cp apps/api/.env.example apps/api/.env.local
-# If .env.example is empty in your snapshot, open apps/api/.env.local and fill values from this README.
+# 3) Create the shared env file (first time only)
+cp .env.example .env
 
 # make this if first time for database
 # cd apps/api

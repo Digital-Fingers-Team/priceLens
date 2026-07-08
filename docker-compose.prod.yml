@@ -48,7 +48,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile.api
     restart: always
-    env_file: apps/api/.env.production
+    env_file: .env.production
     ports:
       - "3001:3001"
     depends_on:

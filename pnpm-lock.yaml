@@ -17,6 +17,9 @@ importers:
       class-validator:
         specifier: ^0.14.4
         version: 0.14.4
+      dotenv-cli:
+        specifier: ^7.4.2
+        version: 7.4.4
       turbo:
         specifier: ^1.13.0
         version: 1.13.4
@@ -204,6 +207,9 @@ importers:
       '@typescript-eslint/parser':
         specifier: ^6.18.0
         version: 6.21.0(eslint@8.57.1)(typescript@5.9.3)
+      dotenv-cli:
+        specifier: ^7.4.2
+        version: 7.4.4
       eslint:
         specifier: ^8.56.0
         version: 8.57.1
@@ -283,6 +289,9 @@ importers:
       autoprefixer:
         specifier: ^10.4.20
         version: 10.5.0(postcss@8.5.15)
+      dotenv:
+        specifier: ^16.4.5
+        version: 16.6.1
       eslint:
         specifier: ^8.57.0
         version: 8.57.1
@@ -2250,6 +2259,10 @@ packages:
 
   dom-helpers@5.2.1:
     resolution: {integrity: sha512-nRCa7CK3VTrM2NmGkIy4cbK7IZlgBE/PYMn55rrXefr5xXDP0LdtfPnblFDoVdcAfslJ7or6iqAUnx0CCGIWQA==}
+
+  dotenv-cli@7.4.4:
+    resolution: {integrity: sha512-XkBYCG0tPIes+YZr4SpfFv76SQrV/LeCE8CI7JSEMi3VR9MvTihCGTOtbIexD6i2mXF+6px7trb1imVCXSNMDw==}
+    hasBin: true
 
   dotenv-expand@10.0.0:
     resolution: {integrity: sha512-GopVGCpVS1UKH75VKHGuQFqS1Gusej0z4FyQkPdwjil2gNIv+LNsqBlboOzpJFZKVT95GkCyWJbBSdFEFUWI2A==}
@@ -7255,6 +7268,13 @@ snapshots:
     dependencies:
       '@babel/runtime': 7.29.7
       csstype: 3.2.3
+
+  dotenv-cli@7.4.4:
+    dependencies:
+      cross-spawn: 7.0.6
+      dotenv: 16.6.1
+      dotenv-expand: 10.0.0
+      minimist: 1.2.8
 
   dotenv-expand@10.0.0: {}
 

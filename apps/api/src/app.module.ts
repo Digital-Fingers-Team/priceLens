@@ -28,7 +28,8 @@ import retailersConfig from './config/retailers.config';
     ConfigModule.forRoot({
       isGlobal: true,
       load: [appConfig, databaseConfig, redisConfig, authConfig, searchConfig, retailersConfig],
-      envFilePath: ['.env.local', '.env'],
+      // Shared with apps/web from the repo root — see /.env.example
+      envFilePath: ['../../.env.local', '../../.env'],
       cache: true,
     }),
 

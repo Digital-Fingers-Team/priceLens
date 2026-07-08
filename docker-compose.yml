@@ -59,7 +59,7 @@ services:
   #     dockerfile: docker/Dockerfile.api
   #   container_name: pricelens_api
   #   restart: unless-stopped
-  #   env_file: apps/api/.env
+  #   env_file: .env
   #   ports:
   #     - "3001:3001"
   #   depends_on:
