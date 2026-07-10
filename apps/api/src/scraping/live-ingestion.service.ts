@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { MatchStatus, ProductTier, Prisma, ScrapingJobStatus, Platform, Category } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { NormalizerService } from '../matching/normalizer.service';
+import { FuzzyMatcherService } from '../matching/fuzzy-matcher.service';
 import { AmazonConnector } from './connectors/amazon.connector';
 import { AlibabaConnector } from './connectors/alibaba.connector';
 import { NoonConnector } from './connectors/noon.connector';
@@ -12,6 +13,14 @@ import { TwoBConnector } from './connectors/twob.connector';
 import { ElarabyConnector } from './connectors/elaraby.connector';
 import { RetailerConnector } from './interfaces/retailer-connector.interface';
 import { RetailerListing } from './interfaces/retailer-listing.interface';
+
+/**
+ * Minimum combined fuzzy score (token overlap + Jaccard + edit similarity) for
+ * merging a scraped listing into an existing canonical product from another store.
+ * High on purpose: a wrong merge (two different products shown as one) is worse
+ * than a missed merge (same product shown twice).
+ */
+const FUZZY_MATCH_THRESHOLD = 0.85;
 
 export interface LiveIngestionOptions {
   platformSlugs?: string[];
@@ -45,6 +54,7 @@ export class LiveIngestionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly normalizer: NormalizerService,
+    private readonly fuzzyMatcher: FuzzyMatcherService,
     private readonly amazonConnector: AmazonConnector,
     private readonly alibabaConnector: AlibabaConnector,
     private readonly noonConnector: NoonConnector,
@@ -276,7 +286,7 @@ export class LiveIngestionService {
             }
             seenExternalIds.add(listing.externalId);
 
-            if (listing.priceUsd == null || !Number.isFinite(listing.priceUsd)) {
+            if (listing.priceUsd == null || !Number.isFinite(listing.priceUsd) || listing.priceUsd <= 0) {
               this.logger.warn(
                 `Skipping listing "${listing.title}" from ${connector.slug} — no usable price (likely a scrape error, not a real product)`,
               );
@@ -493,6 +503,9 @@ export class LiveIngestionService {
       take: 200,
     });
 
+    const listingBrand = listing.brand?.trim().toLowerCase() ?? extracted.brand?.trim().toLowerCase() ?? null;
+    const listingModel = listing.model?.trim().toLowerCase() ?? extracted.model?.trim().toLowerCase() ?? null;
+
     for (const candidate of candidates) {
       const candidateNormalized = candidate.normalizedTitle.trim().toLowerCase();
       if (candidateNormalized !== normalized.normalized) {
@@ -500,18 +513,57 @@ export class LiveIngestionService {
       }
 
       const candidateBrand = candidate.brand?.trim().toLowerCase() ?? null;
-      const listingBrand = listing.brand?.trim().toLowerCase() ?? extracted.brand?.trim().toLowerCase() ?? null;
       if (candidateBrand && listingBrand && candidateBrand !== listingBrand) {
         continue;
       }
 
       const candidateModel = candidate.model?.trim().toLowerCase() ?? null;
-      const listingModel = listing.model?.trim().toLowerCase() ?? extracted.model?.trim().toLowerCase() ?? null;
       if (candidateModel && listingModel && candidateModel !== listingModel) {
         continue;
       }
 
       return candidate;
+    }
+
+    // No exact title match — fuzzy pass so the same product listed with slightly
+    // different titles on different stores still merges into one canonical product.
+    let best: { candidate: (typeof candidates)[number]; score: number } | null = null;
+
+    for (const candidate of candidates) {
+      const candidateBrand = candidate.brand?.trim().toLowerCase() ?? null;
+      if (candidateBrand && listingBrand && candidateBrand !== listingBrand) {
+        continue;
+      }
+
+      if (this.fuzzyMatcher.detectVariantConflict(listing.title, candidate.title)) {
+        continue;
+      }
+
+      const candidateAttributes = (candidate.attributes ?? {}) as Record<string, unknown>;
+      const candidateStorage = typeof candidateAttributes.storage === 'string' ? candidateAttributes.storage : undefined;
+      const candidateRam = typeof candidateAttributes.ram === 'string' ? candidateAttributes.ram : undefined;
+      if (
+        this.fuzzyMatcher.detectStorageConflict(extracted.storage ?? undefined, candidateStorage) ||
+        this.fuzzyMatcher.detectRamConflict(extracted.ram ?? undefined, candidateRam)
+      ) {
+        continue;
+      }
+
+      const candidateTitle = this.normalizer.normalizeTitle(candidate.title);
+      const score = this.fuzzyMatcher.combinedScore(
+        normalized.normalized,
+        normalized.tokens,
+        candidateTitle.normalized,
+        candidateTitle.tokens,
+      );
+
+      if (score > (best?.score ?? 0)) {
+        best = { candidate, score };
+      }
+    }
+
+    if (best && best.score >= FUZZY_MATCH_THRESHOLD) {
+      return best.candidate;
     }
 
     return null;
