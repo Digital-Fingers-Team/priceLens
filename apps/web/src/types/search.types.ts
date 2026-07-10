@@ -18,6 +18,7 @@ export interface SearchResponse {
   processingTimeMs: number;
   page: number;
   limit: number;
+  liveFetchTriggered?: boolean;
 }
 
 export interface SearchFilters {

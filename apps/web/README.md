@@ -1,6 +1,6 @@
 # PriceLens
 
-A production-grade cross-platform price comparison engine. One search aggregates matching listings across Amazon, Newegg, Best Buy, B&H, and Walmart — then groups them under canonical products using a 10-step layered matching pipeline.
+A production-grade cross-platform price comparison engine. One search aggregates matching listings across Amazon, Noon, Jumia, Carrefour, and Alibaba — then groups them under canonical products using a 10-step layered matching pipeline.
 
 ---
 
@@ -120,7 +120,7 @@ pnpm db:seed
 
 Seed creates:
 - **Categories**: Electronics → Laptops, Graphics Cards, Smartphones
-- **Platforms**: Amazon, Newegg, Best Buy, B&H Photo, Walmart
+- **Platforms**: Amazon, Noon, Jumia, Carrefour, Alibaba
 - **Users**: `admin@pricelens.dev` / `admin_dev_password_change_me`
 
 ### 6. Start development servers

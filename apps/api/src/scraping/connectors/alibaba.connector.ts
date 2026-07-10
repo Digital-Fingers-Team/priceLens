@@ -7,8 +7,8 @@ export class AlibabaConnector extends JsonLdSearchConnector {
   readonly slug = 'alibaba';
   protected readonly defaultCurrency = 'USD';
 
-  constructor(private readonly configService: ConfigService) {
-    super();
+  constructor(configService: ConfigService) {
+    super(configService);
   }
 
   get isEnabled(): boolean {

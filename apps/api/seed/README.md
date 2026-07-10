@@ -2,9 +2,11 @@
 
 This seed pipeline generates structured marketplace data for search, matching, price comparison, price history charts, and admin review workflows.
 
+By default `pnpm db:seed` only bootstraps users, categories, and store/platform rows — it no longer generates synthetic canonical products, listings, or price history, since real catalog data now comes from `LiveIngestionService`. Set `SEED_GENERATE_PRODUCTS=true` to opt back into the synthetic dataset (e.g. for local development without live scraping, or load-testing search/matching). To remove synthetic demo products already in the database, run `pnpm seed:purge-demo` (see `purgeDemoProducts.ts`) — it identifies them by their `dummyimage.com` placeholder image, so real ingested products are left untouched.
+
 ## Profiles
 
-`pnpm db:seed` defaults to `SEED_PROFILE=full`.
+`pnpm db:seed` defaults to `SEED_PROFILE=full` (only relevant when `SEED_GENERATE_PRODUCTS=true`).
 
 | Profile | Products | Listings/product | Challenge listings | History/listing |
 | --- | ---: | ---: | ---: | ---: |
@@ -24,6 +26,7 @@ SEED_PROFILE=medium SEED_BATCH_SIZE=5000 pnpm db:seed
 
 ## Environment
 
+- `SEED_GENERATE_PRODUCTS=true` enables synthetic canonical product/listing/price-history generation; omitted or any other value skips it
 - `SEED_PROFILE=full|medium|demo`, default `full`
 - `SEED_RESET=true` deletes generated marketplace rows before seeding
 - `SEED_RESUME=false` starts a new run instead of resuming an active one

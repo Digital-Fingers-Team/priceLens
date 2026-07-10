@@ -10,6 +10,12 @@ export function useSearch(filters: SearchFilters) {
     enabled: filters.q.trim().length > 0,
     placeholderData: (prev) => prev, // keep previous data while fetching new page
     staleTime: 30 * 1000,
+    // A zero-result search kicks off a background live-fetch job (see products.service.ts)
+    // instead of blocking the request. Poll briefly so results appear once it lands.
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      return data?.liveFetchTriggered && data.hits.length === 0 ? 4000 : false;
+    },
   });
 }
 

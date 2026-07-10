@@ -15,7 +15,8 @@
     "test:cov": "dotenv -e ../../.env -- jest --coverage",
     "prisma:generate": "dotenv -e ../../.env -- prisma generate",
     "prisma:migrate": "dotenv -e ../../.env -- prisma migrate dev",
-    "prisma:seed": "dotenv -e ../../.env -- ts-node prisma/seed.ts"
+    "prisma:seed": "dotenv -e ../../.env -- ts-node prisma/seed.ts",
+    "seed:purge-demo": "dotenv -e ../../.env -- ts-node seed/purgeDemoProducts.ts"
   },
   "dependencies": {
     "@nestjs/bull": "^10.1.1",
@@ -75,6 +76,7 @@
     "@types/passport-jwt": "^4.0.1",
     "@types/passport-local": "^1.0.38",
     "@types/pg": "^8.20.0",
+    "@types/pg-copy-streams": "^1.2.5",
     "@types/uuid": "^9.0.7",
     "@typescript-eslint/eslint-plugin": "^6.18.0",
     "@typescript-eslint/parser": "^6.18.0",

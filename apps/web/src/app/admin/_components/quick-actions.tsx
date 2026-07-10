@@ -26,18 +26,10 @@ export function QuickActions() {
   async function handleLiveSync() {
     setIsSyncing(true);
     try {
-      const report = await adminApi.triggerLiveIngestion(['bestbuy'], 25);
-      const summary = report.platforms[0];
-      if (summary) {
-        addToast(
-          `Live sync finished: ${summary.listingsUpserted} listings from ${summary.platformName}`,
-          'success',
-        );
-      } else {
-        addToast('Live sync finished with no listings returned', 'info');
-      }
+      await adminApi.triggerLiveIngestion(['jumia', 'carrefour', 'alibaba'], 25);
+      addToast('Live sync queued — this runs in the background and can take a few minutes', 'success');
     } catch {
-      addToast('Live sync failed', 'error');
+      addToast('Live sync failed to queue', 'error');
     } finally {
       setIsSyncing(false);
     }
@@ -73,10 +65,10 @@ export function QuickActions() {
             leftIcon={<DatabaseZap className="w-4 h-4" />}
             onClick={handleLiveSync}
           >
-            Sync Best Buy catalog
+            Sync live catalog
           </Button>
           <p className="text-[11px] text-ink-500">
-            Pulls real listings from the live Best Buy API and upserts them into the catalog.
+            Pulls real listings from Jumia, Carrefour, and Alibaba and upserts them into the catalog.
           </p>
         </div>
 

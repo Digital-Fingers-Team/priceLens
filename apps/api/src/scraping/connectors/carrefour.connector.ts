@@ -7,8 +7,8 @@ export class CarrefourConnector extends JsonLdSearchConnector {
   readonly slug = 'carrefour';
   protected readonly defaultCurrency = 'AED';
 
-  constructor(private readonly configService: ConfigService) {
-    super();
+  constructor(configService: ConfigService) {
+    super(configService);
   }
 
   get isEnabled(): boolean {

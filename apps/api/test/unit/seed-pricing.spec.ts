@@ -30,6 +30,7 @@ describe('seed pricing', () => {
       batchSize: 10,
       reset: false,
       resume: true,
+      generateProducts: true,
       now: new Date('2026-06-05T00:00:00Z'),
       logInterval: 10,
     };

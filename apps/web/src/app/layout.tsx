@@ -14,7 +14,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: { default: 'PriceLens', template: '%s | PriceLens' },
   description:
-    'Compare prices across Amazon, Newegg, Best Buy, and more. Find the best deal in seconds.',
+    'Compare prices across Amazon, Noon, Jumia, and more. Find the best deal in seconds.',
   keywords: ['price comparison', 'best price', 'price tracker', 'deal finder'],
   icons: {
     icon: '/favicon.svg',

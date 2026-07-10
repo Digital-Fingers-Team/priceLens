@@ -30,7 +30,7 @@ export async function copyRows(
   const quotedColumns = columns.map(quoteIdent).join(', ');
   const conflictClause = conflictTarget ? `ON CONFLICT ${conflictTarget} DO NOTHING` : 'ON CONFLICT DO NOTHING';
 
-  await client.query(`CREATE TEMP TABLE ${quotedTemp} (LIKE ${quotedTarget} INCLUDING DEFAULTS) ON COMMIT DROP`);
+  await client.query(`CREATE TEMP TABLE ${quotedTemp} (LIKE ${quotedTarget} INCLUDING DEFAULTS)`);
   await copyInto(client, tempTable, columns, rows);
   const result = await client.query(
     `INSERT INTO ${quotedTarget} (${quotedColumns}) SELECT ${quotedColumns} FROM ${quotedTemp} ${conflictClause}`,

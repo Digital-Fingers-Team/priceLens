@@ -65,4 +65,22 @@ export const storeDefinitions: StoreDefinition[] = [
     priceModifier: 1.01,
     titleStyle: 'dash',
   },
+  {
+    slug: '2b',
+    name: '2B Egypt',
+    baseUrl: 'https://2b.com.eg',
+    connectorType: ConnectorType.HTTP_API,
+    rateLimit: 60,
+    priceModifier: 1.0,
+    titleStyle: 'dash',
+  },
+  {
+    slug: 'elaraby',
+    name: 'ELARABY',
+    baseUrl: 'https://www.elarabygroup.com',
+    connectorType: ConnectorType.HTTP_API,
+    rateLimit: 60,
+    priceModifier: 1.0,
+    titleStyle: 'clean',
+  },
 ];

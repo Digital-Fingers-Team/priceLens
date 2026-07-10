@@ -7,8 +7,8 @@ export class AmazonConnector extends JsonLdSearchConnector {
   readonly slug = 'amazon';
   protected readonly defaultCurrency = 'USD';
 
-  constructor(private readonly configService: ConfigService) {
-    super();
+  constructor(configService: ConfigService) {
+    super(configService);
   }
 
   get isEnabled(): boolean {

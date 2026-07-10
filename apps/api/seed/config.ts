@@ -45,6 +45,7 @@ export function loadSeedConfig(env: NodeJS.ProcessEnv = process.env): SeedConfig
     batchSize: positiveInt(env.SEED_BATCH_SIZE, defaults.batchSize),
     reset: env.SEED_RESET === 'true',
     resume: env.SEED_RESUME !== 'false',
+    generateProducts: env.SEED_GENERATE_PRODUCTS === 'true',
     now: env.SEED_NOW ? new Date(env.SEED_NOW) : new Date(),
     logInterval: positiveInt(env.SEED_LOG_INTERVAL, defaults.logInterval),
   };

@@ -3,12 +3,13 @@ import { ConfigService } from '@nestjs/config';
 import { MatchStatus, ProductTier, Prisma, ScrapingJobStatus, Platform, Category } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { NormalizerService } from '../matching/normalizer.service';
-import { BestBuyConnector } from './bestbuy.connector';
 import { AmazonConnector } from './connectors/amazon.connector';
 import { AlibabaConnector } from './connectors/alibaba.connector';
 import { NoonConnector } from './connectors/noon.connector';
 import { JumiaConnector } from './connectors/jumia.connector';
 import { CarrefourConnector } from './connectors/carrefour.connector';
+import { TwoBConnector } from './connectors/twob.connector';
+import { ElarabyConnector } from './connectors/elaraby.connector';
 import { RetailerConnector } from './interfaces/retailer-connector.interface';
 import { RetailerListing } from './interfaces/retailer-listing.interface';
 
@@ -44,21 +45,23 @@ export class LiveIngestionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly normalizer: NormalizerService,
-    private readonly bestBuyConnector: BestBuyConnector,
     private readonly amazonConnector: AmazonConnector,
     private readonly alibabaConnector: AlibabaConnector,
     private readonly noonConnector: NoonConnector,
     private readonly jumiaConnector: JumiaConnector,
     private readonly carrefourConnector: CarrefourConnector,
+    private readonly twoBConnector: TwoBConnector,
+    private readonly elarabyConnector: ElarabyConnector,
     private readonly configService: ConfigService,
   ) {
     const connectors: RetailerConnector[] = [
-      this.bestBuyConnector,
       this.amazonConnector,
       this.alibabaConnector,
       this.noonConnector,
       this.jumiaConnector,
       this.carrefourConnector,
+      this.twoBConnector,
+      this.elarabyConnector,
     ];
     this.connectorsBySlug = new Map(connectors.map((connector) => [connector.slug, connector]));
   }
@@ -135,6 +138,102 @@ export class LiveIngestionService {
       orderBy: [{ level: 'asc' }, { name: 'asc' }],
     });
 
+    const categoryQueries = categories.map((category) => ({
+      category,
+      queries: this.buildQueriesForCategory(category),
+    }));
+
+    return this.runIngestionJob(platform, connector, limitPerQuery, categoryQueries, {
+      categoryCount: categories.length,
+    });
+  }
+
+  /**
+   * Ingests listings for a single ad hoc search term (what the user actually typed)
+   * against one resolved category, instead of sweeping every category's canned queries.
+   */
+  async runQueryIngestion(
+    query: string,
+    options: LiveIngestionOptions = {},
+  ): Promise<IngestionReport> {
+    const startedAt = new Date();
+    const trimmedQuery = query.trim();
+
+    if (!trimmedQuery) {
+      return { startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString(), platforms: [], skippedPlatforms: [] };
+    }
+
+    const availableConnectorSlugs = Array.from(this.connectorsBySlug.keys());
+    const requestedPlatforms = options.platformSlugs?.length
+      ? options.platformSlugs.map((slug) => slug.toLowerCase())
+      : availableConnectorSlugs;
+
+    const limitPerQuery = Math.max(
+      1,
+      options.limitPerQuery ?? this.configService.get<number>('retailers.liveIngestionLimit', 25),
+    );
+
+    const platforms = await this.prisma.platform.findMany({
+      where: { slug: { in: requestedPlatforms }, isActive: true },
+      orderBy: { name: 'asc' },
+    });
+
+    const foundSlugs = new Set(platforms.map((platform) => platform.slug));
+    const skippedPlatforms: Array<{ slug: string; reason: string }> = [];
+    const summaries: IngestionSummary[] = [];
+
+    for (const requestedSlug of requestedPlatforms) {
+      if (!this.connectorsBySlug.has(requestedSlug)) {
+        skippedPlatforms.push({ slug: requestedSlug, reason: 'unsupported_platform' });
+      } else if (!foundSlugs.has(requestedSlug)) {
+        skippedPlatforms.push({ slug: requestedSlug, reason: 'platform_not_found_or_inactive' });
+      }
+    }
+
+    const category = await this.resolveCategoryForQuery(trimmedQuery);
+
+    for (const platform of platforms) {
+      const connector = this.connectorsBySlug.get(platform.slug);
+      if (!connector) {
+        skippedPlatforms.push({ slug: platform.slug, reason: 'connector_not_implemented' });
+        continue;
+      }
+      if (!connector.isEnabled) {
+        skippedPlatforms.push({ slug: platform.slug, reason: 'connector_disabled' });
+        continue;
+      }
+      if (!category) {
+        skippedPlatforms.push({ slug: platform.slug, reason: 'no_matching_category' });
+        continue;
+      }
+
+      try {
+        summaries.push(
+          await this.runIngestionJob(platform, connector, limitPerQuery, [
+            { category, queries: [trimmedQuery] },
+          ]),
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        skippedPlatforms.push({ slug: platform.slug, reason: `ingestion_failed:${message}` });
+      }
+    }
+
+    return {
+      startedAt: startedAt.toISOString(),
+      finishedAt: new Date().toISOString(),
+      platforms: summaries,
+      skippedPlatforms,
+    };
+  }
+
+  private async runIngestionJob(
+    platform: Platform,
+    connector: RetailerConnector,
+    limitPerQuery: number,
+    categoryQueries: Array<{ category: Category; queries: string[] }>,
+    extraPayload: Record<string, unknown> = {},
+  ): Promise<IngestionSummary> {
     const job = await this.prisma.scrapingJob.create({
       data: {
         platformId: platform.id,
@@ -144,7 +243,7 @@ export class LiveIngestionService {
         payload: this.toJson({
           connector: connector.slug,
           limitPerQuery,
-          categoryCount: categories.length,
+          ...extraPayload,
         }),
         startedAt: new Date(),
       },
@@ -165,9 +264,7 @@ export class LiveIngestionService {
     const seenExternalIds = new Set<string>();
 
     try {
-      for (const category of categories) {
-        const queries = this.buildQueriesForCategory(category);
-
+      for (const { category, queries } of categoryQueries) {
         for (const query of queries) {
           summary.queriesRun += 1;
 
@@ -177,8 +274,15 @@ export class LiveIngestionService {
             if (seenExternalIds.has(listing.externalId)) {
               continue;
             }
-
             seenExternalIds.add(listing.externalId);
+
+            if (listing.priceUsd == null || !Number.isFinite(listing.priceUsd)) {
+              this.logger.warn(
+                `Skipping listing "${listing.title}" from ${connector.slug} — no usable price (likely a scrape error, not a real product)`,
+              );
+              continue;
+            }
+
             summary.listingsDiscovered += 1;
 
             const result = await this.persistListing(platform, category, listing, connector.slug);
@@ -215,6 +319,26 @@ export class LiveIngestionService {
 
       throw error;
     }
+  }
+
+  private async resolveCategoryForQuery(query: string): Promise<Category | null> {
+    const normalizedQuery = query.trim().toLowerCase();
+    const queryTerms = normalizedQuery.split(/\s+/).filter(Boolean);
+
+    const categories = await this.prisma.category.findMany({ where: { level: { gt: 0 } } });
+
+    const match = categories.find((category) => {
+      const name = category.name.toLowerCase();
+      if (name.includes(normalizedQuery) || normalizedQuery.includes(name)) {
+        return true;
+      }
+      return category.searchTerms.some((term) => {
+        const normalizedTerm = term.toLowerCase();
+        return normalizedQuery.includes(normalizedTerm) || queryTerms.includes(normalizedTerm);
+      });
+    });
+
+    return match ?? categories[0] ?? null;
   }
 
   private buildQueriesForCategory(category: Category): string[] {

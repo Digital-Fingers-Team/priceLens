@@ -13,6 +13,7 @@ export interface SeedConfig {
   batchSize: number;
   reset: boolean;
   resume: boolean;
+  generateProducts: boolean;
   now: Date;
   logInterval: number;
 }

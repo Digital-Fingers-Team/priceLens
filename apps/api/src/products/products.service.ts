@@ -1,7 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { LiveIngestionService } from '../scraping/live-ingestion.service';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
+import { Prisma, ProductTier } from '@prisma/client';
 import type { CanonicalProduct, SourceListing } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
+import { INGESTION_QUEUE, RUN_QUERY_INGESTION_JOB } from '../workers/ingestion.processor';
 
 type SortBy = 'minPriceUsd' | 'maxPriceUsd' | 'listingCount' | 'updatedAt';
 type SortDir = 'asc' | 'desc';
@@ -111,7 +114,7 @@ export interface PriceHistoryResponse {
 export class ProductsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly liveIngestionService: LiveIngestionService,
+    @InjectQueue(INGESTION_QUEUE) private readonly ingestionQueue: Queue,
   ) {}
 
   async searchProducts(options: SearchProductsOptions) {
@@ -129,144 +132,65 @@ export class ProductsService {
       liveFetch = true,
     } = options;
 
-    const products = await this.prisma.canonicalProduct.findMany({
-      where: {
-        // Only return products backed by real observed listings/prices.
-        sourceListings: {
-          some: {
-            priceUsd: { not: null },
-          },
-        },
-      },
-      include: {
-        category: true,
-        sourceListings: {
-          include: { platform: true },
-        },
-      },
-    });
-
     const normalizedQuery = q.trim().toLowerCase();
-    let filtered = products.filter((product) => {
-      const searchText = [
-        product.title,
-        product.brand ?? '',
-        product.model ?? '',
-        product.slug,
-        product.category.name,
-        ...(product.category.searchTerms ?? []),
-      ]
-        .join(' ')
-        .toLowerCase();
+    const rawPage = Math.max(page, 1);
+    const offset = (rawPage - 1) * limit;
 
-      const hasQuery =
-        !normalizedQuery ||
-        searchText.includes(normalizedQuery) ||
-        normalizedQuery.split(/\s+/).every((term) => searchText.includes(term));
+    const whereClause = this.buildSearchWhereSql(normalizedQuery, brand, categoryId, tier);
+    const havingClause = this.buildHavingSql(minPrice, maxPrice);
+    const orderBySql = this.buildOrderBySql(sortBy, sortDir);
 
-      if (!hasQuery) return false;
-      if (brand && product.brand?.toLowerCase() !== brand.toLowerCase()) return false;
-      if (categoryId && product.categoryId !== categoryId) return false;
-      if (tier && product.tier !== tier) return false;
+    // Sort/filter/paginate at the DB level first — only the current page's
+    // products get their full listings fetched, instead of pulling every
+    // matching product's entire listing set just to sort and slice 20 out of it.
+    const [pageRows, countRows] = await Promise.all([
+      this.prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+        SELECT cp.id
+        FROM canonical_products cp
+        JOIN categories c ON c.id = cp.category_id
+        JOIN source_listings sl ON sl.canonical_product_id = cp.id
+        WHERE ${whereClause}
+        GROUP BY cp.id
+        ${havingClause}
+        ORDER BY ${orderBySql}
+        LIMIT ${limit} OFFSET ${offset}
+      `),
+      this.prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
+        SELECT COUNT(*)::bigint as count FROM (
+          SELECT cp.id
+          FROM canonical_products cp
+          JOIN categories c ON c.id = cp.category_id
+          JOIN source_listings sl ON sl.canonical_product_id = cp.id
+          WHERE ${whereClause}
+          GROUP BY cp.id
+          ${havingClause}
+        ) matched
+      `),
+    ]);
 
-      const stats = this.getProductStats(product as ProductWithRelations);
-      if (minPrice != null && (stats.minPriceUsd == null || stats.minPriceUsd < minPrice)) {
-        return false;
-      }
-      if (maxPrice != null && (stats.maxPriceUsd == null || stats.maxPriceUsd > maxPrice)) {
-        return false;
-      }
+    const total = Number(countRows[0]?.count ?? 0);
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const currentPage = Math.min(rawPage, totalPages);
 
-      return true;
-    });
-
-
-    if (liveFetch && normalizedQuery && filtered.length === 0) {
-      await this.liveIngestionService.runLiveIngestion({
-        platformSlugs: ['bestbuy', 'amazon'],
-        limitPerQuery: 12,
-      });
-
-      const refreshed = await this.prisma.canonicalProduct.findMany({
-        where: {
-          sourceListings: {
-            some: {
-              priceUsd: { not: null },
-            },
-          },
-        },
-        include: {
-          category: true,
-          sourceListings: {
-            include: { platform: true },
-          },
-        },
-      });
-
-      filtered = refreshed.filter((product) => {
-        const searchText = [
-          product.title,
-          product.brand ?? '',
-          product.model ?? '',
-          product.slug,
-          product.category.name,
-          ...(product.category.searchTerms ?? []),
-        ]
-          .join(' ')
-          .toLowerCase();
-
-        const hasQuery =
-          !normalizedQuery ||
-          searchText.includes(normalizedQuery) ||
-          normalizedQuery.split(/\s+/).every((term) => searchText.includes(term));
-
-        if (!hasQuery) return false;
-        if (brand && product.brand?.toLowerCase() !== brand.toLowerCase()) return false;
-        if (categoryId && product.categoryId !== categoryId) return false;
-        if (tier && product.tier !== tier) return false;
-
-        const stats = this.getProductStats(product as ProductWithRelations);
-        if (minPrice != null && (stats.minPriceUsd == null || stats.minPriceUsd < minPrice)) {
-          return false;
-        }
-        if (maxPrice != null && (stats.maxPriceUsd == null || stats.maxPriceUsd > maxPrice)) {
-          return false;
-        }
-
-        return true;
-      });
+    let liveFetchTriggered = false;
+    if (liveFetch && normalizedQuery) {
+      liveFetchTriggered = await this.triggerOnDemandLiveFetch(normalizedQuery);
     }
 
-    const sorted = filtered.sort((a, b) => {
-      const aStats = this.getProductStats(a as ProductWithRelations);
-      const bStats = this.getProductStats(b as ProductWithRelations);
+    const pageIds = pageRows.map((row) => row.id);
+    let hits: ReturnType<ProductsService['mapSearchHit']>[] = [];
 
-      const compareValues = () => {
-        switch (sortBy) {
-          case 'listingCount':
-            return aStats.listingCount - bStats.listingCount;
-          case 'maxPriceUsd':
-            return (aStats.maxPriceUsd ?? -Infinity) - (bStats.maxPriceUsd ?? -Infinity);
-          case 'updatedAt':
-            return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
-          case 'minPriceUsd':
-          default:
-            return (aStats.minPriceUsd ?? Infinity) - (bStats.minPriceUsd ?? Infinity);
-        }
-      };
-
-      const direction = sortDir === 'desc' ? -1 : 1;
-      const primary = compareValues();
-      if (primary !== 0) return primary * direction;
-
-      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-    });
-
-    const total = sorted.length;
-    const totalPages = Math.max(1, Math.ceil(total / limit));
-    const currentPage = Math.min(Math.max(page, 1), totalPages);
-    const start = (currentPage - 1) * limit;
-    const hits = sorted.slice(start, start + limit).map((product) => this.mapSearchHit(product as ProductWithRelations));
+    if (pageIds.length > 0) {
+      const products = await this.prisma.canonicalProduct.findMany({
+        where: { id: { in: pageIds } },
+        include: { category: true, sourceListings: { include: { platform: true } } },
+      });
+      const productsById = new Map(products.map((product) => [product.id, product]));
+      hits = pageIds
+        .map((id) => productsById.get(id))
+        .filter((product) => !!product)
+        .map((product) => this.mapSearchHit(product as ProductWithRelations));
+    }
 
     return {
       hits,
@@ -275,7 +199,99 @@ export class ProductsService {
       processingTimeMs: 0,
       page: currentPage,
       limit,
+      liveFetchTriggered,
     };
+  }
+
+  private buildSearchWhereSql(
+    normalizedQuery: string,
+    brand?: string,
+    categoryId?: string,
+    tier?: string,
+  ): Prisma.Sql {
+    const conditions: Prisma.Sql[] = [Prisma.sql`sl.price_usd IS NOT NULL`];
+
+    for (const term of normalizedQuery.split(/\s+/).filter(Boolean)) {
+      const pattern = `%${term}%`;
+      conditions.push(Prisma.sql`(
+        cp.title ILIKE ${pattern} OR
+        cp.brand ILIKE ${pattern} OR
+        cp.model ILIKE ${pattern} OR
+        cp.slug ILIKE ${pattern} OR
+        c.name ILIKE ${pattern} OR
+        EXISTS (SELECT 1 FROM unnest(c.search_terms) st WHERE st ILIKE ${pattern})
+      )`);
+    }
+
+    if (brand) {
+      conditions.push(Prisma.sql`cp.brand ILIKE ${brand}`);
+    }
+    if (categoryId) {
+      conditions.push(Prisma.sql`cp.category_id = ${categoryId}`);
+    }
+    if (tier && (Object.values(ProductTier) as string[]).includes(tier)) {
+      conditions.push(Prisma.sql`cp.tier = ${tier}::"ProductTier"`);
+    }
+
+    return Prisma.join(conditions, ' AND ');
+  }
+
+  private buildHavingSql(minPrice?: number, maxPrice?: number): Prisma.Sql {
+    const parts: Prisma.Sql[] = [];
+    if (minPrice != null) {
+      parts.push(Prisma.sql`MIN(sl.price_usd) >= ${minPrice}`);
+    }
+    if (maxPrice != null) {
+      parts.push(Prisma.sql`MAX(sl.price_usd) <= ${maxPrice}`);
+    }
+    return parts.length ? Prisma.sql`HAVING ${Prisma.join(parts, ' AND ')}` : Prisma.empty;
+  }
+
+  private buildOrderBySql(sortBy: SortBy, sortDir: SortDir): Prisma.Sql {
+    const column = {
+      minPriceUsd: Prisma.sql`MIN(sl.price_usd)`,
+      maxPriceUsd: Prisma.sql`MAX(sl.price_usd)`,
+      listingCount: Prisma.sql`COUNT(sl.id)`,
+      updatedAt: Prisma.sql`cp.updated_at`,
+    }[sortBy];
+
+    const direction = sortDir === 'desc' ? Prisma.sql`DESC` : Prisma.sql`ASC`;
+    return Prisma.sql`${column} ${direction} NULLS LAST, cp.updated_at DESC`;
+  }
+
+  /** Per-query cooldown so repeat searches (pagination, sorting, retyping) don't re-scrape. */
+  private static readonly LIVE_FETCH_COOLDOWN_MS = 10 * 60 * 1000;
+  private readonly lastLiveFetchAt = new Map<string, number>();
+
+  /**
+   * Queues a background job that searches connectors for what the user actually typed,
+   * instead of blocking the search request on it. Results are served from the DB
+   * immediately while this refreshes prices/products from the retailer APIs. The jobId
+   * dedups concurrent triggers for the same query — Bull returns the existing job instead
+   * of piling up duplicate scrapes while one is in flight — and the cooldown map skips
+   * queries that were already refreshed recently.
+   */
+  private async triggerOnDemandLiveFetch(query: string): Promise<boolean> {
+    const lastRun = this.lastLiveFetchAt.get(query);
+    if (lastRun != null && Date.now() - lastRun < ProductsService.LIVE_FETCH_COOLDOWN_MS) {
+      return false;
+    }
+
+    try {
+      await this.ingestionQueue.add(
+        RUN_QUERY_INGESTION_JOB,
+        { query, limitPerQuery: 12 },
+        {
+          jobId: `on-demand-live-fetch:${query}`,
+          removeOnComplete: true,
+          removeOnFail: true,
+        },
+      );
+      this.lastLiveFetchAt.set(query, Date.now());
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async suggest(q: string, limit = 6) {

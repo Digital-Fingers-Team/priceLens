@@ -7,8 +7,8 @@ export class JumiaConnector extends JsonLdSearchConnector {
   readonly slug = 'jumia';
   protected readonly defaultCurrency = 'EGP';
 
-  constructor(private readonly configService: ConfigService) {
-    super();
+  constructor(configService: ConfigService) {
+    super(configService);
   }
 
   get isEnabled(): boolean {

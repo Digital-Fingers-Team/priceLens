@@ -20,7 +20,6 @@ export async function runSeed(): Promise<void> {
     const run = await startSeedRun(prisma, config);
     const categoryIds = await upsertCategories(prisma);
     const stores = await generateStores(prisma);
-    const products = buildProductSeeds(config, categoryIds);
 
     const stats: GenerationStats = {
       products: 0,
@@ -29,23 +28,29 @@ export async function runSeed(): Promise<void> {
       priceHistory: 0,
     };
 
-    await withPgClient(config, async (client) => {
-      stats.products = await insertProducts(prisma, client, config, run.id, products);
-      const historyWriter = new PriceHistoryWriter(prisma, client, config, run.id, products);
-      const listingStats = await generateListings(
-        prisma,
-        client,
-        config,
-        run.id,
-        products,
-        stores,
-        (listings) => historyWriter.addListings(listings),
-      );
-      await historyWriter.flush();
-      stats.listings = listingStats.listings;
-      stats.challengeListings = listingStats.challenges;
-      stats.priceHistory = historyWriter.count();
-    });
+    if (config.generateProducts) {
+      const products = buildProductSeeds(config, categoryIds);
+
+      await withPgClient(config, async (client) => {
+        stats.products = await insertProducts(prisma, client, config, run.id, products);
+        const historyWriter = new PriceHistoryWriter(prisma, client, config, run.id, products);
+        const listingStats = await generateListings(
+          prisma,
+          client,
+          config,
+          run.id,
+          products,
+          stores,
+          (listings) => historyWriter.addListings(listings),
+        );
+        await historyWriter.flush();
+        stats.listings = listingStats.listings;
+        stats.challengeListings = listingStats.challenges;
+        stats.priceHistory = historyWriter.count();
+      });
+    } else {
+      console.log('[seed] SEED_GENERATE_PRODUCTS is not "true" — skipping synthetic product/listing/price-history generation. Real catalog data comes from live ingestion; set SEED_GENERATE_PRODUCTS=true to opt back into the demo dataset.');
+    }
 
     await prisma.seedRun.update({
       where: { id: run.id },
@@ -58,10 +63,7 @@ export async function runSeed(): Promise<void> {
 
     console.log('[seed] Complete:', {
       profile: config.profile,
-      products: products.length,
-      listingsTarget: products.length * config.listingsPerProduct,
-      challengeListingsTarget: config.challengeListingTarget,
-      priceHistoryTarget: products.length * config.listingsPerProduct * config.historyRowsPerListing,
+      generateProducts: config.generateProducts,
       inserted: stats,
     });
   } catch (error) {

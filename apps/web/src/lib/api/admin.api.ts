@@ -3,7 +3,7 @@ import type {
   ReviewQueueItem,
   DashboardStats,
   ResolveDecision,
-  LiveIngestionReport,
+  LiveIngestionQueuedResponse,
 } from '@/types/admin.types';
 import type { ApiResponse, PaginatedData } from '@/types/api.types';
 
@@ -53,10 +53,10 @@ export const adminApi = {
   },
 
   triggerLiveIngestion: async (
-    platformSlugs: string[] = ['bestbuy'],
+    platformSlugs: string[] = ['jumia', 'carrefour', 'alibaba'],
     limitPerQuery = 25,
-  ): Promise<LiveIngestionReport> => {
-    const res = await apiClient.post<ApiResponse<LiveIngestionReport>>('/admin/ingest/live', {
+  ): Promise<LiveIngestionQueuedResponse> => {
+    const res = await apiClient.post<ApiResponse<LiveIngestionQueuedResponse>>('/admin/ingest/live', {
       platformSlugs,
       limitPerQuery,
     });

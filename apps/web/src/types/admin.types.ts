@@ -82,3 +82,9 @@ export interface LiveIngestionReport {
   platforms: LiveIngestionSummary[];
   skippedPlatforms: Array<{ slug: string; reason: string }>;
 }
+
+export interface LiveIngestionQueuedResponse {
+  queued: boolean;
+  jobId: string;
+  platformSlugs: string[];
+}

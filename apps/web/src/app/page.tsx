@@ -7,7 +7,7 @@ import { TrendingUp, ShieldCheck, Zap } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'PriceLens — Find the Best Price',
-  description: 'Compare product prices across Amazon, Newegg, Best Buy and more. One search, every price.',
+  description: 'Compare product prices across Amazon, Noon, Jumia and more. One search, every price.',
 };
 
 function HeroFeatures() {
@@ -52,7 +52,7 @@ export default function HomePage() {
             </h1>
 
             <p className="text-lg text-ink-400 max-w-xl mx-auto text-balance">
-              Compare prices across Amazon, Newegg, Best Buy, and more.
+              Compare prices across Amazon, Noon, Jumia, and more.
               Our matching engine groups identical products so you always see the real range.
             </p>
           </div>
