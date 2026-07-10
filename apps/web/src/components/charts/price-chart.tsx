@@ -146,7 +146,7 @@ export function PriceChart({ productId }: PriceChartProps) {
           />
 
           <YAxis
-            tickFormatter={(v) => `$${(v / 1000).toFixed(v >= 1000 ? 1 : 0)}${v >= 1000 ? 'k' : ''}`}
+            tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${v}`)}
             tick={{ fontSize: 11, fill: '#606080' }}
             axisLine={false}
             tickLine={false}

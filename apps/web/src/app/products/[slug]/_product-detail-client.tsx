@@ -10,6 +10,7 @@ import { PriceChartSkeleton } from '@/components/charts/price-chart-skeleton';
 import { PriceStatsBar } from '@/components/product/price-stats-bar';
 import { Button } from '@/components/ui/button';
 import { usePriceStats } from '@/lib/hooks/use-price-history';
+import { formatCurrency } from '@/lib/utils/format';
 import { useProduct } from '@/lib/hooks/use-product';
 
 interface ProductDetailClientProps {
@@ -122,13 +123,13 @@ export function ProductDetailClient({ slug }: ProductDetailClientProps) {
               <div className="rounded-lg border border-ink-800 bg-ink-950/40 p-3">
                 <p className="text-ink-500 text-xs">All-time low</p>
                 <p className="text-ink-100 font-semibold mt-1">
-                  {allTime?.min != null ? `$${allTime.min.toFixed(2)}` : '—'}
+                  {formatCurrency(allTime?.min)}
                 </p>
               </div>
               <div className="rounded-lg border border-ink-800 bg-ink-950/40 p-3">
                 <p className="text-ink-500 text-xs">All-time high</p>
                 <p className="text-ink-100 font-semibold mt-1">
-                  {allTime?.max != null ? `$${allTime.max.toFixed(2)}` : '—'}
+                  {formatCurrency(allTime?.max)}
                 </p>
               </div>
               <div className="rounded-lg border border-ink-800 bg-ink-950/40 p-3">
@@ -138,7 +139,7 @@ export function ProductDetailClient({ slug }: ProductDetailClientProps) {
               <div className="rounded-lg border border-ink-800 bg-ink-950/40 p-3">
                 <p className="text-ink-500 text-xs">Current median</p>
                 <p className="text-ink-100 font-semibold mt-1">
-                  {product.priceStats.median != null ? `$${product.priceStats.median.toFixed(2)}` : '—'}
+                  {formatCurrency(product.priceStats.median)}
                 </p>
               </div>
             </div>
