@@ -43,6 +43,8 @@ export interface CanonicalProduct {
   updatedAt: string;
   // Aggregated price data (computed server-side)
   priceStats: PriceStats;
+  // Distinct retailers carrying this product (a store with 3 listings counts once)
+  storeCount?: number;
   // Listings (included on detail page)
   sourceListings?: SourceListing[];
   _count?: { sourceListings: number };

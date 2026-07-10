@@ -23,8 +23,18 @@ export function ProductHeader({ product }: ProductHeaderProps) {
   const { priceStats } = product;
   const hasRange = priceStats.min != null && priceStats.max != null && priceStats.min !== priceStats.max;
   const listingCount = product._count?.sourceListings ?? product.sourceListings?.length ?? 0;
+  const storeCount =
+    product.storeCount ??
+    (product.sourceListings?.length
+      ? new Set(product.sourceListings.map((l) => l.platform.id)).size
+      : 0);
 
-  const attrs = product.attributes as Record<string, string>;
+  // Attributes can contain nested objects; only flat values render as chips.
+  const attrs = Object.fromEntries(
+    Object.entries((product.attributes ?? {}) as Record<string, unknown>).filter(
+      ([, val]) => typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean',
+    ),
+  ) as Record<string, string | number | boolean>;
 
   return (
     <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
@@ -91,7 +101,7 @@ export function ProductHeader({ product }: ProductHeaderProps) {
         <div className="rounded-xl border border-ink-700 bg-ink-900 p-5 space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider">
-              Price Across {listingCount} Store{listingCount !== 1 ? 's' : ''}
+              Price Across {storeCount} Store{storeCount !== 1 ? 's' : ''}
             </p>
             <div className="flex items-center gap-1 text-xs text-ink-500">
               <Store className="w-3.5 h-3.5" />

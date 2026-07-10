@@ -4,6 +4,7 @@ export interface SearchHit extends CanonicalProduct {
   minPriceUsd: number | null;
   maxPriceUsd: number | null;
   listingCount: number;
+  storeCount: number;
   _formatted?: {
     title?: string;
     brand?: string;

@@ -590,6 +590,7 @@ export class ProductsService {
         current: stats.minPriceUsd,
         currency: 'USD',
       },
+      storeCount: this.countDistinctStores(product),
       ...(includeListings
         ? {
             sourceListings: product.sourceListings.map((listing) => this.mapListing(listing)),
@@ -597,6 +598,11 @@ export class ProductsService {
           }
         : {}),
     };
+  }
+
+  /** A product with three listings from one retailer is still sold at one store. */
+  private countDistinctStores(product: ProductWithRelations): number {
+    return new Set(product.sourceListings.map((listing) => listing.platformId)).size;
   }
 
   private mapListing(

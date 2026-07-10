@@ -522,6 +522,10 @@ export class LiveIngestionService {
         continue;
       }
 
+      if (this.hasIdentifierConflict(listing, candidate)) {
+        continue;
+      }
+
       return candidate;
     }
 
@@ -536,6 +540,10 @@ export class LiveIngestionService {
       }
 
       if (this.fuzzyMatcher.detectVariantConflict(listing.title, candidate.title)) {
+        continue;
+      }
+
+      if (this.hasIdentifierConflict(listing, candidate)) {
         continue;
       }
 
@@ -567,6 +575,29 @@ export class LiveIngestionService {
     }
 
     return null;
+  }
+
+  /**
+   * Same store, near-identical titles, different SKUs (e.g. ELARABY's many
+   * "Remote Control TORNADO LED TV Black" remotes) must never merge: when both
+   * sides carry the same kind of identifier and the values differ, they are
+   * different products no matter how similar the titles look.
+   */
+  private hasIdentifierConflict(
+    listing: RetailerListing,
+    candidate: { gtin: string | null; upc: string | null; ean: string | null; mpn: string | null },
+  ): boolean {
+    const pairs: Array<[string | null | undefined, string | null]> = [
+      [listing.identifiers.gtin, candidate.gtin],
+      [listing.identifiers.upc, candidate.upc],
+      [listing.identifiers.ean, candidate.ean],
+      [listing.identifiers.mpn, candidate.mpn],
+    ];
+
+    return pairs.some(
+      ([listingId, candidateId]) =>
+        !!listingId && !!candidateId && listingId.trim().toLowerCase() !== candidateId.trim().toLowerCase(),
+    );
   }
 
   private async findByIdentifier(identifiers: RetailerListing['identifiers']) {

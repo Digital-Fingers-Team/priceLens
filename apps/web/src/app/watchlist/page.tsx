@@ -77,7 +77,7 @@ function WatchlistContent() {
 
       {items.map((item) => {
         const product = item.canonicalProduct;
-        const listingCount = product._count?.sourceListings ?? 0;
+        const listingCount = product.storeCount ?? product._count?.sourceListings ?? 0;
 
         return (
           <div

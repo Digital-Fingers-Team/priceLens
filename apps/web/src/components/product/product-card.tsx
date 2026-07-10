@@ -102,13 +102,13 @@ export function ProductCard({ product }: ProductCardProps) {
             dangerouslySetInnerHTML={{ __html: titleHtml }}
           />
 
-          {/* Listing count */}
+          {/* Store count (distinct retailers, not raw listing rows) */}
           <div className="flex items-center gap-1 text-xs text-ink-500">
             <Store className="w-3.5 h-3.5" />
             <span>
               {product.listingCount === 0
                 ? 'No listings yet'
-                : `${product.listingCount} store${product.listingCount === 1 ? '' : 's'}`}
+                : `${product.storeCount ?? product.listingCount} store${(product.storeCount ?? product.listingCount) === 1 ? '' : 's'}`}
             </span>
           </div>
 
