@@ -95,13 +95,8 @@ export function ListingTable({ listings, showConfidence = false }: ListingTableP
                     'font-bold text-base',
                     isBest ? 'text-signal' : 'text-ink-100',
                   )}>
-                    {formatCurrency(listing.priceUsd)}
+                    {formatCurrency(listing.priceUsd, listing.rawCurrency)}
                   </span>
-                  {listing.rawCurrency !== 'USD' && listing.rawPrice != null && (
-                    <p className="text-xs text-ink-500">
-                      {listing.rawCurrency} {listing.rawPrice}
-                    </p>
-                  )}
                 </td>
 
                 {/* Stock */}

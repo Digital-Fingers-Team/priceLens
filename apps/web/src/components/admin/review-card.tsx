@@ -83,7 +83,7 @@ export function ReviewCard({ item }: ReviewCardProps) {
           <div className="flex items-center gap-3 text-xs text-ink-400">
             {item.sourceListing.rawPrice != null && (
               <span className="font-semibold text-signal">
-                {item.sourceListing.rawCurrency} {formatCurrency(item.sourceListing.rawPrice ?? undefined)}
+                {formatCurrency(item.sourceListing.rawPrice ?? undefined, item.sourceListing.rawCurrency)}
               </span>
             )}
             <a

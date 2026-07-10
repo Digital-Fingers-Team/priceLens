@@ -1,22 +1,29 @@
+// Prices are stored as the raw amount scraped from the retailer; every active
+// store is Egyptian, so EGP is the display default unless a listing says otherwise.
+const DEFAULT_CURRENCY = 'EGP';
+
 export function formatCurrency(
   value: number | null | undefined,
-  currency = 'USD',
+  currency: string | null = DEFAULT_CURRENCY,
 ): string {
   if (value == null) return '—';
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency,
+    currency: currency ?? DEFAULT_CURRENCY,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
 }
 
-export function formatCompactCurrency(value: number | null | undefined): string {
+export function formatCompactCurrency(
+  value: number | null | undefined,
+  currency: string | null = DEFAULT_CURRENCY,
+): string {
   if (value == null) return '—';
   if (value >= 1000) {
-    return `$${(value / 1000).toFixed(1)}k`;
+    return `${currency ?? DEFAULT_CURRENCY} ${(value / 1000).toFixed(1)}k`;
   }
-  return formatCurrency(value);
+  return formatCurrency(value, currency);
 }
 
 export function formatDate(iso: string | null | undefined): string {
