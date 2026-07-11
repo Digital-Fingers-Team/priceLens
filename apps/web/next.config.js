@@ -38,6 +38,10 @@ const nextConfig = {
         protocol: 'https',
         hostname: '**.carrefouruae.com',
       },
+      {
+        protocol: 'https',
+        hostname: '**.mafrservices.com',
+      },
       // 2B and ELARABY serve product images from their apex/store domains directly.
       {
         protocol: 'https',
