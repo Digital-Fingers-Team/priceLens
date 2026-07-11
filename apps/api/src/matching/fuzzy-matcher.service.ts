@@ -138,6 +138,16 @@ export class FuzzyMatcherService {
     return normalizeRam(ramA) !== normalizeRam(ramB) ? 'ram_conflict' : null;
   }
 
+  /**
+   * Detect conflicting color values.
+   * Color is its own SKU for phones/laptops — a black unit and a blue unit
+   * must never be merged into one canonical product.
+   */
+  detectColorConflict(colorA?: string, colorB?: string): string | null {
+    if (!colorA || !colorB) return null;
+    return colorA.trim().toLowerCase() !== colorB.trim().toLowerCase() ? 'color_conflict' : null;
+  }
+
   private normalizeStorage(val: string): string {
     const normalized = this.storageToGb(val);
     if (normalized === null) return val.trim().toLowerCase();

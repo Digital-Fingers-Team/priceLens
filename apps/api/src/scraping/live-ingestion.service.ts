@@ -553,20 +553,32 @@ export class LiveIngestionService {
       const candidateAttributes = (candidate.attributes ?? {}) as Record<string, unknown>;
       const candidateStorage = typeof candidateAttributes.storage === 'string' ? candidateAttributes.storage : undefined;
       const candidateRam = typeof candidateAttributes.ram === 'string' ? candidateAttributes.ram : undefined;
+      const candidateColor = typeof candidateAttributes.color === 'string' ? candidateAttributes.color : undefined;
       if (
         this.fuzzyMatcher.detectStorageConflict(extracted.storage ?? undefined, candidateStorage) ||
-        this.fuzzyMatcher.detectRamConflict(extracted.ram ?? undefined, candidateRam)
+        this.fuzzyMatcher.detectRamConflict(extracted.ram ?? undefined, candidateRam) ||
+        this.fuzzyMatcher.detectColorConflict(extracted.color ?? undefined, candidateColor)
       ) {
         continue;
       }
 
       const candidateTitle = this.normalizer.normalizeTitle(candidate.title);
-      const score = this.fuzzyMatcher.combinedScore(
+      const titleScore = this.fuzzyMatcher.combinedScore(
         normalized.normalized,
         normalized.tokens,
         candidateTitle.normalized,
         candidateTitle.tokens,
       );
+
+      // Retailers pad titles wildly differently ("Samsung Galaxy S26 - 256GB - Sky
+      // Blue" vs "Samsung Galaxy S26, Unlocked Android Smartphone... Galaxy AI...
+      // Sky Blue"), which tanks raw title token-overlap even for the exact same SKU.
+      // If brand, model number, storage, RAM and color all agree (and none of the
+      // conflict guards above rejected the pair), that structured agreement is
+      // stronger evidence of a true match than the noisy title text is.
+      const candidateModel = candidate.model?.trim().toLowerCase() ?? null;
+      const modelsAgree = !!candidateModel && !!listingModel && candidateModel === listingModel;
+      const score = modelsAgree ? Math.max(titleScore, 1) : titleScore;
 
       if (score > (best?.score ?? 0)) {
         best = { candidate, score };
