@@ -1,0 +1,71 @@
+# syntax=docker/dockerfile:1
+
+FROM node:22-bookworm-slim AS build
+RUN corepack enable && corepack prepare pnpm@11.4.0 --activate
+WORKDIR /repo
+
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+COPY apps/api/package.json apps/api/package.json
+COPY apps/web/package.json apps/web/package.json
+# fetch-timeout/retries guard against a slow registry connection during the
+# build; --filter restricts the install to what @pricelens/api actually
+# needs (skips apps/web's Next.js/React tree entirely).
+RUN pnpm config set fetch-timeout 600000 && pnpm config set fetch-retries 5
+RUN pnpm install --frozen-lockfile --filter @pricelens/api...
+
+# Without openssl here, `prisma generate` below can't detect this stage's
+# libssl and silently defaults to the wrong engine binary (debian-openssl-1.1.x)
+# — which then fails to load at runtime in the openssl-3.0.x runtime image
+# (Chrome's dependencies pull in libssl3 there). Confirmed by actually running
+# the built image: "Prisma Client could not locate the Query Engine for
+# runtime debian-openssl-3.0.x".
+RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
+
+COPY apps/api apps/api
+# apps/api's build script runs `dotenv -e ../../.env -- prisma generate && nest build`;
+# prisma generate only reads the schema, it never connects, so a placeholder is enough.
+RUN echo "DATABASE_URL=postgresql://placeholder:placeholder@localhost:5432/placeholder" > .env
+RUN pnpm --filter @pricelens/api build
+
+
+FROM node:22-bookworm-slim AS runtime
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Real Google Chrome (not Playwright's bundled Chromium) + a virtual display
+# (Xvfb) so it can run non-headless — see apps/api/src/scraping/browser/
+# browser-session.service.ts for why headless mode gets blocked by these
+# retailers' bot detection. x11vnc + noVNC give optional, password-gated
+# remote access to that virtual display for one-time interactive
+# logins/CAPTCHA-solves (apps/api/scripts/login-store.ts) — off by default,
+# see docker/entrypoint.api.sh.
+
+# Deliberately NOT installing Debian's `novnc` package — it pulls in the
+# unrelated OpenStack python3-novnc console proxy and its whole oslo.*
+# dependency chain (hundreds of MB). `python3-websockify` alone is the actual
+# proxy we need; the noVNC web client itself is just static HTML/JS/CSS, so
+# it's fetched directly from upstream instead.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      wget ca-certificates fonts-liberation \
+      xvfb fluxbox x11vnc python3-websockify \
+    && wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
+    && apt-get install -y --no-install-recommends /tmp/chrome.deb \
+    && rm -f /tmp/chrome.deb \
+    && wget -q -O /tmp/novnc.tar.gz https://github.com/novnc/noVNC/archive/refs/tags/v1.5.0.tar.gz \
+    && mkdir -p /usr/share/novnc \
+    && tar -xzf /tmp/novnc.tar.gz -C /usr/share/novnc --strip-components=1 \
+    && rm -f /tmp/novnc.tar.gz \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN corepack enable && corepack prepare pnpm@11.4.0 --activate
+
+WORKDIR /repo
+COPY --from=build /repo/node_modules /repo/node_modules
+COPY --from=build /repo/apps/api /repo/apps/api
+
+WORKDIR /repo/apps/api
+COPY docker/entrypoint.api.sh /usr/local/bin/entrypoint.api.sh
+RUN chmod +x /usr/local/bin/entrypoint.api.sh
+
+ENV NODE_ENV=production
+EXPOSE 3001 6080
+ENTRYPOINT ["/usr/local/bin/entrypoint.api.sh"]

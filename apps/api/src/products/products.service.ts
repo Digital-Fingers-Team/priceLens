@@ -6,7 +6,7 @@ import type { CanonicalProduct, SourceListing } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { INGESTION_QUEUE, RUN_QUERY_INGESTION_JOB } from '../workers/ingestion.processor';
 
-type SortBy = 'minPriceUsd' | 'maxPriceUsd' | 'listingCount' | 'updatedAt';
+type SortBy = 'relevance' | 'minPriceUsd' | 'maxPriceUsd' | 'listingCount' | 'updatedAt';
 type SortDir = 'asc' | 'desc';
 
 interface SearchProductsOptions {
@@ -127,8 +127,8 @@ export class ProductsService {
       tier,
       page = 1,
       limit = 20,
-      sortBy = 'minPriceUsd',
-      sortDir = 'asc',
+      sortBy = 'relevance',
+      sortDir = 'desc',
       liveFetch = true,
     } = options;
 
@@ -138,7 +138,8 @@ export class ProductsService {
 
     const whereClause = this.buildSearchWhereSql(normalizedQuery, brand, categoryId, tier);
     const havingClause = this.buildHavingSql(minPrice, maxPrice);
-    const orderBySql = this.buildOrderBySql(sortBy, sortDir);
+    const relevanceSql = this.buildRelevanceScoreSql(normalizedQuery);
+    const orderBySql = this.buildOrderBySql(sortBy, sortDir, relevanceSql);
 
     // Sort/filter/paginate at the DB level first — only the current page's
     // products get their full listings fetched, instead of pulling every
@@ -218,7 +219,7 @@ export class ProductsService {
         cp.brand ILIKE ${pattern} OR
         cp.model ILIKE ${pattern} OR
         cp.slug ILIKE ${pattern} OR
-        c.name ILIKE ${pattern} OR
+        EXISTS (SELECT 1 FROM unnest(string_to_array(lower(c.name), ' ')) tok WHERE tok = ${term}) OR
         EXISTS (SELECT 1 FROM unnest(c.search_terms) st WHERE st ILIKE ${pattern})
       )`);
     }
@@ -247,7 +248,12 @@ export class ProductsService {
     return parts.length ? Prisma.sql`HAVING ${Prisma.join(parts, ' AND ')}` : Prisma.empty;
   }
 
-  private buildOrderBySql(sortBy: SortBy, sortDir: SortDir): Prisma.Sql {
+  private buildOrderBySql(sortBy: SortBy, sortDir: SortDir, relevanceSql: Prisma.Sql): Prisma.Sql {
+    if (sortBy === 'relevance') {
+      const direction = sortDir === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
+      return Prisma.sql`MAX(${relevanceSql}) ${direction}, MIN(sl.price_usd) ASC NULLS LAST, cp.updated_at DESC`;
+    }
+
     const column = {
       minPriceUsd: Prisma.sql`MIN(sl.price_usd)`,
       maxPriceUsd: Prisma.sql`MAX(sl.price_usd)`,
@@ -257,6 +263,80 @@ export class ProductsService {
 
     const direction = sortDir === 'desc' ? Prisma.sql`DESC` : Prisma.sql`ASC`;
     return Prisma.sql`${column} ${direction} NULLS LAST, cp.updated_at DESC`;
+  }
+
+  /**
+   * Titles like "iPhone 17" satisfy `ILIKE '%phone%'` purely because "iPhone"
+   * contains that substring — so a case titled "... for iPhone 17 ..." scores
+   * the same as the phone itself on title match, then wins on the price
+   * tie-break for being cheaper. Demoting known accessory nouns (unless the
+   * query itself asks for one) keeps the base product above its accessories
+   * for any category, not just phones.
+   */
+  private static readonly ACCESSORY_KEYWORDS = [
+    'case', 'cover', 'protector', 'skin', 'pod', 'bumper', 'sleeve', 'pouch',
+    'stand', 'mount', 'strap', 'charger', 'cable', 'tempered glass', 'screen guard',
+  ];
+
+  /**
+   * Weighted relevance score for ranking search hits. Without this, results were
+   * ordered purely by price, so a cheap unrelated accessory (e.g. a phone case
+   * matching "phone" only through its category) would outrank an actual phone.
+   * Title matches are weighted far above category/search-term matches so that
+   * loosely-related category matches sink instead of dominating page one.
+   */
+  private buildRelevanceScoreSql(normalizedQuery: string): Prisma.Sql {
+    const terms = normalizedQuery.split(/\s+/).filter(Boolean);
+    if (terms.length === 0) {
+      return Prisma.sql`0`;
+    }
+
+    const termScores = terms.map((term) => {
+      const contains = `%${term}%`;
+      const startsWith = `${term}%`;
+      return Prisma.sql`(
+        CASE
+          WHEN cp.title ILIKE ${startsWith} THEN 12
+          WHEN cp.title ILIKE ${contains} THEN 6
+          ELSE 0
+        END +
+        CASE
+          WHEN cp.brand ILIKE ${term} THEN 10
+          WHEN cp.brand ILIKE ${contains} THEN 4
+          ELSE 0
+        END +
+        CASE WHEN cp.model ILIKE ${contains} THEN 6 ELSE 0 END +
+        CASE
+          WHEN EXISTS (SELECT 1 FROM unnest(string_to_array(lower(c.name), ' ')) tok WHERE tok = ${term}) THEN 5
+          ELSE 0
+        END +
+        CASE
+          WHEN EXISTS (SELECT 1 FROM unnest(c.search_terms) st WHERE st ILIKE ${contains}) THEN 2
+          ELSE 0
+        END
+      )`;
+    });
+
+    const fullPhraseBonus = Prisma.sql`(
+      CASE
+        WHEN cp.title ILIKE ${normalizedQuery} THEN 50
+        WHEN cp.title ILIKE ${`${normalizedQuery}%`} THEN 20
+        WHEN cp.title ILIKE ${`%${normalizedQuery}%`} THEN 8
+        ELSE 0
+      END
+    )`;
+
+    const queryAsksForAccessory = ProductsService.ACCESSORY_KEYWORDS.some((keyword) =>
+      normalizedQuery.includes(keyword),
+    );
+    const accessoryPenalty = queryAsksForAccessory
+      ? Prisma.sql`0`
+      : Prisma.sql`(CASE WHEN ${Prisma.join(
+          ProductsService.ACCESSORY_KEYWORDS.map((keyword) => Prisma.sql`cp.title ILIKE ${`%${keyword}%`}`),
+          ' OR ',
+        )} THEN -20 ELSE 0 END)`;
+
+    return Prisma.sql`(${fullPhraseBonus} + ${accessoryPenalty} + ${Prisma.join(termScores, ' + ')})`;
   }
 
   /** Per-query cooldown so repeat searches (pagination, sorting, retyping) don't re-scrape. */
@@ -311,18 +391,24 @@ export class ProductsService {
 
     return products
       .filter((product) => {
-        const haystack = [
-          product.title,
-          product.brand ?? '',
-          product.model ?? '',
-          product.slug,
-          product.category.name,
-        ]
+        // Category name is matched as whole words only (not "haystack.includes"),
+        // otherwise a query like "phone" substring-matches the "Headphones"
+        // category and floods phone suggestions with earbuds/headphones.
+        const haystack = [product.title, product.brand ?? '', product.model ?? '', product.slug]
           .join(' ')
           .toLowerCase();
-        return haystack.includes(query) || query.split(/\s+/).every((term) => haystack.includes(term));
+        const categoryTokens = product.category.name.toLowerCase().split(/\s+/);
+        const queryTerms = query.split(/\s+/).filter(Boolean);
+        return (
+          queryTerms.length > 0 &&
+          queryTerms.every((term) => haystack.includes(term) || categoryTokens.includes(term))
+        );
       })
-      .sort((a, b) => a.title.localeCompare(b.title))
+      .sort((a, b) => {
+        const aStarts = a.title.toLowerCase().startsWith(query) ? 0 : 1;
+        const bStarts = b.title.toLowerCase().startsWith(query) ? 0 : 1;
+        return aStarts - bStarts || a.title.localeCompare(b.title);
+      })
       .slice(0, limit)
       .map((product) => ({
         id: product.id,

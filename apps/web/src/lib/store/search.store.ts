@@ -15,8 +15,8 @@ const DEFAULT_FILTERS: SearchFilters = {
   q: '',
   page: 1,
   limit: 20,
-  sortBy: 'minPriceUsd',
-  sortDir: 'asc',
+  sortBy: 'relevance',
+  sortDir: 'desc',
 };
 
 export const useSearchStore = create<SearchState>((set) => ({

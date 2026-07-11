@@ -38,6 +38,7 @@ export const MATCH_STATUS_LABELS: Record<string, string> = {
 };
 
 export const SORT_OPTIONS = [
+  { label: 'Best Match', value: 'relevance', dir: 'desc' },
   { label: 'Lowest Price', value: 'minPriceUsd', dir: 'asc' },
   { label: 'Highest Price', value: 'maxPriceUsd', dir: 'desc' },
   { label: 'Most Listings', value: 'listingCount', dir: 'desc' },

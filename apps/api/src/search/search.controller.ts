@@ -15,7 +15,7 @@ export class SearchController {
     @Query('tier') tier?: string,
     @Query('minPrice') minPrice?: string,
     @Query('maxPrice') maxPrice?: string,
-    @Query('sortBy') sortBy?: 'minPriceUsd' | 'maxPriceUsd' | 'listingCount' | 'updatedAt',
+    @Query('sortBy') sortBy?: 'relevance' | 'minPriceUsd' | 'maxPriceUsd' | 'listingCount' | 'updatedAt',
     @Query('sortDir') sortDir?: 'asc' | 'desc',
     @Query('page') page?: string,
     @Query('limit') limit?: string,

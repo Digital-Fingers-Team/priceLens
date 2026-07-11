@@ -38,5 +38,9 @@ Thumbs.db
 **/prisma/*.sqlite
 **/prisma/*.sqlite3
 
+# Browser automation profiles (hold live retailer login sessions — never commit)
+.browser-profiles/
+**/.browser-profiles/
+
 # Misc
 *.tsbuildinfo

@@ -1,27 +1,27 @@
 'use client';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { Search, Heart, User, LogOut, Shield, Menu, X, TrendingUp } from 'lucide-react';
+import { Heart, User, LogOut, Shield, Menu, X, TrendingUp } from 'lucide-react';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { useLogout } from '@/lib/hooks/use-auth';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils/cn';
+import { SearchBar } from '@/components/search/search-bar';
 
 export function Navbar() {
+  const pathname = usePathname();
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
   const { mutate: logout, isPending: loggingOut } = useLogout();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
 
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'MODERATOR';
+  // The /search page already renders its own SearchBar plus the query summary
+  // and filters — showing this one too would put two search boxes on screen.
+  const onSearchPage = pathname?.startsWith('/search');
 
-  function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
-    router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-    setSearchQuery('');
+  function handleMobileSearch(q: string) {
+    router.push(`/search?q=${encodeURIComponent(q)}`);
     setMobileOpen(false);
   }
 
@@ -44,27 +44,9 @@ export function Navbar() {
           </Link>
 
           {/* Desktop search */}
-          <form
-            onSubmit={handleSearch}
-            className="hidden md:flex flex-1 max-w-xl"
-          >
-            <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-500 pointer-events-none" />
-              <input
-                type="search"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search products, brands, models…"
-                className={cn(
-                  'w-full h-10 pl-9 pr-4 rounded-lg text-sm',
-                  'bg-ink-800 border border-ink-600',
-                  'text-ink-100 placeholder:text-ink-500',
-                  'focus:outline-none focus:border-signal/50 focus:ring-1 focus:ring-signal/20',
-                  'transition-colors duration-150',
-                )}
-              />
-            </div>
-          </form>
+          {!onSearchPage && (
+            <SearchBar className="hidden md:flex flex-1 max-w-xl" />
+          )}
 
           {/* Desktop actions */}
           <nav className="hidden md:flex items-center gap-1">
@@ -125,16 +107,7 @@ export function Navbar() {
       {/* Mobile menu */}
       {mobileOpen && (
         <div className="md:hidden border-t border-ink-700 bg-ink-950 px-4 py-4 space-y-4">
-          <form onSubmit={handleSearch} className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-500 pointer-events-none" />
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search products…"
-              className="w-full h-10 pl-9 pr-4 rounded-lg text-sm bg-ink-800 border border-ink-600 text-ink-100 placeholder:text-ink-500 focus:outline-none focus:border-signal/50"
-            />
-          </form>
+          {!onSearchPage && <SearchBar onSearch={handleMobileSearch} />}
 
           <div className="flex flex-col gap-1">
             {isAuthenticated ? (

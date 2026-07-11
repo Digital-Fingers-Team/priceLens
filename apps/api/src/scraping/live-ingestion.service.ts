@@ -6,6 +6,7 @@ import { NormalizerService } from '../matching/normalizer.service';
 import { FuzzyMatcherService } from '../matching/fuzzy-matcher.service';
 import { AmazonConnector } from './connectors/amazon.connector';
 import { AlibabaConnector } from './connectors/alibaba.connector';
+import { AliExpressConnector } from './connectors/aliexpress.connector';
 import { NoonConnector } from './connectors/noon.connector';
 import { JumiaConnector } from './connectors/jumia.connector';
 import { CarrefourConnector } from './connectors/carrefour.connector';
@@ -57,6 +58,7 @@ export class LiveIngestionService {
     private readonly fuzzyMatcher: FuzzyMatcherService,
     private readonly amazonConnector: AmazonConnector,
     private readonly alibabaConnector: AlibabaConnector,
+    private readonly aliExpressConnector: AliExpressConnector,
     private readonly noonConnector: NoonConnector,
     private readonly jumiaConnector: JumiaConnector,
     private readonly carrefourConnector: CarrefourConnector,
@@ -67,6 +69,7 @@ export class LiveIngestionService {
     const connectors: RetailerConnector[] = [
       this.amazonConnector,
       this.alibabaConnector,
+      this.aliExpressConnector,
       this.noonConnector,
       this.jumiaConnector,
       this.carrefourConnector,

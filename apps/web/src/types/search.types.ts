@@ -29,7 +29,7 @@ export interface SearchFilters {
   minPrice?: number;
   maxPrice?: number;
   tier?: string;
-  sortBy?: 'minPriceUsd' | 'maxPriceUsd' | 'listingCount' | 'updatedAt';
+  sortBy?: 'relevance' | 'minPriceUsd' | 'maxPriceUsd' | 'listingCount' | 'updatedAt';
   sortDir?: 'asc' | 'desc';
   page?: number;
   limit?: number;

@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module';
 import { MatchingModule } from '../matching/matching.module';
+import { BrowserSessionService } from './browser/browser-session.service';
 import { AmazonConnector } from './connectors/amazon.connector';
 import { AlibabaConnector } from './connectors/alibaba.connector';
+import { AliExpressConnector } from './connectors/aliexpress.connector';
 import { NoonConnector } from './connectors/noon.connector';
 import { JumiaConnector } from './connectors/jumia.connector';
 import { CarrefourConnector } from './connectors/carrefour.connector';
@@ -13,8 +15,10 @@ import { LiveIngestionService } from './live-ingestion.service';
 @Module({
   imports: [DatabaseModule, MatchingModule],
   providers: [
+    BrowserSessionService,
     AmazonConnector,
     AlibabaConnector,
+    AliExpressConnector,
     NoonConnector,
     JumiaConnector,
     CarrefourConnector,
@@ -25,6 +29,7 @@ import { LiveIngestionService } from './live-ingestion.service';
   exports: [
     AmazonConnector,
     AlibabaConnector,
+    AliExpressConnector,
     NoonConnector,
     JumiaConnector,
     CarrefourConnector,

@@ -28,8 +28,8 @@ export function SearchFilters() {
     !!filters.tier ||
     filters.minPrice != null ||
     filters.maxPrice != null ||
-    (filters.sortBy != null && filters.sortBy !== 'minPriceUsd') ||
-    (filters.sortDir != null && filters.sortDir !== 'asc');
+    (filters.sortBy != null && filters.sortBy !== 'relevance') ||
+    (filters.sortDir != null && filters.sortDir !== 'desc');
 
   return (
     <aside className="w-full lg:w-80 shrink-0 rounded-xl border border-ink-700 bg-ink-900 p-5 space-y-5 lg:sticky lg:top-24">
@@ -106,7 +106,7 @@ export function SearchFilters() {
             <label className="text-sm font-medium text-ink-200">Sort by</label>
             <select
               className={selectClassName}
-              value={filters.sortBy ?? 'minPriceUsd'}
+              value={filters.sortBy ?? 'relevance'}
               onChange={(e) =>
                 setFilter('sortBy', e.target.value as SearchFiltersType['sortBy'])
               }
@@ -123,7 +123,7 @@ export function SearchFilters() {
             <label className="text-sm font-medium text-ink-200">Direction</label>
             <select
               className={selectClassName}
-              value={filters.sortDir ?? 'asc'}
+              value={filters.sortDir ?? 'desc'}
               onChange={(e) =>
                 setFilter('sortDir', e.target.value as SearchFiltersType['sortDir'])
               }

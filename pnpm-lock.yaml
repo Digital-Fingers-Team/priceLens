@@ -131,6 +131,9 @@ importers:
       passport-local:
         specifier: ^1.0.0
         version: 1.0.0
+      patchright:
+        specifier: ^1.61.1
+        version: 1.61.1
       pg:
         specifier: ^8.21.0
         version: 8.21.0
@@ -2700,6 +2703,11 @@ packages:
   fs.realpath@1.0.0:
     resolution: {integrity: sha512-OO0pH2lK6a0hZnAdau5ItzHPI6pUlvI7jMVnxUQRtw4owF2wk8lOSabtGDCTP4Ggrg2MbGnWO9X8K1t4+fGMDw==}
 
+  fsevents@2.3.2:
+    resolution: {integrity: sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==}
+    engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
+    os: [darwin]
+
   fsevents@2.3.3:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
@@ -3878,6 +3886,16 @@ packages:
   passport@0.7.0:
     resolution: {integrity: sha512-cPLl+qZpSc+ireUvt+IzqbED1cHHkDoVYMo30jbJIdOOjQ1MQYZBPiNvmi8UM6lJuOpTPXJGZQk0DtC4y61MYQ==}
     engines: {node: '>= 0.4.0'}
+
+  patchright-core@1.61.1:
+    resolution: {integrity: sha512-d6Ju67DE6OzqlEX3WPvUX2SLEs6iMY1WERit//mpsrT98VHcztaUo0CBw2Lpxq25VdufVEiWEdcc0HnLwdiq6A==}
+    engines: {node: '>=18'}
+    hasBin: true
+
+  patchright@1.61.1:
+    resolution: {integrity: sha512-kZWNZ2tunsBMTBWtARFVWaNvB739GOybTlIPLT91eyx0YERjtUjESawomwO0hnOh6jt1L3Sru0PK62ylYOfqQw==}
+    engines: {node: '>=18'}
+    hasBin: true
 
   path-exists@4.0.0:
     resolution: {integrity: sha512-ak9Qy5Q7jYb2Wwcey5Fpvg2KoAc/ZIhLSLOSBmRmygPsGwkVVt0fZa0qrtMz+m6tJTAHfZQ8FnmB4MG4LWy7/w==}
@@ -7892,6 +7910,9 @@ snapshots:
 
   fs.realpath@1.0.0: {}
 
+  fsevents@2.3.2:
+    optional: true
+
   fsevents@2.3.3:
     optional: true
 
@@ -9334,6 +9355,14 @@ snapshots:
       passport-strategy: 1.0.0
       pause: 0.0.1
       utils-merge: 1.0.1
+
+  patchright-core@1.61.1: {}
+
+  patchright@1.61.1:
+    dependencies:
+      patchright-core: 1.61.1
+    optionalDependencies:
+      fsevents: 2.3.2
 
   path-exists@4.0.0: {}
 
