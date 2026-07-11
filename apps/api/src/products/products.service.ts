@@ -340,7 +340,7 @@ export class ProductsService {
   }
 
   /** Per-query cooldown so repeat searches (pagination, sorting, retyping) don't re-scrape. */
-  private static readonly LIVE_FETCH_COOLDOWN_MS = 10 * 60 * 1000;
+  private static readonly LIVE_FETCH_COOLDOWN_MS = 30 * 1000;
   private readonly lastLiveFetchAt = new Map<string, number>();
 
   /**
