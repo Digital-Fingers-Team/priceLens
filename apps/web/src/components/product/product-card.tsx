@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { Heart, ExternalLink, ShieldCheck, Store } from 'lucide-react';
 import type { SearchHit } from '@/types/search.types';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +16,7 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product }: ProductCardProps) {
+  const router = useRouter();
   const { isAuthenticated } = useAuthStore();
   const isWatched = useIsWatched(product.id);
   const { mutate: toggleWatchlist, isPending } = useToggleWatchlist();
@@ -25,14 +27,18 @@ export function ProductCard({ product }: ProductCardProps) {
 
   function handleWatchlist(e: React.MouseEvent) {
     e.preventDefault();
-    if (!isAuthenticated) return;
+    if (!isAuthenticated) {
+      // Send guests to sign in instead of silently doing nothing
+      router.push('/login');
+      return;
+    }
     toggleWatchlist({ productId: product.id, isWatched });
   }
 
   return (
-    <Link href={`/products/${product.slug}`} className="group block">
+    <Link href={`/products/${product.slug}`} className="group block min-w-0">
       <article className={cn(
-        'h-full rounded-xl border border-ink-700 bg-ink-900',
+        'h-full min-w-0 rounded-xl border border-ink-700 bg-ink-900',
         'transition-all duration-200',
         'group-hover:border-ink-500 group-hover:bg-ink-800',
         'group-hover:shadow-lg group-hover:shadow-black/30',
@@ -61,30 +67,32 @@ export function ProductCard({ product }: ProductCardProps) {
                 <ShieldCheck className="w-3 h-3" /> Verified
               </Badge>
             )}
-            {product.tier === 'ULTRA_PREMIUM' && (
-              <Badge variant="premium">{TIER_LABELS[product.tier]}</Badge>
-            )}
           </div>
 
           {/* Watchlist button */}
-          {isAuthenticated && (
-            <button
-              onClick={handleWatchlist}
-              disabled={isPending}
-              className={cn(
-                'absolute top-3 right-3 w-8 h-8 rounded-full',
-                'flex items-center justify-center',
-                'transition-all duration-150',
-                isWatched
-                  ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                  : 'bg-ink-900/80 text-ink-400 border border-ink-700 opacity-0 group-hover:opacity-100',
-                'hover:scale-110 disabled:opacity-50',
-              )}
-              aria-label={isWatched ? 'Remove from watchlist' : 'Add to watchlist'}
-            >
-              <Heart className={cn('w-4 h-4', isWatched && 'fill-current')} />
-            </button>
-          )}
+          <button
+            onClick={handleWatchlist}
+            disabled={isPending}
+            className={cn(
+              'absolute top-3 right-3 w-8 h-8 rounded-full',
+              'flex items-center justify-center',
+              'transition-all duration-150',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/60 focus-visible:opacity-100',
+              isWatched
+                ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                : 'bg-ink-900/80 text-ink-400 border border-ink-700 opacity-0 group-hover:opacity-100 focus:opacity-100',
+              'hover:scale-110 disabled:opacity-50',
+            )}
+            aria-label={
+              !isAuthenticated
+                ? 'Sign in to save to watchlist'
+                : isWatched
+                ? 'Remove from watchlist'
+                : 'Add to watchlist'
+            }
+          >
+            <Heart className={cn('w-4 h-4', isWatched && 'fill-current')} />
+          </button>
         </div>
 
         {/* Content */}
@@ -120,12 +128,12 @@ export function ProductCard({ product }: ProductCardProps) {
                   Price range
                 </p>
                 {hasPriceRange ? (
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-lg font-bold text-signal">
+                  <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 min-w-0">
+                    <span className="text-lg font-bold text-signal whitespace-nowrap">
                       {formatCurrency(product.minPriceUsd)}
                     </span>
                     <span className="text-ink-500 text-sm">—</span>
-                    <span className="text-sm font-medium text-ink-300">
+                    <span className="text-sm font-medium text-ink-300 whitespace-nowrap">
                       {formatCurrency(product.maxPriceUsd)}
                     </span>
                   </div>
@@ -142,10 +150,18 @@ export function ProductCard({ product }: ProductCardProps) {
 
           {/* CTA */}
           <div className="flex items-center justify-between pt-1">
-            <Badge variant={product.tier === 'BUDGET' ? 'info' : 'outline'}>
+            <Badge
+              variant={
+                product.tier === 'ULTRA_PREMIUM'
+                  ? 'premium'
+                  : product.tier === 'BUDGET'
+                  ? 'info'
+                  : 'outline'
+              }
+            >
               {TIER_LABELS[product.tier] ?? product.tier}
             </Badge>
-            <span className="flex items-center gap-1 text-xs font-medium text-signal opacity-0 group-hover:opacity-100 transition-opacity">
+            <span className="flex items-center gap-1 text-xs font-medium text-signal transition-colors group-hover:text-signal-dim">
               Compare <ExternalLink className="w-3 h-3" />
             </span>
           </div>

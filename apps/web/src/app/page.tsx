@@ -3,7 +3,7 @@ import { Suspense } from 'react';
 import { SearchBar } from '@/components/search/search-bar';
 import { TrendingSection } from './_components/trending-section';
 import { ProductCardSkeleton } from '@/components/product/product-card-skeleton';
-import { TrendingUp, ShieldCheck, Zap } from 'lucide-react';
+import { TrendingUp, BarChart3, Bell, Store } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'PriceLens — Find the Best Price',
@@ -14,9 +14,9 @@ function HeroFeatures() {
   return (
     <div className="flex flex-wrap justify-center gap-6 text-sm text-ink-500">
       {[
-        { icon: Zap, label: 'Real-time prices' },
-        { icon: ShieldCheck, label: 'Verified products' },
-        { icon: TrendingUp, label: 'Price history' },
+        { icon: Store, label: 'Compare across stores' },
+        { icon: BarChart3, label: 'Price history charts' },
+        { icon: Bell, label: 'Track price drops' },
       ].map(({ icon: Icon, label }) => (
         <div key={label} className="flex items-center gap-2">
           <Icon className="w-4 h-4 text-signal" />
@@ -33,19 +33,10 @@ export default function HomePage() {
       {/* Hero */}
       <section className="relative overflow-hidden">
         {/* Grid background */}
-        <div className="absolute inset-0 bg-grid-pattern opacity-100 pointer-events-none" />
-        {/* Radial glow */}
-        <div className="absolute inset-0 bg-radial-gradient pointer-events-none"
-          style={{ background: 'radial-gradient(ellipse 80% 50% at 50% -10%, rgba(0,255,136,0.06), transparent)' }}
-        />
+        <div className="absolute inset-0 bg-grid-pattern opacity-60 pointer-events-none" />
 
         <div className="relative max-w-3xl mx-auto px-4 sm:px-6 pt-20 pb-16 text-center space-y-8">
           <div className="space-y-4">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-signal/20 bg-signal/5 text-signal text-xs font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-signal animate-pulse-signal" />
-              Prices updated continuously
-            </div>
-
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-ink-50 leading-[1.1] text-balance">
               One search.<br />
               <span className="text-signal">Every price.</span>
@@ -72,7 +63,7 @@ export default function HomePage() {
         <Suspense
           fallback={
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {Array.from({ length: 8 }).map((_, i) => <ProductCardSkeleton key={i} />)}
+              {Array.from({ length: 4 }).map((_, i) => <ProductCardSkeleton key={i} />)}
             </div>
           }
         >

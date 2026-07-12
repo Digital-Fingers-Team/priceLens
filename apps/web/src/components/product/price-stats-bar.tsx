@@ -1,4 +1,3 @@
-import { TrendingDown, TrendingUp, Minus } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/format';
 
 interface PriceStatsBarProps {
@@ -12,12 +11,10 @@ interface PriceStatsBarProps {
 function StatCell({
   label,
   value,
-  icon,
   highlight,
 }: {
   label: string;
   value: string;
-  icon?: React.ReactNode;
   highlight?: 'green' | 'red' | 'neutral';
 }) {
   const color =
@@ -29,10 +26,7 @@ function StatCell({
 
   return (
     <div className="flex flex-col items-center gap-1 px-4 py-3">
-      <div className="flex items-center gap-1 text-ink-500 text-xs">
-        {icon}
-        <span className="uppercase tracking-wider font-medium">{label}</span>
-      </div>
+      <span className="text-ink-500 text-xs uppercase tracking-wider font-medium">{label}</span>
       <span className={`text-lg font-bold ${color}`}>{value}</span>
     </div>
   );
@@ -51,19 +45,16 @@ export function PriceStatsBar({
         <StatCell
           label="Best Price"
           value={formatCurrency(min)}
-          icon={<TrendingDown className="w-3 h-3 text-emerald-400" />}
           highlight="green"
         />
         <StatCell
           label="Highest"
           value={formatCurrency(max)}
-          icon={<TrendingUp className="w-3 h-3 text-red-400" />}
           highlight="red"
         />
         <StatCell
           label="Average"
           value={formatCurrency(avg)}
-          icon={<Minus className="w-3 h-3" />}
           highlight="neutral"
         />
         <StatCell

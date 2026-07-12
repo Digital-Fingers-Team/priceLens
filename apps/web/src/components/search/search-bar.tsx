@@ -117,7 +117,8 @@ export function SearchBar({
                 inputRef.current?.focus();
               }}
               className={cn(
-                'absolute right-12 text-ink-500 hover:text-ink-300 transition-colors',
+                'absolute text-ink-500 hover:text-ink-300 transition-colors',
+                'focus-visible:outline-none focus-visible:text-ink-200',
                 isHero ? 'right-14' : 'right-10',
               )}
             >
@@ -127,18 +128,16 @@ export function SearchBar({
 
           <button
             type="submit"
+            aria-label="Search"
             className={cn(
               'absolute right-2 flex items-center justify-center rounded-lg',
               'bg-signal text-ink-950 font-semibold',
               'hover:bg-signal-dim transition-colors',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/50',
               isHero ? 'h-10 w-10' : 'h-6 w-6',
             )}
           >
-            {isFetching ? (
-              <Loader2 className={cn('animate-spin', isHero ? 'w-4 h-4' : 'w-3 h-3')} />
-            ) : (
-              <Search className={isHero ? 'w-4 h-4' : 'w-3 h-3'} />
-            )}
+            <Search className={isHero ? 'w-4 h-4' : 'w-3 h-3'} />
           </button>
         </div>
       </form>
