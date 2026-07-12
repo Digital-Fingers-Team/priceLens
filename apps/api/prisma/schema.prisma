@@ -165,7 +165,7 @@ model CanonicalProduct {
   imageUrl      String? @map("image_url")
   thumbnailUrl  String? @map("thumbnail_url")
 
-  titleEmbedding Unsupported("vector(1536)")? @map("title_embedding")
+  titleEmbedding Unsupported("vector(768)")? @map("title_embedding")
 
   tier        ProductTier @default(MID_RANGE)
   isVerified  Boolean     @default(false) @map("is_verified")

@@ -4,6 +4,7 @@ import { MatchStatus, ProductTier, Prisma, ScrapingJobStatus, Platform, Category
 import { PrismaService } from '../database/prisma.service';
 import { NormalizerService } from '../matching/normalizer.service';
 import { FuzzyMatcherService } from '../matching/fuzzy-matcher.service';
+import { SemanticService } from '../matching/semantic.service';
 import { AmazonConnector } from './connectors/amazon.connector';
 import { AlibabaConnector } from './connectors/alibaba.connector';
 import { AliExpressConnector } from './connectors/aliexpress.connector';
@@ -56,6 +57,7 @@ export class LiveIngestionService {
     private readonly prisma: PrismaService,
     private readonly normalizer: NormalizerService,
     private readonly fuzzyMatcher: FuzzyMatcherService,
+    private readonly semantic: SemanticService,
     private readonly amazonConnector: AmazonConnector,
     private readonly alibabaConnector: AlibabaConnector,
     private readonly aliExpressConnector: AliExpressConnector,
@@ -386,12 +388,17 @@ export class LiveIngestionService {
       mpn: listing.identifiers.mpn ?? undefined,
     });
 
-    const canonicalMatch = await this.findCanonicalMatch(category.id, normalized, extracted, listing);
+    // Computed once and threaded through both the match lookup and (if nothing
+    // matches) the new-product creation, so we never call Ollama twice for the
+    // same listing.
+    const listingEmbedding = await this.semantic.embed(listing.title);
+
+    const canonicalMatch = await this.findCanonicalMatch(category.id, normalized, extracted, listing, listingEmbedding);
     const matchedExistingCanonicalProduct = !!canonicalMatch;
 
     const canonicalProduct =
       canonicalMatch ??
-      (await this.createCanonicalProduct(category, listing, normalized, extracted));
+      (await this.createCanonicalProduct(category, listing, normalized, extracted, listingEmbedding));
 
     const sourceListing = await this.prisma.sourceListing.upsert({
       where: {
@@ -493,6 +500,7 @@ export class LiveIngestionService {
     normalized: ReturnType<NormalizerService['normalizeTitle']>,
     extracted: ReturnType<NormalizerService['extractAttributes']>,
     listing: RetailerListing,
+    listingEmbedding: number[] | null,
   ) {
     const identifierMatch = await this.findByIdentifier(listing.identifiers);
     if (identifierMatch) {
@@ -508,6 +516,7 @@ export class LiveIngestionService {
 
     const listingBrand = listing.brand?.trim().toLowerCase() ?? extracted.brand?.trim().toLowerCase() ?? null;
     const listingModel = listing.model?.trim().toLowerCase() ?? extracted.model?.trim().toLowerCase() ?? null;
+    const listingIsAccessory = this.normalizer.isAccessory(listing.title);
 
     for (const candidate of candidates) {
       const candidateNormalized = candidate.normalizedTitle.trim().toLowerCase();
@@ -532,13 +541,38 @@ export class LiveIngestionService {
       return candidate;
     }
 
-    // No exact title match — fuzzy pass so the same product listed with slightly
-    // different titles on different stores still merges into one canonical product.
+    // Ask the local LLM about the handful of candidates whose titles are closest
+    // by meaning (embedding similarity) — it isn't fooled by marketing filler the
+    // way plain text-overlap scoring is. Only falls through to the legacy fuzzy
+    // pass below if Ollama itself is unreachable.
+    if (listingEmbedding) {
+      const aiMatch = await this.findMatchViaLocalAi(
+        listing,
+        extracted,
+        listingBrand,
+        listingIsAccessory,
+        listingEmbedding,
+        categoryId,
+      );
+      if (aiMatch !== undefined) {
+        return aiMatch;
+      }
+    }
+
+    // Legacy fallback (regex/text-overlap heuristic) — used only when Ollama is
+    // unreachable, so ingestion never silently stops matching entirely.
     let best: { candidate: (typeof candidates)[number]; score: number } | null = null;
 
     for (const candidate of candidates) {
       const candidateBrand = candidate.brand?.trim().toLowerCase() ?? null;
       if (candidateBrand && listingBrand && candidateBrand !== listingBrand) {
+        continue;
+      }
+
+      // An accessory's title routinely *names* the product it's compatible with
+      // ("Case for Samsung Galaxy S26 Ultra") — that would otherwise satisfy the
+      // brand/model/title checks below and merge a phone case into the phone.
+      if (listingIsAccessory !== this.normalizer.isAccessory(candidate.title)) {
         continue;
       }
 
@@ -593,6 +627,76 @@ export class LiveIngestionService {
   }
 
   /**
+   * Finds the nearest canonical products by title-embedding similarity, filters
+   * them through the same hard conflict guards as the legacy matcher (brand,
+   * variant, identifier, storage/RAM/color), then asks the local LLM to confirm
+   * whichever survive, closest first. Returns:
+   * - a canonical product if the LLM confirms a match,
+   * - `null` if it checked plausible neighbors and confirmed none of them match,
+   * - `undefined` if Ollama isn't reachable, so the caller should fall back to
+   *   the legacy heuristic matcher instead.
+   */
+  private async findMatchViaLocalAi(
+    listing: RetailerListing,
+    extracted: ReturnType<NormalizerService['extractAttributes']>,
+    listingBrand: string | null,
+    listingIsAccessory: boolean,
+    listingEmbedding: number[],
+    categoryId: string,
+  ) {
+    const nearest = await this.semantic.findSimilarProducts(listingEmbedding, 8, categoryId);
+    if (nearest.length === 0) {
+      return null;
+    }
+
+    const nearestCandidates = await this.prisma.canonicalProduct.findMany({
+      where: { id: { in: nearest.map((n) => n.id) } },
+    });
+    const candidateById = new Map(nearestCandidates.map((c) => [c.id, c]));
+
+    for (const { id } of nearest) {
+      const candidate = candidateById.get(id);
+      if (!candidate) continue;
+
+      const candidateBrand = candidate.brand?.trim().toLowerCase() ?? null;
+      if (candidateBrand && listingBrand && candidateBrand !== listingBrand) {
+        continue;
+      }
+      if (listingIsAccessory !== this.normalizer.isAccessory(candidate.title)) {
+        continue;
+      }
+      if (this.fuzzyMatcher.detectVariantConflict(listing.title, candidate.title)) {
+        continue;
+      }
+      if (this.hasIdentifierConflict(listing, candidate)) {
+        continue;
+      }
+
+      const candidateAttributes = (candidate.attributes ?? {}) as Record<string, unknown>;
+      const candidateStorage = typeof candidateAttributes.storage === 'string' ? candidateAttributes.storage : undefined;
+      const candidateRam = typeof candidateAttributes.ram === 'string' ? candidateAttributes.ram : undefined;
+      const candidateColor = typeof candidateAttributes.color === 'string' ? candidateAttributes.color : undefined;
+      if (
+        this.fuzzyMatcher.detectStorageConflict(extracted.storage ?? undefined, candidateStorage) ||
+        this.fuzzyMatcher.detectRamConflict(extracted.ram ?? undefined, candidateRam) ||
+        this.fuzzyMatcher.detectColorConflict(extracted.color ?? undefined, candidateColor)
+      ) {
+        continue;
+      }
+
+      const verdict = await this.semantic.judgeSameProduct(listing.title, candidate.title);
+      if (verdict === null) {
+        return undefined;
+      }
+      if (verdict) {
+        return candidate;
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Same store, near-identical titles, different SKUs (e.g. ELARABY's many
    * "Remote Control TORNADO LED TV Black" remotes) must never merge: when both
    * sides carry the same kind of identifier and the values differ, they are
@@ -638,6 +742,7 @@ export class LiveIngestionService {
     listing: RetailerListing,
     normalized: ReturnType<NormalizerService['normalizeTitle']>,
     extracted: ReturnType<NormalizerService['extractAttributes']>,
+    listingEmbedding: number[] | null,
   ) {
     const baseSlug = this.toSlug(
       [listing.brand ?? extracted.brand, listing.model ?? extracted.model, listing.title]
@@ -648,7 +753,7 @@ export class LiveIngestionService {
 
     const price = listing.priceUsd ?? null;
 
-    return this.prisma.canonicalProduct.create({
+    const product = await this.prisma.canonicalProduct.create({
       data: {
         categoryId: category.id,
         slug,
@@ -667,6 +772,14 @@ export class LiveIngestionService {
         isVerified: false,
       },
     });
+
+    // Stored so the next listing that might be this same product on another
+    // store doesn't need to re-embed every existing candidate's title to compare.
+    if (listingEmbedding) {
+      await this.semantic.storeCanonicalEmbedding(product.id, listingEmbedding);
+    }
+
+    return product;
   }
 
   private async ensureUniqueSlug(baseSlug: string): Promise<string> {

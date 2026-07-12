@@ -288,24 +288,64 @@ export class NormalizerService {
 
   private extractColor(title: string, attrs: Record<string, unknown>): string | undefined {
     const colors = [
+      // Compound/specific names must come before the generic color words they
+      // contain (e.g. "cosmic orange" before "orange"), otherwise two different
+      // shades both collapse to the same generic bucket and look identical to
+      // the color-conflict guard.
+      'cosmic orange',
+      'cobalt violet',
+      'sky blue',
+      'deep blue',
+      'mist blue',
+      'navy blue',
+      'baby blue',
+      'awesome graphite',
+      'awesome violet',
+      'awesome black',
+      'awesome white',
+      'phantom black',
+      'phantom violet',
+      'phantom white',
+      'space gray',
+      'space grey',
+      'space black',
+      'rose gold',
+      'jet black',
+      'matte black',
+      'midnight green',
+      'alpine green',
+      'sage green',
       'black',
       'white',
       'silver',
       'gold',
-      'space gray',
-      'space black',
       'midnight',
       'starlight',
       'blue',
       'red',
       'green',
+      'violet',
       'purple',
+      'lavender',
       'titanium',
       'natural',
       'graphite',
-      'rose gold',
       'pink',
       'yellow',
+      'orange',
+      'bronze',
+      'coral',
+      'mint',
+      'sage',
+      'burgundy',
+      'maroon',
+      'beige',
+      'cream',
+      'navy',
+      'teal',
+      'olive',
+      'gray',
+      'grey',
     ];
 
     for (const key of ['color', 'colour']) {
@@ -403,6 +443,11 @@ export class NormalizerService {
       /\b(skin|wrap|sticker|decal)\b/i,
       /\b(replacement\s+(?:battery|part|screen))\b/i,
       /\b(compatible with|for use with|fits)\b/i,
+      // Arabic-language listings (common on AliExpress/Noon/Jumia for this
+      // market) use their own accessory vocabulary — none of the English
+      // patterns above match script other than Latin, so these need to be
+      // checked separately rather than relying on translation.
+      /(واقي|جراب|كفر|غطاء|حافظة|شاحن|كابل|زجاج\s*مقوى|لاصقة|حامل)/,
     ];
 
     return accessoryPatterns.some((pattern) => pattern.test(title));
