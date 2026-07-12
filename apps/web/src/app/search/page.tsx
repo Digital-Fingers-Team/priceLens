@@ -41,10 +41,17 @@ export default function SearchPage() {
     router.replace(`/search?${params.toString()}`, { scroll: false });
   }, [filters, router]);
 
-  const { data, isLoading, isFetching, isError } = useSearch(filters);
+  const { data, isLoading, isFetching, isError, refetch } = useSearch(filters);
 
   function handleSearch(q: string) {
-    setFilters({ q, page: 1 });
+    const trimmed = q.trim();
+    if (trimmed === filters.q.trim()) {
+      // Same query resubmitted — filters won't change, so nothing would
+      // normally trigger a new request. Force a fresh read from the DB.
+      refetch();
+      return;
+    }
+    setFilters({ q: trimmed, page: 1 });
   }
 
   const page = filters.page ?? 1;
