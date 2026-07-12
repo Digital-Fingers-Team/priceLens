@@ -73,7 +73,7 @@ export class AmazonConnector implements RetailerConnector {
       this.logger.warn(`Search failed for "${query}" (${this.slug}): ${message}`);
       return [];
     } finally {
-      await page.close();
+      await this.browserSession.closeStore(this.slug);
     }
   }
 

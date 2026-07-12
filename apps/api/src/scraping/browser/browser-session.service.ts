@@ -46,6 +46,25 @@ export class BrowserSessionService implements OnModuleDestroy {
     });
   }
 
+  /**
+   * Fully closes the persistent Chrome profile for a store, terminating every
+   * tab (including the initial `about:blank` page Chrome always spawns) and
+   * removing it from the pool so the next fetch launches a fresh browser.
+   */
+  async closeStore(storeSlug: string): Promise<void> {
+    const contextPromise = this.contexts.get(storeSlug);
+    if (!contextPromise) return;
+
+    this.contexts.delete(storeSlug);
+    try {
+      const context = await contextPromise;
+      await context.close();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Failed to close browser context for "${storeSlug}": ${message}`);
+    }
+  }
+
   async onModuleDestroy(): Promise<void> {
     for (const [storeSlug, contextPromise] of this.contexts) {
       try {
