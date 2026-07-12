@@ -2,10 +2,12 @@ import { Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bull';
 import { LiveIngestionService, LiveIngestionOptions } from '../scraping/live-ingestion.service';
+import { ReconciliationOptions, ReconciliationService } from '../matching/reconciliation.service';
 
 export const INGESTION_QUEUE = 'ingestion';
 export const RUN_LIVE_INGESTION_JOB = 'run-live-ingestion';
 export const RUN_QUERY_INGESTION_JOB = 'run-query-ingestion';
+export const RUN_RECONCILIATION_JOB = 'run-reconciliation';
 
 interface RunQueryIngestionData extends LiveIngestionOptions {
   query: string;
@@ -15,7 +17,21 @@ interface RunQueryIngestionData extends LiveIngestionOptions {
 export class IngestionProcessor {
   private readonly logger = new Logger(IngestionProcessor.name);
 
-  constructor(private readonly liveIngestionService: LiveIngestionService) {}
+  constructor(
+    private readonly liveIngestionService: LiveIngestionService,
+    private readonly reconciliationService: ReconciliationService,
+  ) {}
+
+  @Process(RUN_RECONCILIATION_JOB)
+  async handleRunReconciliation(job: Job<ReconciliationOptions>) {
+    this.logger.log(`Starting reconciliation (job ${job.id})`);
+    const report = await this.reconciliationService.reconcile(job.data ?? {});
+    this.logger.log(
+      `Finished reconciliation (job ${job.id}): ${report.merges.length} ` +
+        `${report.dryRun ? 'proposed' : 'executed'} merge(s) over ${report.pairsExamined} pair(s)`,
+    );
+    return report;
+  }
 
   @Process(RUN_LIVE_INGESTION_JOB)
   async handleRunLiveIngestion(job: Job<LiveIngestionOptions>) {

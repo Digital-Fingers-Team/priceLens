@@ -17,6 +17,9 @@ export class SemanticService {
   private readonly baseUrl: string;
   private readonly embedModel: string;
   private readonly matchModel: string;
+  private readonly openRouterApiKey: string;
+  private readonly openRouterBaseUrl: string;
+  private readonly openRouterMatchModel: string;
 
   constructor(
     private readonly config: ConfigService,
@@ -24,7 +27,10 @@ export class SemanticService {
   ) {
     this.baseUrl = this.config.get<string>('search.ollamaBaseUrl', 'http://localhost:11434');
     this.embedModel = this.config.get<string>('search.ollamaEmbedModel', 'nomic-embed-text');
-    this.matchModel = this.config.get<string>('search.ollamaMatchModel', 'qwen2.5:3b');
+    this.matchModel = this.config.get<string>('search.ollamaMatchModel', 'qwen2.5:1.5b');
+    this.openRouterApiKey = this.config.get<string>('search.openRouterApiKey', '');
+    this.openRouterBaseUrl = this.config.get<string>('search.openRouterBaseUrl', 'https://openrouter.ai/api/v1');
+    this.openRouterMatchModel = this.config.get<string>('search.openRouterMatchModel', 'meta-llama/llama-3.1-8b-instruct');
   }
 
   /**
@@ -72,6 +78,22 @@ Product B: "${titleB}"
 
 Respond with ONLY this JSON object and nothing else: {"same": true or false}`;
 
+    // Prefer the local Ollama model (no cost, no egress). If it's unreachable
+    // — e.g. on a server with no local LLM — fall back to OpenRouter so matching
+    // keeps working instead of silently degrading to the heuristic matcher.
+    const local = await this.judgeViaOllama(prompt);
+    if (local !== undefined) {
+      return local;
+    }
+    return this.judgeViaOpenRouter(prompt);
+  }
+
+  /**
+   * Returns the parsed verdict, or `undefined` (not null) to signal the local
+   * model was unreachable so the caller can try the cloud fallback. `null` here
+   * means Ollama answered but with an unusable payload.
+   */
+  private async judgeViaOllama(prompt: string): Promise<boolean | null | undefined> {
     try {
       const response = await fetch(`${this.baseUrl}/api/generate`, {
         method: 'POST',
@@ -95,7 +117,46 @@ Respond with ONLY this JSON object and nothing else: {"same": true or false}`;
       const parsed = JSON.parse(data.response) as { same?: boolean };
       return typeof parsed.same === 'boolean' ? parsed.same : null;
     } catch (err) {
-      this.logger.warn(`Ollama match-judgement call failed (is Ollama running?): ${(err as Error).message}`);
+      this.logger.warn(`Ollama match-judgement unavailable, will try OpenRouter fallback: ${(err as Error).message}`);
+      return undefined;
+    }
+  }
+
+  private async judgeViaOpenRouter(prompt: string): Promise<boolean | null> {
+    if (!this.openRouterApiKey) {
+      this.logger.warn('OpenRouter fallback skipped: OPENROUTER_API_KEY not set');
+      return null;
+    }
+
+    try {
+      const response = await fetch(`${this.openRouterBaseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.openRouterApiKey}`,
+        },
+        body: JSON.stringify({
+          model: this.openRouterMatchModel,
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0,
+          response_format: { type: 'json_object' },
+        }),
+        signal: AbortSignal.timeout(45_000),
+      });
+
+      if (!response.ok) {
+        throw new Error(`OpenRouter HTTP ${response.status}`);
+      }
+
+      const data = (await response.json()) as {
+        choices?: Array<{ message?: { content?: string } }>;
+      };
+      const content = data.choices?.[0]?.message?.content;
+      if (!content) return null;
+      const parsed = JSON.parse(content) as { same?: boolean };
+      return typeof parsed.same === 'boolean' ? parsed.same : null;
+    } catch (err) {
+      this.logger.warn(`OpenRouter match-judgement call failed: ${(err as Error).message}`);
       return null;
     }
   }
