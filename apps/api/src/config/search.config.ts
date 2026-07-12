@@ -24,4 +24,10 @@ export default registerAs('search', () => ({
   reconciliationSimilarityThreshold: Number(process.env.RECONCILIATION_SIMILARITY_THRESHOLD ?? '0.82'),
   // Max candidate pairs examined per run, to bound LLM calls.
   reconciliationMaxPairs: Number(process.env.RECONCILIATION_MAX_PAIRS ?? '200'),
+  // How many nearest neighbours to pull per product from the HNSW index when
+  // building the candidate list. Higher = more thorough, more rows to filter.
+  reconciliationNeighborsPerProduct: Number(process.env.RECONCILIATION_NEIGHBORS_PER_PRODUCT ?? '5'),
+  // When false, the OpenRouter cloud fallback for match-judgement is disabled even
+  // if a key is present, keeping every title on-machine (local Ollama only).
+  openRouterFallbackEnabled: (process.env.OPENROUTER_FALLBACK_ENABLED ?? 'true') !== 'false',
 }));

@@ -61,8 +61,9 @@ export class ReconciliationService {
     const dryRun = options.dryRun ?? this.config.get<boolean>('search.reconciliationDryRun', true);
     const maxPairs = options.maxPairs ?? this.config.get<number>('search.reconciliationMaxPairs', 200);
     const threshold = this.config.get<number>('search.reconciliationSimilarityThreshold', 0.82);
+    const neighborsPerProduct = this.config.get<number>('search.reconciliationNeighborsPerProduct', 5);
 
-    const pairs = await this.findCandidatePairs(threshold, maxPairs);
+    const pairs = await this.findCandidatePairs(threshold, maxPairs, neighborsPerProduct);
     this.logger.log(
       `Reconciliation start (dryRun=${dryRun}): ${pairs.length} candidate pair(s) above similarity ${threshold}`,
     );
@@ -101,7 +102,7 @@ export class ReconciliationService {
             `[sim ${pair.similarity.toFixed(3)}]`,
         );
       } else {
-        await this.mergeCanonicals(keep.id, merge.id);
+        await this.mergeCanonicals(keep, merge);
         this.logger.log(
           `Merged "${merge.title}" (${merge.id}) → "${keep.title}" (${keep.id}) [sim ${pair.similarity.toFixed(3)}]`,
         );
@@ -116,22 +117,37 @@ export class ReconciliationService {
   }
 
   /**
-   * Self-join over the embedding column: every pair of canonical products in the
-   * same category whose cosine distance is within the threshold. `a.id < b.id`
-   * keeps each pair once and avoids self-pairs.
+   * For each canonical product, ask the HNSW index for its `neighborsPerProduct`
+   * nearest same-category neighbours (LATERAL join → indexed KNN, not the old
+   * O(n^2) cross-join), then keep the pairs within the similarity threshold.
+   * `a_id < b_id` collapses the two directions of each pair into one row.
    */
-  private async findCandidatePairs(threshold: number, maxPairs: number): Promise<CandidatePair[]> {
-    const maxDistance = 1 - threshold;
+  private async findCandidatePairs(
+    threshold: number,
+    maxPairs: number,
+    neighborsPerProduct: number,
+  ): Promise<CandidatePair[]> {
     return this.prisma.$queryRaw<CandidatePair[]>`
-      SELECT a.id AS a_id, b.id AS b_id,
-             1 - (a.title_embedding <=> b.title_embedding) AS similarity
-      FROM canonical_products a
-      JOIN canonical_products b
-        ON a.category_id = b.category_id
-        AND a.id < b.id
-      WHERE a.title_embedding IS NOT NULL
-        AND b.title_embedding IS NOT NULL
-        AND (a.title_embedding <=> b.title_embedding) < ${maxDistance}
+      WITH deduped AS (
+        SELECT DISTINCT ON (a_id, b_id) a_id, b_id, similarity FROM (
+          SELECT LEAST(a.id, nn.id) AS a_id, GREATEST(a.id, nn.id) AS b_id,
+                 1 - (a.title_embedding <=> nn.title_embedding) AS similarity
+          FROM canonical_products a
+          JOIN LATERAL (
+            SELECT b.id, b.title_embedding
+            FROM canonical_products b
+            WHERE b.category_id = a.category_id
+              AND b.id <> a.id
+              AND b.title_embedding IS NOT NULL
+            ORDER BY a.title_embedding <=> b.title_embedding
+            LIMIT ${neighborsPerProduct}
+          ) nn ON true
+          WHERE a.title_embedding IS NOT NULL
+        ) pairs
+        WHERE similarity >= ${threshold}
+        ORDER BY a_id, b_id, similarity DESC
+      )
+      SELECT a_id, b_id, similarity FROM deduped
       ORDER BY similarity DESC
       LIMIT ${maxPairs}
     `;
@@ -185,8 +201,13 @@ export class ReconciliationService {
    * now-empty canonical — all in one transaction. WatchlistItem carries a
    * (userId, canonicalProductId) unique constraint, so a user watching both
    * products would collide on reassignment; those rows are dropped instead.
+   *
+   * Before deleting, any identifier / image the loser has but the keeper lacks is
+   * copied onto the keeper so a unique GTIN/UPC/EAN/MPN isn't lost with the row.
    */
-  private async mergeCanonicals(keepId: string, mergeId: string): Promise<void> {
+  private async mergeCanonicals(keep: CanonicalRow, merge: CanonicalRow): Promise<void> {
+    const keepId = keep.id;
+    const mergeId = merge.id;
     await this.prisma.$transaction(async (tx) => {
       await tx.sourceListing.updateMany({
         where: { canonicalProductId: mergeId },
@@ -227,7 +248,43 @@ export class ReconciliationService {
         }
       }
 
+      // Delete the loser first so its unique identifiers are freed, then copy
+      // any the keeper is missing onto the keeper without violating the
+      // @unique constraints on gtin/upc/ean.
       await tx.canonicalProduct.delete({ where: { id: mergeId } });
+      await this.backfillKeeper(tx, keep, merge);
     });
+  }
+
+  /**
+   * Copy identifiers, image, and brand/model/sku the loser has but the keeper is
+   * missing onto the keeper. Also merges the loser's `attributes` keys that the
+   * keeper doesn't already define. No-op if the keeper is already fully populated.
+   */
+  private async backfillKeeper(
+    tx: Prisma.TransactionClient,
+    keep: CanonicalRow,
+    merge: CanonicalRow,
+  ): Promise<void> {
+    const data: Prisma.CanonicalProductUpdateInput = {};
+
+    const scalarKeys = [
+      'gtin', 'upc', 'ean', 'mpn', 'sku', 'brand', 'model', 'imageUrl', 'thumbnailUrl',
+    ] as const;
+    for (const key of scalarKeys) {
+      if (!keep[key] && merge[key]) {
+        (data as Record<string, unknown>)[key] = merge[key];
+      }
+    }
+
+    const keepAttrs = (keep.attributes ?? {}) as Record<string, unknown>;
+    const mergeAttrs = (merge.attributes ?? {}) as Record<string, unknown>;
+    const mergedAttrs: Record<string, unknown> = { ...mergeAttrs, ...keepAttrs };
+    if (Object.keys(mergedAttrs).length > Object.keys(keepAttrs).length) {
+      data.attributes = mergedAttrs as Prisma.InputJsonValue;
+    }
+
+    if (Object.keys(data).length === 0) return;
+    await tx.canonicalProduct.update({ where: { id: keep.id }, data });
   }
 }

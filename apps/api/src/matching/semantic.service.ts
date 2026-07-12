@@ -20,6 +20,7 @@ export class SemanticService {
   private readonly openRouterApiKey: string;
   private readonly openRouterBaseUrl: string;
   private readonly openRouterMatchModel: string;
+  private readonly openRouterFallbackEnabled: boolean;
 
   constructor(
     private readonly config: ConfigService,
@@ -31,6 +32,7 @@ export class SemanticService {
     this.openRouterApiKey = this.config.get<string>('search.openRouterApiKey', '');
     this.openRouterBaseUrl = this.config.get<string>('search.openRouterBaseUrl', 'https://openrouter.ai/api/v1');
     this.openRouterMatchModel = this.config.get<string>('search.openRouterMatchModel', 'meta-llama/llama-3.1-8b-instruct');
+    this.openRouterFallbackEnabled = this.config.get<boolean>('search.openRouterFallbackEnabled', true);
   }
 
   /**
@@ -123,11 +125,20 @@ Respond with ONLY this JSON object and nothing else: {"same": true or false}`;
   }
 
   private async judgeViaOpenRouter(prompt: string): Promise<boolean | null> {
+    if (!this.openRouterFallbackEnabled) {
+      this.logger.warn('OpenRouter fallback skipped: disabled (OPENROUTER_FALLBACK_ENABLED=false)');
+      return null;
+    }
     if (!this.openRouterApiKey) {
       this.logger.warn('OpenRouter fallback skipped: OPENROUTER_API_KEY not set');
       return null;
     }
 
+    // This sends product titles to a third party (OpenRouter). It runs only when
+    // local Ollama is unreachable AND the fallback is explicitly enabled.
+    this.logger.warn(
+      `Local model unavailable — sending titles to OpenRouter (${this.openRouterMatchModel}) for match judgement`,
+    );
     try {
       const response = await fetch(`${this.openRouterBaseUrl}/chat/completions`, {
         method: 'POST',
