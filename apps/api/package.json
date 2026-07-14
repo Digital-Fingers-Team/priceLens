@@ -17,7 +17,7 @@
     "prisma:migrate": "dotenv -e ../../.env -- prisma migrate dev",
     "prisma:seed": "dotenv -e ../../.env -- ts-node prisma/seed.ts",
     "seed:purge-demo": "dotenv -e ../../.env -- ts-node seed/purgeDemoProducts.ts",
-    "login:noon": "dotenv -e ../../.env -- ts-node scripts/login-store.ts noon https://www.noon.com/uae-en/",
+    "login:noon": "dotenv -e ../../.env -- ts-node scripts/login-store.ts noon https://www.noon.com/egypt-en/",
     "login:alibaba": "dotenv -e ../../.env -- ts-node scripts/login-store.ts alibaba https://www.alibaba.com/trade/search?SearchText=laptop",
     "login:amazon": "dotenv -e ../../.env -- ts-node scripts/login-store.ts amazon https://www.amazon.com/s?k=laptop"
   },

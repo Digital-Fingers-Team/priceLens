@@ -20,6 +20,7 @@ export class SemanticService {
   private readonly openRouterApiKey: string;
   private readonly openRouterBaseUrl: string;
   private readonly openRouterMatchModel: string;
+  private readonly openRouterEmbedModel: string;
   private readonly openRouterFallbackEnabled: boolean;
 
   constructor(
@@ -32,16 +33,26 @@ export class SemanticService {
     this.openRouterApiKey = this.config.get<string>('search.openRouterApiKey', '');
     this.openRouterBaseUrl = this.config.get<string>('search.openRouterBaseUrl', 'https://openrouter.ai/api/v1');
     this.openRouterMatchModel = this.config.get<string>('search.openRouterMatchModel', 'meta-llama/llama-3.1-8b-instruct');
+    this.openRouterEmbedModel = this.config.get<string>('search.openRouterEmbedModel', 'openai/text-embedding-3-small');
     this.openRouterFallbackEnabled = this.config.get<boolean>('search.openRouterFallbackEnabled', true);
   }
 
   /**
    * Generate a text embedding using a local Ollama model (nomic-embed-text by
    * default) — no API key, no network egress, runs entirely on this machine.
-   * Returns null if Ollama isn't reachable, so callers can fall back to the
-   * plain heuristic matcher instead of failing ingestion outright.
+   * Falls back to OpenRouter if Ollama is unreachable, so ingestion doesn't
+   * silently drop to the plain heuristic matcher just because the local
+   * daemon isn't running. Returns null only if both are unavailable.
    */
   async embed(text: string): Promise<number[] | null> {
+    const local = await this.embedViaOllama(text);
+    if (local !== undefined) {
+      return local;
+    }
+    return this.embedViaOpenRouter(text);
+  }
+
+  private async embedViaOllama(text: string): Promise<number[] | null | undefined> {
     try {
       const response = await fetch(`${this.baseUrl}/api/embeddings`, {
         method: 'POST',
@@ -57,7 +68,48 @@ export class SemanticService {
       const data = (await response.json()) as OllamaEmbeddingResponse;
       return Array.isArray(data.embedding) ? data.embedding : null;
     } catch (err) {
-      this.logger.warn(`Ollama embedding call failed (is Ollama running?): ${(err as Error).message}`);
+      this.logger.warn(`Ollama embedding call failed, will try OpenRouter fallback: ${(err as Error).message}`);
+      return undefined;
+    }
+  }
+
+  private async embedViaOpenRouter(text: string): Promise<number[] | null> {
+    if (!this.openRouterFallbackEnabled) {
+      this.logger.warn('OpenRouter embedding fallback skipped: disabled (OPENROUTER_FALLBACK_ENABLED=false)');
+      return null;
+    }
+    if (!this.openRouterApiKey) {
+      this.logger.warn('OpenRouter embedding fallback skipped: OPENROUTER_API_KEY not set');
+      return null;
+    }
+
+    // Requests 768 dims via the OpenAI `dimensions` param so the vector fits
+    // the same vector(768) column populated by nomic-embed-text.
+    this.logger.warn(`Ollama unavailable — embedding via OpenRouter (${this.openRouterEmbedModel})`);
+    try {
+      const response = await fetch(`${this.openRouterBaseUrl}/embeddings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.openRouterApiKey}`,
+        },
+        body: JSON.stringify({
+          model: this.openRouterEmbedModel,
+          input: text.slice(0, 8000),
+          dimensions: 768,
+        }),
+        signal: AbortSignal.timeout(30_000),
+      });
+
+      if (!response.ok) {
+        throw new Error(`OpenRouter embeddings HTTP ${response.status}`);
+      }
+
+      const data = (await response.json()) as { data?: Array<{ embedding?: number[] }> };
+      const embedding = data.data?.[0]?.embedding;
+      return Array.isArray(embedding) ? embedding : null;
+    } catch (err) {
+      this.logger.warn(`OpenRouter embedding call failed: ${(err as Error).message}`);
       return null;
     }
   }

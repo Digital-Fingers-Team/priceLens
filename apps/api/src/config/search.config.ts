@@ -13,6 +13,10 @@ export default registerAs('search', () => ({
   openRouterApiKey: process.env.OPENROUTER_API_KEY ?? process.env.OPENAI_API_KEY ?? '',
   openRouterBaseUrl: process.env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1',
   openRouterMatchModel: process.env.OPENROUTER_MATCH_MODEL ?? 'meta-llama/llama-3.1-8b-instruct',
+  // Embedding model for the same cloud fallback, requested at 768 dims via the
+  // OpenAI `dimensions` param (forwarded through OpenRouter) to match the
+  // vector(768) column sized for nomic-embed-text.
+  openRouterEmbedModel: process.env.OPENROUTER_EMBED_MODEL ?? 'openai/text-embedding-3-small',
   // Background reconciliation job that re-checks EXISTING canonical products for
   // duplicates and merges them (fixes the "1 store" problem). Runs on a cron and
   // can also be triggered manually. Dry-run only logs proposed merges.

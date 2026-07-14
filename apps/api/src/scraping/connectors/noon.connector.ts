@@ -38,7 +38,7 @@ export class NoonConnector implements RetailerConnector {
     if (!trimmed) return [];
 
     const baseUrl = this.configService.get<string>('retailers.noonBaseUrl', 'https://www.noon.com');
-    const url = `${baseUrl.replace(/\/$/, '')}/uae-en/search?q=${encodeURIComponent(trimmed)}`;
+    const url = `${baseUrl.replace(/\/$/, '')}/egypt-en/search?q=${encodeURIComponent(trimmed)}`;
 
     const page = await this.browserSession.getPage(this.slug);
     try {
@@ -94,7 +94,7 @@ export class NoonConnector implements RetailerConnector {
       externalUrl: card.href,
       title,
       priceUsd: price,
-      currency: 'AED',
+      currency: 'EGP',
       brand: null,
       model: null,
       imageUrl: card.imageUrl,

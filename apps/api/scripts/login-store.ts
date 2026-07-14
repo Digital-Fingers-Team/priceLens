@@ -12,7 +12,7 @@ import { chromium } from 'patchright';
 
 async function main() {
   const storeSlug = process.argv[2] ?? 'noon';
-  const homeUrl = process.argv[3] ?? 'https://www.noon.com/uae-en/';
+  const homeUrl = process.argv[3] ?? 'https://www.noon.com/egypt-en/';
   const profileRoot = process.env.BROWSER_PROFILE_DIR ?? path.join(process.cwd(), '.browser-profiles');
   const profileDir = path.join(profileRoot, storeSlug);
 
