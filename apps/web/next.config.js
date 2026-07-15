@@ -36,6 +36,10 @@ const nextConfig = {
       },
       {
         protocol: 'https',
+        hostname: '**.aliexpress-media.com',
+      },
+      {
+        protocol: 'https',
         hostname: '**.carrefouruae.com',
       },
       {

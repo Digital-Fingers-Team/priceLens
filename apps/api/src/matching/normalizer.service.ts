@@ -43,6 +43,19 @@ const BRAND_ALIASES: Record<string, string> = {
   seagate: 'Seagate',
   'western digital': 'Western Digital',
   wd: 'Western Digital',
+  oppo: 'OPPO',
+  xiaomi: 'Xiaomi',
+  redmi: 'Xiaomi',
+  poco: 'Xiaomi',
+  huawei: 'Huawei',
+  honor: 'Honor',
+  vivo: 'Vivo',
+  realme: 'realme',
+  nokia: 'Nokia',
+  infinix: 'Infinix',
+  tecno: 'Tecno',
+  itel: 'itel',
+  nothing: 'Nothing',
 };
 
 const CRITICAL_VARIANTS = [
@@ -157,14 +170,35 @@ export class NormalizerService {
     return result;
   }
 
+  /**
+   * Retailer titles almost always lead with the actual brand ("Oppo A6...",
+   * "Samsung Galaxy..."), so a startsWith match is checked first and wins
+   * outright. Only when nothing matches at the start do we fall back to
+   * scanning the rest of the title — and even then we take the leftmost
+   * alias hit, not the first one in BRAND_ALIASES' insertion order, so an
+   * incidental later mention (a color like "Sapphire Blue", a spec footnote
+   * like "Google Play", a compatibility list like "... for Samsung/iPhone")
+   * can't outrank a real brand mention earlier in the title.
+   */
   private extractBrandFromTitle(title: string): string | undefined {
     const lower = title.toLowerCase();
+
     for (const [alias, canonical] of Object.entries(BRAND_ALIASES)) {
-      if (lower.startsWith(alias) || lower.includes(` ${alias} `)) {
+      if (lower.startsWith(`${alias} `) || lower === alias) {
         return canonical;
       }
     }
-    return undefined;
+
+    let bestIndex = -1;
+    let bestCanonical: string | undefined;
+    for (const [alias, canonical] of Object.entries(BRAND_ALIASES)) {
+      const index = lower.indexOf(` ${alias} `);
+      if (index !== -1 && (bestIndex === -1 || index < bestIndex)) {
+        bestIndex = index;
+        bestCanonical = canonical;
+      }
+    }
+    return bestCanonical;
   }
 
   private extractBrandFromAttributes(attrs: Record<string, unknown>): string | undefined {

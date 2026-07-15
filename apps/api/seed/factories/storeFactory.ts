@@ -57,6 +57,15 @@ export const storeDefinitions: StoreDefinition[] = [
     titleStyle: 'compact',
   },
   {
+    slug: 'alibaba',
+    name: 'Alibaba',
+    baseUrl: 'https://www.alibaba.com',
+    connectorType: ConnectorType.HTTP_API,
+    rateLimit: 60,
+    priceModifier: 0.89,
+    titleStyle: 'compact',
+  },
+  {
     slug: 'carrefour',
     name: 'Carrefour',
     baseUrl: 'https://www.carrefouruae.com',
