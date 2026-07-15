@@ -393,7 +393,7 @@ export class LiveIngestionService {
     // same listing.
     const listingEmbedding = await this.semantic.embed(listing.title);
 
-    const canonicalMatch = await this.findCanonicalMatch(category.id, normalized, extracted, listing, listingEmbedding);
+    const canonicalMatch = await this.findCanonicalMatch(category.id, normalized, extracted, listing);
     const matchedExistingCanonicalProduct = !!canonicalMatch;
 
     const canonicalProduct =
@@ -500,7 +500,6 @@ export class LiveIngestionService {
     normalized: ReturnType<NormalizerService['normalizeTitle']>,
     extracted: ReturnType<NormalizerService['extractAttributes']>,
     listing: RetailerListing,
-    listingEmbedding: number[] | null,
   ) {
     const identifierMatch = await this.findByIdentifier(listing.identifiers);
     if (identifierMatch) {
@@ -541,27 +540,21 @@ export class LiveIngestionService {
       return candidate;
     }
 
-    // Ask the local LLM about the handful of candidates whose titles are closest
-    // by meaning (embedding similarity) — it isn't fooled by marketing filler the
-    // way plain text-overlap scoring is. Only falls through to the legacy fuzzy
-    // pass below if Ollama itself is unreachable.
-    if (listingEmbedding) {
-      const aiMatch = await this.findMatchViaLocalAi(
-        listing,
-        extracted,
-        listingBrand,
-        listingIsAccessory,
-        listingEmbedding,
-        categoryId,
-      );
-      if (aiMatch !== undefined) {
-        return aiMatch;
-      }
-    }
-
-    // Legacy fallback (regex/text-overlap heuristic) — used only when Ollama is
-    // unreachable, so ingestion never silently stops matching entirely.
-    let best: { candidate: (typeof candidates)[number]; score: number } | null = null;
+    // Rank same-category candidates that survive the hard-conflict guards
+    // (brand, accessory-vs-product, variant, identifier, storage/RAM/color) by
+    // fuzzy text similarity, then ask the local LLM to confirm the closest few,
+    // strongest match first.
+    //
+    // This used to rank candidates by title-embedding similarity instead of
+    // fuzzy score. That turned out to actively mislead: nomic-embed-text scored
+    // the SAME phone worded differently by two stores at ~0.54 similarity —
+    // *lower* than two completely different phone models (~0.53) — while a
+    // wrong-color variant of the exact same listing scored a near-perfect ~1.0.
+    // Embeddings were essentially blind to the attributes that actually decide
+    // a match here and were quietly starving the LLM step of the right
+    // candidates. Fuzzy text score (edit distance + token overlap) orders these
+    // sanely, and the conflict guards below still do the real precision work.
+    const survivors: Array<{ candidate: (typeof candidates)[number]; score: number }> = [];
 
     for (const candidate of candidates) {
       const candidateBrand = candidate.brand?.trim().toLowerCase() ?? null;
@@ -588,10 +581,12 @@ export class LiveIngestionService {
       const candidateStorage = typeof candidateAttributes.storage === 'string' ? candidateAttributes.storage : undefined;
       const candidateRam = typeof candidateAttributes.ram === 'string' ? candidateAttributes.ram : undefined;
       const candidateColor = typeof candidateAttributes.color === 'string' ? candidateAttributes.color : undefined;
+      const candidateDisplaySize = typeof candidateAttributes.displaySize === 'string' ? candidateAttributes.displaySize : undefined;
       if (
         this.fuzzyMatcher.detectStorageConflict(extracted.storage ?? undefined, candidateStorage) ||
         this.fuzzyMatcher.detectRamConflict(extracted.ram ?? undefined, candidateRam) ||
-        this.fuzzyMatcher.detectColorConflict(extracted.color ?? undefined, candidateColor)
+        this.fuzzyMatcher.detectColorConflict(extracted.color ?? undefined, candidateColor) ||
+        this.fuzzyMatcher.detectDisplaySizeConflict(extracted.displaySize ?? undefined, candidateDisplaySize)
       ) {
         continue;
       }
@@ -609,88 +604,37 @@ export class LiveIngestionService {
       // Sky Blue"), which tanks raw title token-overlap even for the exact same SKU.
       // If brand, model number, storage, RAM and color all agree (and none of the
       // conflict guards above rejected the pair), that structured agreement is
-      // stronger evidence of a true match than the noisy title text is.
+      // stronger evidence of a true match than the noisy title text is — boost it
+      // to the front of the LLM confirmation queue without short-circuiting the
+      // LLM check itself.
       const candidateModel = candidate.model?.trim().toLowerCase() ?? null;
       const modelsAgree = !!candidateModel && !!listingModel && candidateModel === listingModel;
-      const score = modelsAgree ? Math.max(titleScore, 1) : titleScore;
+      const score = modelsAgree ? Math.max(titleScore, 0.95) : titleScore;
 
-      if (score > (best?.score ?? 0)) {
-        best = { candidate, score };
-      }
+      survivors.push({ candidate, score });
     }
 
-    if (best && best.score >= FUZZY_MATCH_THRESHOLD) {
-      return best.candidate;
-    }
+    survivors.sort((a, b) => b.score - a.score);
+    const topCandidates = survivors.slice(0, 8);
 
-    return null;
-  }
-
-  /**
-   * Finds the nearest canonical products by title-embedding similarity, filters
-   * them through the same hard conflict guards as the legacy matcher (brand,
-   * variant, identifier, storage/RAM/color), then asks the local LLM to confirm
-   * whichever survive, closest first. Returns:
-   * - a canonical product if the LLM confirms a match,
-   * - `null` if it checked plausible neighbors and confirmed none of them match,
-   * - `undefined` if Ollama isn't reachable, so the caller should fall back to
-   *   the legacy heuristic matcher instead.
-   */
-  private async findMatchViaLocalAi(
-    listing: RetailerListing,
-    extracted: ReturnType<NormalizerService['extractAttributes']>,
-    listingBrand: string | null,
-    listingIsAccessory: boolean,
-    listingEmbedding: number[],
-    categoryId: string,
-  ) {
-    const nearest = await this.semantic.findSimilarProducts(listingEmbedding, 8, categoryId);
-    if (nearest.length === 0) {
-      return null;
-    }
-
-    const nearestCandidates = await this.prisma.canonicalProduct.findMany({
-      where: { id: { in: nearest.map((n) => n.id) } },
-    });
-    const candidateById = new Map(nearestCandidates.map((c) => [c.id, c]));
-
-    for (const { id } of nearest) {
-      const candidate = candidateById.get(id);
-      if (!candidate) continue;
-
-      const candidateBrand = candidate.brand?.trim().toLowerCase() ?? null;
-      if (candidateBrand && listingBrand && candidateBrand !== listingBrand) {
-        continue;
-      }
-      if (listingIsAccessory !== this.normalizer.isAccessory(candidate.title)) {
-        continue;
-      }
-      if (this.fuzzyMatcher.detectVariantConflict(listing.title, candidate.title)) {
-        continue;
-      }
-      if (this.hasIdentifierConflict(listing, candidate)) {
-        continue;
-      }
-
-      const candidateAttributes = (candidate.attributes ?? {}) as Record<string, unknown>;
-      const candidateStorage = typeof candidateAttributes.storage === 'string' ? candidateAttributes.storage : undefined;
-      const candidateRam = typeof candidateAttributes.ram === 'string' ? candidateAttributes.ram : undefined;
-      const candidateColor = typeof candidateAttributes.color === 'string' ? candidateAttributes.color : undefined;
-      if (
-        this.fuzzyMatcher.detectStorageConflict(extracted.storage ?? undefined, candidateStorage) ||
-        this.fuzzyMatcher.detectRamConflict(extracted.ram ?? undefined, candidateRam) ||
-        this.fuzzyMatcher.detectColorConflict(extracted.color ?? undefined, candidateColor)
-      ) {
-        continue;
-      }
-
+    let llmUnavailable = false;
+    for (const { candidate } of topCandidates) {
       const verdict = await this.semantic.judgeSameProduct(listing.title, candidate.title);
-      if (verdict === null) {
-        return undefined;
-      }
-      if (verdict) {
+      if (verdict === true) {
         return candidate;
       }
+      if (verdict === null) {
+        // Ollama and the OpenRouter fallback are both unreachable — stop asking
+        // (every remaining call would fail the same way) and fall back below.
+        llmUnavailable = true;
+        break;
+      }
+    }
+
+    // LLM couldn't be reached for any candidate — fall back to the plain fuzzy
+    // score threshold so ingestion doesn't stall or silently stop matching.
+    if (llmUnavailable && survivors.length > 0 && survivors[0].score >= FUZZY_MATCH_THRESHOLD) {
+      return survivors[0].candidate;
     }
 
     return null;

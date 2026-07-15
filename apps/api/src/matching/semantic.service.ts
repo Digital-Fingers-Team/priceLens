@@ -125,7 +125,18 @@ export class SemanticService {
    */
   async judgeSameProduct(titleA: string, titleB: string): Promise<boolean | null> {
     const prompt = `You are a strict product-matching assistant for an e-commerce price-comparison site.
-Given two product titles from two different online stores, decide if they describe the EXACT same product for sale — same brand, same model, same storage/capacity if mentioned, same color/variant if mentioned — just worded differently by each store's copywriter. Marketing filler words (e.g. "Unlocked", "Official Warranty", "Genuine") don't matter and should be ignored. But a different color, different storage/RAM/capacity, or a different model tier (e.g. "Pro" vs base, "Ultra" vs base, "Max" vs base, "Mini" vs base) means they are NOT the same product.
+Given two product titles from two different online stores, decide if they describe the EXACT same product for sale — same brand, same model number/code, same storage/capacity if mentioned, same color/variant if mentioned — just worded differently by each store's copywriter.
+
+These differences are just copywriting style and do NOT make it a different product — ignore them:
+- Marketing filler ("Unlocked", "Official Warranty", "Genuine", "Global Version")
+- Spacing/punctuation around specs ("8GB" vs "8 GB", "5G" tag present or absent, "Dual SIM" mentioned or not)
+- Word order, extra descriptive adjectives, or one title being longer/more detailed than the other
+
+These ARE different products — check carefully, because the surrounding words are often otherwise identical:
+- A different color, storage size, or RAM amount
+- A different model tier suffix ("Pro" vs base, "Ultra" vs base, "Max" vs base, "Mini" vs base)
+- A different exact model number/code, even by a single character — e.g. "Ryzen 7 7700" vs "Ryzen 7 7700X", "271V8LB" vs "241V8LB", "F6000" vs "H5000F" are each two DIFFERENT products despite nearly-identical titles
+- A different screen/display size (e.g. "24-inch" vs "27-inch")
 
 Product A: "${titleA}"
 Product B: "${titleB}"
@@ -266,37 +277,6 @@ Respond with ONLY this JSON object and nothing else: {"same": true or false}`;
       UPDATE canonical_products
       SET title_embedding = ${vectorStr}::vector
       WHERE id = ${productId}
-    `;
-  }
-
-  /**
-   * Find the top-N most similar canonical products to a given embedding, using
-   * pgvector's cosine distance operator (<=>). Optionally scoped to a category.
-   */
-  async findSimilarProducts(
-    embedding: number[],
-    limit = 8,
-    categoryId?: string,
-  ): Promise<Array<{ id: string; similarity: number }>> {
-    const vectorStr = `[${embedding.join(',')}]`;
-
-    if (categoryId) {
-      return this.prisma.$queryRaw<Array<{ id: string; similarity: number }>>`
-        SELECT id, 1 - (title_embedding <=> ${vectorStr}::vector) as similarity
-        FROM canonical_products
-        WHERE title_embedding IS NOT NULL
-          AND category_id = ${categoryId}
-        ORDER BY title_embedding <=> ${vectorStr}::vector
-        LIMIT ${limit}
-      `;
-    }
-
-    return this.prisma.$queryRaw<Array<{ id: string; similarity: number }>>`
-      SELECT id, 1 - (title_embedding <=> ${vectorStr}::vector) as similarity
-      FROM canonical_products
-      WHERE title_embedding IS NOT NULL
-      ORDER BY title_embedding <=> ${vectorStr}::vector
-      LIMIT ${limit}
     `;
   }
 }

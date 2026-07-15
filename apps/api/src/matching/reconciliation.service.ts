@@ -117,10 +117,24 @@ export class ReconciliationService {
   }
 
   /**
-   * For each canonical product, ask the HNSW index for its `neighborsPerProduct`
-   * nearest same-category neighbours (LATERAL join → indexed KNN, not the old
-   * O(n^2) cross-join), then keep the pairs within the similarity threshold.
-   * `a_id < b_id` collapses the two directions of each pair into one row.
+   * For each canonical product, find its `neighborsPerProduct` nearest
+   * same-category neighbours by title-trigram similarity (pg_trgm, already
+   * GIN-indexed on `normalized_title`), then keep the pairs within the
+   * similarity threshold. `a_id < b_id` collapses the two directions of each
+   * pair into one row.
+   *
+   * This used to rank neighbours by title-embedding cosine distance
+   * (pgvector). That was actively counterproductive here: nomic-embed-text
+   * scored the SAME phone worded differently by two stores at ~0.54 —
+   * *below* two completely different phone models (~0.53) — while scoring a
+   * wrong-color variant of the exact same listing at ~1.0. At the 0.82
+   * threshold that meant almost every genuine cross-store duplicate was
+   * silently excluded before it ever reached the LLM judge (confirmed by
+   * checking one directly: a known duplicate pair sat at 0.54, a known
+   * non-duplicate pair sat at 1.0). Trigram similarity ranks these sanely —
+   * the true duplicate outscores the wrong-color variant — and the
+   * `hasHardConflict` guard below (brand/color/storage/RAM/identifier) still
+   * does the real precision filtering before any pair reaches the LLM.
    */
   private async findCandidatePairs(
     threshold: number,
@@ -131,18 +145,16 @@ export class ReconciliationService {
       WITH deduped AS (
         SELECT DISTINCT ON (a_id, b_id) a_id, b_id, similarity FROM (
           SELECT LEAST(a.id, nn.id) AS a_id, GREATEST(a.id, nn.id) AS b_id,
-                 1 - (a.title_embedding <=> nn.title_embedding) AS similarity
+                 nn.sim AS similarity
           FROM canonical_products a
           JOIN LATERAL (
-            SELECT b.id, b.title_embedding
+            SELECT b.id, similarity(a.normalized_title, b.normalized_title) AS sim
             FROM canonical_products b
             WHERE b.category_id = a.category_id
               AND b.id <> a.id
-              AND b.title_embedding IS NOT NULL
-            ORDER BY a.title_embedding <=> b.title_embedding
+            ORDER BY a.normalized_title <-> b.normalized_title
             LIMIT ${neighborsPerProduct}
           ) nn ON true
-          WHERE a.title_embedding IS NOT NULL
         ) pairs
         WHERE similarity >= ${threshold}
         ORDER BY a_id, b_id, similarity DESC
@@ -176,7 +188,8 @@ export class ReconciliationService {
     if (
       this.fuzzyMatcher.detectStorageConflict(str(attrsA.storage), str(attrsB.storage)) ||
       this.fuzzyMatcher.detectRamConflict(str(attrsA.ram), str(attrsB.ram)) ||
-      this.fuzzyMatcher.detectColorConflict(str(attrsA.color), str(attrsB.color))
+      this.fuzzyMatcher.detectColorConflict(str(attrsA.color), str(attrsB.color)) ||
+      this.fuzzyMatcher.detectDisplaySizeConflict(str(attrsA.displaySize), str(attrsB.displaySize))
     ) {
       return true;
     }

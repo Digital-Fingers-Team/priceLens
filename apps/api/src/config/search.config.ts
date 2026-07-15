@@ -23,14 +23,19 @@ export default registerAs('search', () => ({
   reconciliationScheduleEnabled: (process.env.RECONCILIATION_SCHEDULE_ENABLED ?? 'true') !== 'false',
   reconciliationCron: process.env.RECONCILIATION_CRON ?? '0 * * * *',
   reconciliationDryRun: (process.env.RECONCILIATION_DRY_RUN ?? 'true') !== 'false',
-  // Minimum cosine similarity (0..1) between two canonical embeddings before the
-  // pair is even considered a candidate worth asking the LLM about.
-  reconciliationSimilarityThreshold: Number(process.env.RECONCILIATION_SIMILARITY_THRESHOLD ?? '0.82'),
+  // Minimum title-trigram similarity (pg_trgm, 0..1) between two canonical
+  // products before the pair is even considered a candidate worth asking the
+  // LLM about. Tuned low on purpose: a genuine cross-store duplicate of the
+  // same phone (just worded differently) scores ~0.45-0.55 here — the
+  // hasHardConflict guard (brand/color/storage/RAM/identifier), not this
+  // threshold, is what actually rejects false positives before the LLM call.
+  reconciliationSimilarityThreshold: Number(process.env.RECONCILIATION_SIMILARITY_THRESHOLD ?? '0.3'),
   // Max candidate pairs examined per run, to bound LLM calls.
-  reconciliationMaxPairs: Number(process.env.RECONCILIATION_MAX_PAIRS ?? '200'),
-  // How many nearest neighbours to pull per product from the HNSW index when
-  // building the candidate list. Higher = more thorough, more rows to filter.
-  reconciliationNeighborsPerProduct: Number(process.env.RECONCILIATION_NEIGHBORS_PER_PRODUCT ?? '5'),
+  reconciliationMaxPairs: Number(process.env.RECONCILIATION_MAX_PAIRS ?? '500'),
+  // How many nearest neighbours to pull per product (by title-trigram
+  // similarity) when building the candidate list. Higher = more thorough,
+  // more rows to filter.
+  reconciliationNeighborsPerProduct: Number(process.env.RECONCILIATION_NEIGHBORS_PER_PRODUCT ?? '8'),
   // When false, the OpenRouter cloud fallback for match-judgement is disabled even
   // if a key is present, keeping every title on-machine (local Ollama only).
   openRouterFallbackEnabled: (process.env.OPENROUTER_FALLBACK_ENABLED ?? 'true') !== 'false',

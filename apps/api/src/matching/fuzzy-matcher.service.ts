@@ -148,6 +148,21 @@ export class FuzzyMatcherService {
     return colorA.trim().toLowerCase() !== colorB.trim().toLowerCase() ? 'color_conflict' : null;
   }
 
+  /**
+   * Detect conflicting display sizes (monitors/TVs/laptops). A 24-inch and a
+   * 27-inch monitor are physically different products even when the rest of
+   * the model name is nearly identical ("LG 24U411A-B" vs "LG 27U411A-B") —
+   * this caught two real false merges where the LLM judge missed the size
+   * digits buried in an otherwise-matching title.
+   */
+  detectDisplaySizeConflict(sizeA?: string, sizeB?: string): string | null {
+    if (!sizeA || !sizeB) return null;
+    const a = parseFloat(sizeA);
+    const b = parseFloat(sizeB);
+    if (Number.isNaN(a) || Number.isNaN(b)) return null;
+    return Math.abs(a - b) >= 0.5 ? 'display_size_conflict' : null;
+  }
+
   private normalizeStorage(val: string): string {
     const normalized = this.storageToGb(val);
     if (normalized === null) return val.trim().toLowerCase();
