@@ -1,9 +1,29 @@
+// Standalone judge-prompt test. Deliberately does NOT bootstrap the full
+// AppModule (see run-reconcile-live.ts for why) -- only wires up what
+// SemanticService needs.
+import { Module } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from '../src/app.module';
+import { ConfigModule } from '@nestjs/config';
+import { PrismaService } from '../src/database/prisma.service';
 import { SemanticService } from '../src/matching/semantic.service';
+import appConfig from '../src/config/app.config';
+import searchConfig from '../src/config/search.config';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      load: [appConfig, searchConfig],
+      envFilePath: ['../../.env.local', '../../.env'],
+      cache: true,
+    }),
+  ],
+  providers: [PrismaService, SemanticService],
+})
+class JudgeOnlyModule {}
 
 async function main() {
-  const app = await NestFactory.createApplicationContext(AppModule, { logger: ['error'] });
+  const app = await NestFactory.createApplicationContext(JudgeOnlyModule, { logger: ['error'] });
   const semantic = app.get(SemanticService);
 
   const pairs: [string, string, string][] = [

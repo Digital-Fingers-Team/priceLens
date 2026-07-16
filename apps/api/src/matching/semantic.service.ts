@@ -132,14 +132,24 @@ Product B: "${titleB}"
 
 Respond with ONLY this JSON object and nothing else: {"same": true or false}`;
 
-    // Prefer the local Ollama model (no cost, no egress). If it's unreachable
-    // — e.g. on a server with no local LLM — fall back to OpenRouter so matching
-    // keeps working instead of silently degrading to the heuristic matcher.
-    const local = await this.judgeViaOllama(prompt);
-    if (local !== undefined) {
-      return local;
+    // Prefer OpenRouter (a real-sized cloud model, e.g. gemini-2.0-flash-001)
+    // over the local Ollama model: testing showed the local qwen2.5:1.5b model
+    // — the largest this machine's hardware can run — reasons unreliably about
+    // real duplicates worded differently by two stores, missing matches it
+    // should catch. Call volume here is small (a handful of guard-surviving
+    // candidates per listing), so the cost is negligible. Falls back to the
+    // local model if OpenRouter is unconfigured or unreachable, so matching
+    // still works fully offline / without an API key.
+    if (this.openRouterFallbackEnabled && this.openRouterApiKey) {
+      const cloud = await this.judgeViaOpenRouter(prompt);
+      if (cloud !== null) {
+        return cloud;
+      }
+      this.logger.warn('OpenRouter judgement unavailable, falling back to local Ollama model');
     }
-    return this.judgeViaOpenRouter(prompt);
+
+    const local = await this.judgeViaOllama(prompt);
+    return local === undefined ? null : local;
   }
 
   /**
@@ -171,26 +181,22 @@ Respond with ONLY this JSON object and nothing else: {"same": true or false}`;
       const parsed = JSON.parse(data.response) as { same?: boolean };
       return typeof parsed.same === 'boolean' ? parsed.same : null;
     } catch (err) {
-      this.logger.warn(`Ollama match-judgement unavailable, will try OpenRouter fallback: ${(err as Error).message}`);
+      this.logger.warn(`Ollama match-judgement unavailable: ${(err as Error).message}`);
       return undefined;
     }
   }
 
   private async judgeViaOpenRouter(prompt: string): Promise<boolean | null> {
     if (!this.openRouterFallbackEnabled) {
-      this.logger.warn('OpenRouter fallback skipped: disabled (OPENROUTER_FALLBACK_ENABLED=false)');
+      this.logger.warn('OpenRouter judgement skipped: disabled (OPENROUTER_FALLBACK_ENABLED=false)');
       return null;
     }
     if (!this.openRouterApiKey) {
-      this.logger.warn('OpenRouter fallback skipped: OPENROUTER_API_KEY not set');
+      this.logger.warn('OpenRouter judgement skipped: OPENROUTER_API_KEY not set');
       return null;
     }
 
-    // This sends product titles to a third party (OpenRouter). It runs only when
-    // local Ollama is unreachable AND the fallback is explicitly enabled.
-    this.logger.warn(
-      `Local model unavailable — sending titles to OpenRouter (${this.openRouterMatchModel}) for match judgement`,
-    );
+    // This sends product titles to a third party (OpenRouter).
     try {
       const response = await fetch(`${this.openRouterBaseUrl}/chat/completions`, {
         method: 'POST',
@@ -202,6 +208,11 @@ Respond with ONLY this JSON object and nothing else: {"same": true or false}`;
           model: this.openRouterMatchModel,
           messages: [{ role: 'user', content: prompt }],
           temperature: 0,
+          // The answer is a few bytes of JSON, but some models (e.g. Gemini,
+          // which reserves an internal "thinking" budget by default) will
+          // otherwise request a huge max_tokens and fail with a 402 credits
+          // error on a low-balance account before producing any output.
+          max_tokens: 50,
           response_format: { type: 'json_object' },
         }),
         signal: AbortSignal.timeout(45_000),
