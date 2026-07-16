@@ -24,6 +24,14 @@ import { RetailerListing } from './interfaces/retailer-listing.interface';
  */
 const FUZZY_MATCH_THRESHOLD = 0.85;
 
+/**
+ * Score assigned to a survivor whose extracted model number exactly matches
+ * the listing's (see the `modelsAgree` boost below). Kept as a named constant
+ * so the auto-accept fast path and the boost that produces this score can't
+ * drift apart.
+ */
+const MODEL_AGREEMENT_SCORE = 0.95;
+
 export interface LiveIngestionOptions {
   platformSlugs?: string[];
   limitPerQuery?: number;
@@ -577,20 +585,26 @@ export class LiveIngestionService {
         continue;
       }
 
+      if (this.fuzzyMatcher.detectDisjointModelConflict(listing.title, candidate.title)) {
+        continue;
+      }
+
       if (this.hasIdentifierConflict(listing, candidate)) {
         continue;
       }
 
-      const candidateAttributes = (candidate.attributes ?? {}) as Record<string, unknown>;
-      const candidateStorage = typeof candidateAttributes.storage === 'string' ? candidateAttributes.storage : undefined;
-      const candidateRam = typeof candidateAttributes.ram === 'string' ? candidateAttributes.ram : undefined;
-      const candidateColor = typeof candidateAttributes.color === 'string' ? candidateAttributes.color : undefined;
-      const candidateDisplaySize = typeof candidateAttributes.displaySize === 'string' ? candidateAttributes.displaySize : undefined;
+      // Recomputed fresh from the candidate's title rather than trusting its
+      // stored `attributes` column, which can be stale or never populated for
+      // older/previously-merged rows (a real false merge this caused: a
+      // "Cobalt Violet" listing merged with a "Black" canonical because the
+      // stored attributes had no color at all, even though it's extractable
+      // straight from the title).
+      const candidateExtracted = this.normalizer.extractAttributes(candidate.title);
       if (
-        this.fuzzyMatcher.detectStorageConflict(extracted.storage ?? undefined, candidateStorage) ||
-        this.fuzzyMatcher.detectRamConflict(extracted.ram ?? undefined, candidateRam) ||
-        this.fuzzyMatcher.detectColorConflict(extracted.color ?? undefined, candidateColor) ||
-        this.fuzzyMatcher.detectDisplaySizeConflict(extracted.displaySize ?? undefined, candidateDisplaySize)
+        this.fuzzyMatcher.detectStorageConflict(extracted.storage ?? undefined, candidateExtracted.storage) ||
+        this.fuzzyMatcher.detectRamConflict(extracted.ram ?? undefined, candidateExtracted.ram) ||
+        this.fuzzyMatcher.detectColorConflict(extracted.color ?? undefined, candidateExtracted.color) ||
+        this.fuzzyMatcher.detectDisplaySizeConflict(extracted.displaySize ?? undefined, candidateExtracted.displaySize)
       ) {
         continue;
       }
@@ -611,15 +625,32 @@ export class LiveIngestionService {
       // stronger evidence of a true match than the noisy title text is — boost it
       // to the front of the LLM confirmation queue without short-circuiting the
       // LLM check itself.
-      const candidateModel = candidate.model?.trim().toLowerCase() ?? null;
+      // Falls back to a fresh extraction for the same reason as above: older
+      // canonical rows predate model extraction for several phone brands, so
+      // the stored `model` column is often empty even though it's derivable
+      // from the title right now.
+      const candidateModel = candidate.model?.trim().toLowerCase() ?? candidateExtracted.model?.trim().toLowerCase() ?? null;
       const modelsAgree = !!candidateModel && !!listingModel && candidateModel === listingModel;
-      const score = modelsAgree ? Math.max(titleScore, 0.95) : titleScore;
+      const score = modelsAgree ? Math.max(titleScore, MODEL_AGREEMENT_SCORE) : titleScore;
 
       survivors.push({ candidate, score });
     }
 
     survivors.sort((a, b) => b.score - a.score);
     const topCandidates = survivors.slice(0, 8);
+
+    // A survivor already scoring >= the "models agree" boost has cleared every
+    // hard-conflict guard above (brand, accessory, variant, model-code-suffix,
+    // disjoint-model-code, identifier, storage/RAM/color/display) AND has an
+    // extracted model number that exactly matches the listing's. That's a
+    // stronger, more reliable signal than the small local LLM: testing showed
+    // qwen2.5:1.5b incorrectly rejects real duplicates worded differently by
+    // two stores (e.g. "Oppo A6 - 8GB RAM - 256GB" vs "OPPO A6 Smartphone,
+    // 256 GB, ... 8 GB RAM") even though every structured attribute agrees.
+    // Skip the unreliable judge call entirely for these and accept directly.
+    if (topCandidates.length > 0 && topCandidates[0].score >= MODEL_AGREEMENT_SCORE) {
+      return topCandidates[0].candidate;
+    }
 
     let llmUnavailable = false;
     for (const { candidate } of topCandidates) {

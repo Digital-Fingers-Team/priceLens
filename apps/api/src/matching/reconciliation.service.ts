@@ -83,7 +83,19 @@ export class ReconciliationService {
 
       if (this.hasHardConflict(a, b)) continue;
 
-      const verdict = await this.semantic.judgeSameProduct(a.title, b.title);
+      // If the model number extracted fresh from each title agrees, that's a
+      // stronger, more reliable signal than the small local LLM judge: testing
+      // showed qwen2.5:1.5b incorrectly rejects real duplicates worded
+      // differently by two stores (e.g. "Oppo A6 - 8GB RAM - 256GB" vs "OPPO
+      // A6 Smartphone, 256 GB, ... 8 GB RAM") even though every structured
+      // attribute agrees. Recomputed from the title rather than trusting the
+      // stored `model` column, since older rows predate model extraction for
+      // several phone brands. Skip the LLM call entirely when it agrees.
+      const modelA = this.normalizer.extractAttributes(a.title).model?.trim().toLowerCase();
+      const modelB = this.normalizer.extractAttributes(b.title).model?.trim().toLowerCase();
+      const modelsAgree = !!modelA && !!modelB && modelA === modelB;
+
+      const verdict = modelsAgree ? true : await this.semantic.judgeSameProduct(a.title, b.title);
       if (verdict !== true) continue;
 
       // Keep the older canonical (stable ids, older price history), merge the newer in.
@@ -182,16 +194,23 @@ export class ReconciliationService {
 
     if (this.fuzzyMatcher.detectModelCodeSuffixConflict(a.title, b.title)) return true;
 
+    if (this.fuzzyMatcher.detectDisjointModelConflict(a.title, b.title)) return true;
+
     if (this.hasIdentifierConflict(a, b)) return true;
 
-    const attrsA = (a.attributes ?? {}) as Record<string, unknown>;
-    const attrsB = (b.attributes ?? {}) as Record<string, unknown>;
-    const str = (v: unknown) => (typeof v === 'string' ? v : undefined);
+    // Recomputed fresh from the title rather than trusting the stored
+    // `attributes` column: older/previously-merged canonical rows can have
+    // stale or never-populated storage/RAM/color/display data (a real false
+    // merge this caused: "Cobalt Violet" merged with "Black" because the
+    // stored attributes on one side had no color at all, even though it's
+    // extractable straight from the title).
+    const extractedA = this.normalizer.extractAttributes(a.title);
+    const extractedB = this.normalizer.extractAttributes(b.title);
     if (
-      this.fuzzyMatcher.detectStorageConflict(str(attrsA.storage), str(attrsB.storage)) ||
-      this.fuzzyMatcher.detectRamConflict(str(attrsA.ram), str(attrsB.ram)) ||
-      this.fuzzyMatcher.detectColorConflict(str(attrsA.color), str(attrsB.color)) ||
-      this.fuzzyMatcher.detectDisplaySizeConflict(str(attrsA.displaySize), str(attrsB.displaySize))
+      this.fuzzyMatcher.detectStorageConflict(extractedA.storage, extractedB.storage) ||
+      this.fuzzyMatcher.detectRamConflict(extractedA.ram, extractedB.ram) ||
+      this.fuzzyMatcher.detectColorConflict(extractedA.color, extractedB.color) ||
+      this.fuzzyMatcher.detectDisplaySizeConflict(extractedA.displaySize, extractedB.displaySize)
     ) {
       return true;
     }

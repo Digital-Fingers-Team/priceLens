@@ -44,6 +44,7 @@ const BRAND_ALIASES: Record<string, string> = {
   'western digital': 'Western Digital',
   wd: 'Western Digital',
   oppo: 'OPPO',
+  reno: 'OPPO',
   xiaomi: 'Xiaomi',
   redmi: 'Xiaomi',
   poco: 'Xiaomi',
@@ -74,6 +75,24 @@ const CRITICAL_VARIANTS = [
   /\bSE\b/i,
   /\bXT\b/i,
 ];
+
+/**
+ * Phone brands with no dedicated model regex below (unlike GPU/Mac/Galaxy/
+ * iPhone). Deliberately excludes CPU/GPU/laptop brands (AMD, NVIDIA, ASUS,
+ * HP, ...): those often repeat a shared prefix ("Ryzen 7") ahead of the
+ * digits that actually distinguish two different SKUs, so the generic
+ * single-next-token capture below would wrongly call two different chips
+ * the "same model" — a mistake this narrower brand list avoids.
+ */
+const GENERIC_MODEL_BRANDS = new Set([
+  'oppo', 'xiaomi', 'redmi', 'poco', 'huawei', 'honor', 'vivo', 'realme',
+  'nokia', 'infinix', 'tecno', 'itel', 'nothing', 'oneplus', 'motorola', 'reno',
+]);
+
+const MODEL_TOKEN_UNIT_SUFFIXES = new Set([
+  'gb', 'tb', 'mb', 'kb', 'mp', 'mah', 'mm', 'cm', 'in', 'inch',
+  'hz', 'khz', 'mhz', 'ghz', 'fps', 'db', 'kw', 'ma', 'g', 'k', 'p', 'w', 'v',
+]);
 
 const STORAGE_PATTERN = /\b(\d+(?:\.\d+)?)\s*(TB|GB|MB)\b/gi;
 const RAM_PATTERNS = [
@@ -239,7 +258,57 @@ export class NormalizerService {
     const iphoneMatch = iphonePattern.exec(title);
     if (iphoneMatch) return iphoneMatch[1];
 
-    return undefined;
+    return this.extractGenericPhoneModel(title);
+  }
+
+  /**
+   * Retailers reword the same phone completely differently around the model
+   * code ("Oppo A6 - 8GB RAM - 256GB - Aurora Gold" vs "OPPO A6 Smartphone,
+   * 256 GB, Aurora Gold, Dual SIM, 8 GB RAM, 5G"), which tanks raw text
+   * similarity for genuine duplicates. The model code itself — the token
+   * immediately after the brand name — stays stable across rewordings, so
+   * capturing it here lets the matcher boost real duplicates with confidence
+   * instead of relying only on noisy title text or the small local LLM.
+   */
+  private extractGenericPhoneModel(title: string): string | undefined {
+    const lower = title.toLowerCase();
+
+    let matchedAlias: string | undefined;
+    let brandEnd = -1;
+
+    for (const alias of GENERIC_MODEL_BRANDS) {
+      if (lower.startsWith(`${alias} `)) {
+        matchedAlias = alias;
+        brandEnd = alias.length;
+        break;
+      }
+    }
+
+    if (!matchedAlias) {
+      let bestIndex = -1;
+      for (const alias of GENERIC_MODEL_BRANDS) {
+        const index = lower.indexOf(` ${alias} `);
+        if (index !== -1 && (bestIndex === -1 || index < bestIndex)) {
+          bestIndex = index;
+          matchedAlias = alias;
+          brandEnd = index + 1 + alias.length;
+        }
+      }
+    }
+
+    if (!matchedAlias || brandEnd === -1) return undefined;
+
+    const rest = lower.slice(brandEnd);
+    const firstToken = rest.split(/[\s,\-/()[\]{}:]+/).filter(Boolean)[0];
+    if (!firstToken || !/\d/.test(firstToken)) return undefined;
+
+    const letters = firstToken.replace(/[0-9]/g, '');
+    if (letters && MODEL_TOKEN_UNIT_SUFFIXES.has(letters)) return undefined;
+
+    // "reno" is a product line, not a full brand name -- fold it back into
+    // the captured number so it matches a title that spells it as one word
+    // elsewhere ("Reno15").
+    return matchedAlias === 'reno' ? `reno${firstToken}` : firstToken;
   }
 
   extractVariant(title: string): string | undefined {
@@ -346,6 +415,7 @@ export class NormalizerService {
       'rose gold',
       'jet black',
       'matte black',
+      'charcoal',
       'midnight green',
       'alpine green',
       'sage green',

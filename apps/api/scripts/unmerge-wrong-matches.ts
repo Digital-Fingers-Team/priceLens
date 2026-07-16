@@ -6,10 +6,8 @@ import { PrismaClient } from '@prisma/client';
 import { NormalizerService } from '../src/matching/normalizer.service';
 
 const LISTING_IDS_TO_SPLIT = [
-  'bf16af81-2774-47b7-8a49-92afbe66e3cf', // AMD Ryzen 7 7700 (wrongly merged into 7700X)
-  'dc1f9269-a26d-4cdb-a466-f93aec1cd9a8', // LG 24-inch monitor (wrongly merged into 27-inch)
-  '4bb5ff10-4038-4d53-a44e-0e0b42c6369a', // Philips 271V8LB 27" (wrongly merged into 241V8LB 24")
-  'bd6b469c-6a31-4aeb-89ad-32c21fec8d0c', // Samsung F6000 TV (wrongly merged into H5000F)
+  'd30350ee-1787-4054-bd9e-9e8554484626', // Samsung Galaxy A37 "Awesome Lavender" (wrongly merged into "Awesome Charcoal" -- "charcoal" was missing from the color dict)
+  'dba04bab-864b-4751-8da6-65c5fe09fccf', // Samsung Galaxy S26 Ultra "Cobalt Violet" (wrongly merged into "Black" -- hasHardConflict trusted stale stored attributes instead of re-extracting from title)
 ];
 
 function toSlug(input: string): string {

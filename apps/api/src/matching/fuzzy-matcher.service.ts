@@ -192,6 +192,43 @@ export class FuzzyMatcherService {
     return null;
   }
 
+  /**
+   * Detect two titles whose primary alphanumeric model/SKU codes are
+   * completely unrelated — e.g. "Samsung ... F6000 Smart TV" vs "Samsung ...
+   * H5000F Smart TV". `detectModelCodeSuffixConflict` deliberately only
+   * fires when both sides share the same digit run (7700 vs 7700X); it stays
+   * silent here because F6000 and H5000F don't share a digit core at all,
+   * which is exactly why this needs a second, complementary check.
+   *
+   * Only "strong" codes count — alphanumeric tokens containing at least one
+   * letter (a real product code), never a bare number, since bare numbers
+   * are usually a spec or a year ("2025 Model") and comparing those would
+   * flag two identical-model TVs from different release-year listings as a
+   * conflict. A bare-digit token like "256" (from "256GB") is excluded the
+   * same way. This only fires when BOTH titles have at least one strong code
+   * and none of those codes is shared — if either title has none, or if the
+   * two share at least one code (even alongside other, non-shared codes,
+   * e.g. one listing tacking on an extra internal SKU), it stays silent and
+   * defers to fuzzy score + the LLM judge as before.
+   */
+  detectDisjointModelConflict(titleA: string, titleB: string): string | null {
+    const strongCodes = (title: string): Set<string> => {
+      const codes = this.extractModelCodes(title);
+      const strong = new Set<string>();
+      for (const [digitKey, code] of codes) {
+        if (/[a-z]/.test(code)) strong.add(digitKey);
+      }
+      return strong;
+    };
+
+    const codesA = strongCodes(titleA);
+    const codesB = strongCodes(titleB);
+    if (codesA.size === 0 || codesB.size === 0) return null;
+
+    const sharesAny = [...codesA].some((key) => codesB.has(key));
+    return sharesAny ? null : 'disjoint_model_code_conflict';
+  }
+
   /** Maps each qualifying code's digit run -> the code's full text (letters + digits, lowercase). */
   private extractModelCodes(title: string): Map<string, string> {
     const codes = new Map<string, string>();
