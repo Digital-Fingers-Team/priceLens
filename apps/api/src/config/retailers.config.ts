@@ -5,6 +5,14 @@ export default registerAs('retailers', () => ({
   liveIngestionLimit: parseInt(process.env.LIVE_INGESTION_LIMIT ?? '25', 10),
   liveIngestionScheduleEnabled: process.env.LIVE_INGESTION_SCHEDULE_ENABLED !== 'false',
   liveIngestionCron: process.env.LIVE_INGESTION_CRON ?? '0 */6 * * *',
+  // After the generic category sweep discovers a product on one store, re-query
+  // the OTHER stores with a specific "brand model storage" query so they return
+  // the SAME product and it gets merged onto one canonical (fixes products that
+  // only ever show "1 store" because each store's generic search returns a
+  // different set of products). Bounded per run to keep scrape volume sane.
+  crossStoreBackfillEnabled: process.env.CROSS_STORE_BACKFILL_ENABLED !== 'false',
+  crossStoreBackfillMaxProducts: parseInt(process.env.CROSS_STORE_BACKFILL_MAX_PRODUCTS ?? '40', 10),
+  crossStoreBackfillLimitPerQuery: parseInt(process.env.CROSS_STORE_BACKFILL_LIMIT_PER_QUERY ?? '5', 10),
   amazonEnabled: process.env.AMAZON_ENABLED !== 'false',
   amazonBaseUrl: process.env.AMAZON_BASE_URL ?? 'https://www.amazon.com',
   alibabaEnabled: process.env.ALIBABA_ENABLED !== 'false',

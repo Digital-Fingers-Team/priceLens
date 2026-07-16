@@ -4,18 +4,16 @@ import { registerAs } from '@nestjs/config';
 export default registerAs('search', () => ({
   meilisearchUrl: process.env.MEILISEARCH_URL ?? 'http://localhost:7700',
   meilisearchKey: process.env.MEILISEARCH_KEY ?? process.env.MEILISEARCH_MASTER_KEY ?? '',
-  ollamaBaseUrl: process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434',
-  ollamaEmbedModel: process.env.OLLAMA_EMBED_MODEL ?? 'nomic-embed-text',
-  ollamaMatchModel: process.env.OLLAMA_MATCH_MODEL ?? 'qwen2.5:1.5b',
-  // Cloud fallback for the match-judgement step when local Ollama is unreachable
-  // (e.g. on a server with no local LLM). Uses the OpenRouter key already set for
-  // the project. Leave OPENROUTER_API_KEY empty to disable the fallback.
+  // Match-judgement and embeddings both run via OpenRouter (cloud) -- this app
+  // needs internet access anyway to scrape live retailer sites, and a local
+  // Ollama model was both slower and less reliable on this machine's hardware.
+  // Leave OPENROUTER_API_KEY empty to disable and fall back to the plain
+  // fuzzy-score heuristic only.
   openRouterApiKey: process.env.OPENROUTER_API_KEY ?? process.env.OPENAI_API_KEY ?? '',
   openRouterBaseUrl: process.env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1',
-  openRouterMatchModel: process.env.OPENROUTER_MATCH_MODEL ?? 'meta-llama/llama-3.1-8b-instruct',
-  // Embedding model for the same cloud fallback, requested at 768 dims via the
-  // OpenAI `dimensions` param (forwarded through OpenRouter) to match the
-  // vector(768) column sized for nomic-embed-text.
+  openRouterMatchModel: process.env.OPENROUTER_MATCH_MODEL ?? 'google/gemini-2.5-flash',
+  // Embedding model, requested at 768 dims via the OpenAI `dimensions` param
+  // (forwarded through OpenRouter) to match the existing vector(768) column.
   openRouterEmbedModel: process.env.OPENROUTER_EMBED_MODEL ?? 'openai/text-embedding-3-small',
   // Background reconciliation job that re-checks EXISTING canonical products for
   // duplicates and merges them (fixes the "1 store" problem). Runs on a cron and
@@ -36,7 +34,7 @@ export default registerAs('search', () => ({
   // similarity) when building the candidate list. Higher = more thorough,
   // more rows to filter.
   reconciliationNeighborsPerProduct: Number(process.env.RECONCILIATION_NEIGHBORS_PER_PRODUCT ?? '8'),
-  // When false, the OpenRouter cloud fallback for match-judgement is disabled even
-  // if a key is present, keeping every title on-machine (local Ollama only).
+  // When false, OpenRouter is disabled even if a key is present, and matching
+  // drops to the plain fuzzy-score heuristic (no LLM at all).
   openRouterFallbackEnabled: (process.env.OPENROUTER_FALLBACK_ENABLED ?? 'true') !== 'false',
 }));

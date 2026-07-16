@@ -113,6 +113,10 @@ export class LiveIngestionService {
 
     const skippedPlatforms: Array<{ slug: string; reason: string }> = [];
     const summaries: IngestionSummary[] = [];
+    // Products created/touched by the generic sweep below. The cross-store
+    // backfill re-queries the other stores for exactly these so the same
+    // product can show up from more than one store instead of just "1 store".
+    const touchedProductIds = new Set<string>();
 
     for (const requestedSlug of requestedPlatforms) {
       if (!this.connectorsBySlug.has(requestedSlug)) {
@@ -134,12 +138,14 @@ export class LiveIngestionService {
       }
 
       try {
-        summaries.push(await this.ingestPlatform(platform, connector, limitPerQuery));
+        summaries.push(await this.ingestPlatform(platform, connector, limitPerQuery, touchedProductIds));
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         skippedPlatforms.push({ slug: platform.slug, reason: `ingestion_failed:${message}` });
       }
     }
+
+    await this.backfillCrossStore(platforms, touchedProductIds, summaries);
 
     const finishedAt = new Date();
 
@@ -155,6 +161,7 @@ export class LiveIngestionService {
     platform: Platform,
     connector: RetailerConnector,
     limitPerQuery: number,
+    touchedProductIds?: Set<string>,
   ): Promise<IngestionSummary> {
     const categories = await this.prisma.category.findMany({
       where: { level: { gt: 0 } },
@@ -166,9 +173,14 @@ export class LiveIngestionService {
       queries: this.buildQueriesForCategory(category),
     }));
 
-    return this.runIngestionJob(platform, connector, limitPerQuery, categoryQueries, {
-      categoryCount: categories.length,
-    });
+    return this.runIngestionJob(
+      platform,
+      connector,
+      limitPerQuery,
+      categoryQueries,
+      { categoryCount: categories.length },
+      touchedProductIds,
+    );
   }
 
   /**
@@ -256,6 +268,7 @@ export class LiveIngestionService {
     limitPerQuery: number,
     categoryQueries: Array<{ category: Category; queries: string[] }>,
     extraPayload: Record<string, unknown> = {},
+    touchedProductIds?: Set<string>,
   ): Promise<IngestionSummary> {
     const job = await this.prisma.scrapingJob.create({
       data: {
@@ -313,6 +326,7 @@ export class LiveIngestionService {
             summary.priceHistoryEntries += result.priceHistoryCreated ? 1 : 0;
             summary.canonicalProductsCreated += result.createdCanonicalProduct ? 1 : 0;
             summary.canonicalProductsMatched += result.matchedExistingCanonicalProduct ? 1 : 0;
+            touchedProductIds?.add(result.canonicalProductId);
           }
         }
       }
@@ -342,6 +356,152 @@ export class LiveIngestionService {
 
       throw error;
     }
+  }
+
+  /**
+   * Second ingestion phase. The generic category sweep finds each store's own
+   * top products for terms like "smartphone", so two stores rarely surface the
+   * SAME product and most canonicals end up with only one store's listing.
+   *
+   * Here we take the products just discovered, build a specific
+   * "brand model storage" query for each, and re-search every OTHER enabled
+   * store for exactly that product. Any results flow back through the normal
+   * persist + match path (findCanonicalMatch), which merges them onto the same
+   * canonical — turning a "1 store" product into a real cross-store comparison.
+   */
+  private async backfillCrossStore(
+    platforms: Platform[],
+    touchedProductIds: Set<string>,
+    summaries: IngestionSummary[],
+  ): Promise<void> {
+    const enabled = this.configService.get<boolean>('retailers.crossStoreBackfillEnabled', true);
+    if (!enabled || touchedProductIds.size === 0) {
+      return;
+    }
+
+    const maxProducts = Math.max(
+      0,
+      this.configService.get<number>('retailers.crossStoreBackfillMaxProducts', 40),
+    );
+    const limitPerQuery = Math.max(
+      1,
+      this.configService.get<number>('retailers.crossStoreBackfillLimitPerQuery', 5),
+    );
+    if (maxProducts === 0) {
+      return;
+    }
+
+    // Only platforms whose connector is present and enabled can be backfilled.
+    const usablePlatforms = platforms.filter((platform) => {
+      const connector = this.connectorsBySlug.get(platform.slug);
+      return connector?.isEnabled;
+    });
+    if (usablePlatforms.length < 2) {
+      // Nothing to cross-reference against with fewer than two live stores.
+      return;
+    }
+
+    const summaryBySlug = new Map(summaries.map((summary) => [summary.platformSlug, summary]));
+
+    // Load the touched products together with the set of platforms that already
+    // carry a listing for each, so we only re-query the stores that are missing
+    // it. Products with the fewest covering stores are prioritized (the "1
+    // store" case is exactly what this exists to fix).
+    const products = await this.prisma.canonicalProduct.findMany({
+      where: { id: { in: Array.from(touchedProductIds) } },
+      include: {
+        category: true,
+        sourceListings: { select: { platformId: true } },
+      },
+    });
+
+    const ranked = products
+      .map((product) => ({
+        product,
+        coveringPlatformIds: new Set(product.sourceListings.map((listing) => listing.platformId)),
+      }))
+      .sort((a, b) => a.coveringPlatformIds.size - b.coveringPlatformIds.size)
+      .slice(0, maxProducts);
+
+    for (const { product, coveringPlatformIds } of ranked) {
+      const query = this.buildProductQuery(product);
+      if (!query) {
+        continue;
+      }
+
+      for (const platform of usablePlatforms) {
+        if (coveringPlatformIds.has(platform.id)) {
+          continue;
+        }
+        const connector = this.connectorsBySlug.get(platform.slug);
+        if (!connector) {
+          continue;
+        }
+
+        try {
+          const listings = await connector.searchListings(query, limitPerQuery);
+          const summary = summaryBySlug.get(platform.slug);
+
+          for (const listing of listings) {
+            if (listing.priceUsd == null || !Number.isFinite(listing.priceUsd) || listing.priceUsd <= 0) {
+              continue;
+            }
+
+            const result = await this.persistListing(platform, product.category, listing, connector.slug);
+            if (summary) {
+              summary.listingsUpserted += 1;
+              summary.priceHistoryEntries += result.priceHistoryCreated ? 1 : 0;
+              summary.canonicalProductsCreated += result.createdCanonicalProduct ? 1 : 0;
+              summary.canonicalProductsMatched += result.matchedExistingCanonicalProduct ? 1 : 0;
+            }
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          this.logger.warn(
+            `Cross-store backfill for "${query}" on ${platform.slug} failed: ${message}`,
+          );
+        }
+      }
+    }
+  }
+
+  /**
+   * Build a specific search query that identifies one product across stores:
+   * brand + model + storage, drawn from the canonical's columns and (as a
+   * fallback for older rows) a fresh extraction from its title. Returns null
+   * when the product isn't specific enough to search precisely (no brand+model),
+   * so we don't fan a vague query out to every store and re-pollute the catalog.
+   */
+  private buildProductQuery(product: {
+    title: string;
+    brand: string | null;
+    model: string | null;
+  }): string | null {
+    const extracted = this.normalizer.extractAttributes(product.title);
+    const brand = product.brand?.trim() || extracted.brand?.trim() || null;
+    const model = product.model?.trim() || extracted.model?.trim() || null;
+
+    if (!brand || !model) {
+      return null;
+    }
+
+    const parts = [brand, model];
+    if (extracted.storage) {
+      parts.push(extracted.storage);
+    }
+
+    // A model that already begins with the brand (e.g. "Galaxy S26" for
+    // Samsung, or a phone model captured as "a6") shouldn't double up awkwardly;
+    // dedupe case-insensitively while preserving order.
+    const seen = new Set<string>();
+    const deduped = parts.filter((part) => {
+      const key = part.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    return deduped.join(' ');
   }
 
   private async resolveCategoryForQuery(query: string): Promise<Category | null> {
@@ -385,6 +545,7 @@ export class LiveIngestionService {
     createdCanonicalProduct: boolean;
     matchedExistingCanonicalProduct: boolean;
     priceHistoryCreated: boolean;
+    canonicalProductId: string;
   }> {
     const normalized = this.normalizer.normalizeTitle(listing.title);
     const extracted = this.normalizer.extractAttributes(listing.title, {
@@ -397,8 +558,8 @@ export class LiveIngestionService {
     });
 
     // Computed once and threaded through both the match lookup and (if nothing
-    // matches) the new-product creation, so we never call Ollama twice for the
-    // same listing.
+    // matches) the new-product creation, so we never embed the same listing
+    // twice.
     const listingEmbedding = await this.semantic.embed(listing.title);
 
     const canonicalMatch = await this.findCanonicalMatch(category.id, normalized, extracted, listing);
@@ -500,6 +661,7 @@ export class LiveIngestionService {
       createdCanonicalProduct: !canonicalMatch,
       matchedExistingCanonicalProduct,
       priceHistoryCreated,
+      canonicalProductId: canonicalProduct.id,
     };
   }
 
@@ -659,8 +821,8 @@ export class LiveIngestionService {
         return candidate;
       }
       if (verdict === null) {
-        // Ollama and the OpenRouter fallback are both unreachable — stop asking
-        // (every remaining call would fail the same way) and fall back below.
+        // OpenRouter is unreachable/unconfigured — stop asking (every
+        // remaining call would fail the same way) and fall back below.
         llmUnavailable = true;
         break;
       }

@@ -3,20 +3,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../database/prisma.service';
 
-interface OllamaEmbeddingResponse {
-  embedding: number[];
-}
-
-interface OllamaGenerateResponse {
-  response: string;
-}
-
 @Injectable()
 export class SemanticService {
   private readonly logger = new Logger(SemanticService.name);
-  private readonly baseUrl: string;
-  private readonly embedModel: string;
-  private readonly matchModel: string;
   private readonly openRouterApiKey: string;
   private readonly openRouterBaseUrl: string;
   private readonly openRouterMatchModel: string;
@@ -27,65 +16,27 @@ export class SemanticService {
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
   ) {
-    this.baseUrl = this.config.get<string>('search.ollamaBaseUrl', 'http://localhost:11434');
-    this.embedModel = this.config.get<string>('search.ollamaEmbedModel', 'nomic-embed-text');
-    this.matchModel = this.config.get<string>('search.ollamaMatchModel', 'qwen2.5:1.5b');
     this.openRouterApiKey = this.config.get<string>('search.openRouterApiKey', '');
     this.openRouterBaseUrl = this.config.get<string>('search.openRouterBaseUrl', 'https://openrouter.ai/api/v1');
-    this.openRouterMatchModel = this.config.get<string>('search.openRouterMatchModel', 'meta-llama/llama-3.1-8b-instruct');
+    this.openRouterMatchModel = this.config.get<string>('search.openRouterMatchModel', 'google/gemini-2.5-flash');
     this.openRouterEmbedModel = this.config.get<string>('search.openRouterEmbedModel', 'openai/text-embedding-3-small');
     this.openRouterFallbackEnabled = this.config.get<boolean>('search.openRouterFallbackEnabled', true);
   }
 
   /**
-   * Generate a text embedding using a local Ollama model (nomic-embed-text by
-   * default) — no API key, no network egress, runs entirely on this machine.
-   * Falls back to OpenRouter if Ollama is unreachable, so ingestion doesn't
-   * silently drop to the plain heuristic matcher just because the local
-   * daemon isn't running. Returns null only if both are unavailable.
+   * Generate a text embedding via OpenRouter. This app always needs internet
+   * access anyway (it scrapes live retailer sites), and a local Ollama model
+   * was found to be both slower (competing for RAM/CPU with everything else
+   * running on this machine) and no more useful — matching ranks candidates
+   * by pg_trgm title similarity now, not embeddings, so this is only used to
+   * store a reference embedding on new canonical products.
    */
   async embed(text: string): Promise<number[] | null> {
-    const local = await this.embedViaOllama(text);
-    if (local !== undefined) {
-      return local;
-    }
-    return this.embedViaOpenRouter(text);
-  }
-
-  private async embedViaOllama(text: string): Promise<number[] | null | undefined> {
-    try {
-      const response = await fetch(`${this.baseUrl}/api/embeddings`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: this.embedModel, prompt: text.slice(0, 8000), keep_alive: '30m' }),
-        signal: AbortSignal.timeout(30_000),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Ollama embeddings HTTP ${response.status}`);
-      }
-
-      const data = (await response.json()) as OllamaEmbeddingResponse;
-      return Array.isArray(data.embedding) ? data.embedding : null;
-    } catch (err) {
-      this.logger.warn(`Ollama embedding call failed, will try OpenRouter fallback: ${(err as Error).message}`);
-      return undefined;
-    }
-  }
-
-  private async embedViaOpenRouter(text: string): Promise<number[] | null> {
-    if (!this.openRouterFallbackEnabled) {
-      this.logger.warn('OpenRouter embedding fallback skipped: disabled (OPENROUTER_FALLBACK_ENABLED=false)');
-      return null;
-    }
-    if (!this.openRouterApiKey) {
-      this.logger.warn('OpenRouter embedding fallback skipped: OPENROUTER_API_KEY not set');
+    if (!this.openRouterFallbackEnabled || !this.openRouterApiKey) {
+      this.logger.warn('Embedding skipped: OpenRouter not configured (OPENROUTER_API_KEY unset or fallback disabled)');
       return null;
     }
 
-    // Requests 768 dims via the OpenAI `dimensions` param so the vector fits
-    // the same vector(768) column populated by nomic-embed-text.
-    this.logger.warn(`Ollama unavailable — embedding via OpenRouter (${this.openRouterEmbedModel})`);
     try {
       const response = await fetch(`${this.openRouterBaseUrl}/embeddings`, {
         method: 'POST',
@@ -96,6 +47,8 @@ export class SemanticService {
         body: JSON.stringify({
           model: this.openRouterEmbedModel,
           input: text.slice(0, 8000),
+          // Requests 768 dims via the OpenAI `dimensions` param so the vector
+          // fits the existing vector(768) column.
           dimensions: 768,
         }),
         signal: AbortSignal.timeout(30_000),
@@ -115,15 +68,21 @@ export class SemanticService {
   }
 
   /**
-   * Ask a small local chat model whether two listing titles describe the exact
-   * same product, just worded differently by each store's copywriter. Regex/text
-   * overlap alone can't tell "Samsung Galaxy S26 - 256GB - Sky Blue" and "Samsung
-   * Galaxy S26, Unlocked Android Smartphone... Galaxy AI... Sky Blue" apart from
-   * two genuinely different phones — this can, because it reads for meaning.
-   * Returns null (not false) if Ollama isn't reachable, so callers can tell
-   * "confirmed different" apart from "couldn't ask."
+   * Ask a cloud model whether two listing titles describe the exact same
+   * product, just worded differently by each store's copywriter. Regex/text
+   * overlap alone can't tell "Samsung Galaxy S26 - 256GB - Sky Blue" and
+   * "Samsung Galaxy S26, Unlocked Android Smartphone... Galaxy AI... Sky Blue"
+   * apart from two genuinely different phones — this can, because it reads
+   * for meaning. Returns null if OpenRouter isn't reachable/configured, so
+   * callers can tell "confirmed different" apart from "couldn't ask" and fall
+   * back to the plain fuzzy-score threshold instead.
    */
   async judgeSameProduct(titleA: string, titleB: string): Promise<boolean | null> {
+    if (!this.openRouterFallbackEnabled || !this.openRouterApiKey) {
+      this.logger.warn('Match judgement skipped: OpenRouter not configured (OPENROUTER_API_KEY unset or fallback disabled)');
+      return null;
+    }
+
     const prompt = `You are a strict product-matching assistant for an e-commerce price-comparison site.
 Given two product titles from two different online stores, decide if they describe the EXACT same product for sale — same brand, same model, same storage/capacity if mentioned, same color/variant if mentioned — just worded differently by each store's copywriter. Marketing filler words (e.g. "Unlocked", "Official Warranty", "Genuine") don't matter and should be ignored. But a different color, different storage/RAM/capacity, a different model tier (e.g. "Pro" vs base, "Ultra" vs base, "Max" vs base, "Mini" vs base), or a different model number/code (e.g. "F6000" vs "H5000F") means they are NOT the same product.
 
@@ -132,71 +91,6 @@ Product B: "${titleB}"
 
 Respond with ONLY this JSON object and nothing else: {"same": true or false}`;
 
-    // Prefer OpenRouter (a real-sized cloud model, e.g. gemini-2.0-flash-001)
-    // over the local Ollama model: testing showed the local qwen2.5:1.5b model
-    // — the largest this machine's hardware can run — reasons unreliably about
-    // real duplicates worded differently by two stores, missing matches it
-    // should catch. Call volume here is small (a handful of guard-surviving
-    // candidates per listing), so the cost is negligible. Falls back to the
-    // local model if OpenRouter is unconfigured or unreachable, so matching
-    // still works fully offline / without an API key.
-    if (this.openRouterFallbackEnabled && this.openRouterApiKey) {
-      const cloud = await this.judgeViaOpenRouter(prompt);
-      if (cloud !== null) {
-        return cloud;
-      }
-      this.logger.warn('OpenRouter judgement unavailable, falling back to local Ollama model');
-    }
-
-    const local = await this.judgeViaOllama(prompt);
-    return local === undefined ? null : local;
-  }
-
-  /**
-   * Returns the parsed verdict, or `undefined` (not null) to signal the local
-   * model was unreachable so the caller can try the cloud fallback. `null` here
-   * means Ollama answered but with an unusable payload.
-   */
-  private async judgeViaOllama(prompt: string): Promise<boolean | null | undefined> {
-    try {
-      const response = await fetch(`${this.baseUrl}/api/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: this.matchModel,
-          prompt,
-          format: 'json',
-          stream: false,
-          options: { temperature: 0 },
-          keep_alive: '30m',
-        }),
-        signal: AbortSignal.timeout(45_000),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Ollama generate HTTP ${response.status}`);
-      }
-
-      const data = (await response.json()) as OllamaGenerateResponse;
-      const parsed = JSON.parse(data.response) as { same?: boolean };
-      return typeof parsed.same === 'boolean' ? parsed.same : null;
-    } catch (err) {
-      this.logger.warn(`Ollama match-judgement unavailable: ${(err as Error).message}`);
-      return undefined;
-    }
-  }
-
-  private async judgeViaOpenRouter(prompt: string): Promise<boolean | null> {
-    if (!this.openRouterFallbackEnabled) {
-      this.logger.warn('OpenRouter judgement skipped: disabled (OPENROUTER_FALLBACK_ENABLED=false)');
-      return null;
-    }
-    if (!this.openRouterApiKey) {
-      this.logger.warn('OpenRouter judgement skipped: OPENROUTER_API_KEY not set');
-      return null;
-    }
-
-    // This sends product titles to a third party (OpenRouter).
     try {
       const response = await fetch(`${this.openRouterBaseUrl}/chat/completions`, {
         method: 'POST',
