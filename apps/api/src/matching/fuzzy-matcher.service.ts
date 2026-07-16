@@ -163,6 +163,49 @@ export class FuzzyMatcherService {
     return Math.abs(a - b) >= 0.5 ? 'display_size_conflict' : null;
   }
 
+  /** Storage/RAM/network-gen unit suffixes to ignore — these are formatting, not model identity. */
+  private static readonly MODEL_CODE_UNIT_SUFFIXES = new Set([
+    'gb', 'tb', 'mb', 'kb', 'mp', 'mah', 'mm', 'cm', 'in', 'inch',
+    'hz', 'khz', 'mhz', 'ghz', 'fps', 'db', 'kw', 'ma', 'g', 'k', 'p', 'w', 'v',
+  ]);
+
+  /**
+   * Detect two titles that share a model number's digits but disagree on a
+   * letter suffix directly attached to it — e.g. "Ryzen 7 7700" vs "Ryzen 7
+   * 7700X", "RTX 4080" vs "RTX 4080Ti". This is deliberately narrow (same
+   * digit run required on both sides) to avoid false-flagging genuine
+   * duplicates worded differently: it only fires when both titles are
+   * talking about the *same* number, just with a different letter glued to
+   * it — a strong, low-noise signal that a 1.5B LLM reliably misses when the
+   * surrounding title text is otherwise near-identical.
+   */
+  detectModelCodeSuffixConflict(titleA: string, titleB: string): string | null {
+    const codesA = this.extractModelCodes(titleA);
+    const codesB = this.extractModelCodes(titleB);
+
+    for (const [digitKey, codeA] of codesA) {
+      const codeB = codesB.get(digitKey);
+      if (codeB && codeA !== codeB) {
+        return 'model_code_suffix_conflict';
+      }
+    }
+    return null;
+  }
+
+  /** Maps each qualifying code's digit run -> the code's full text (letters + digits, lowercase). */
+  private extractModelCodes(title: string): Map<string, string> {
+    const codes = new Map<string, string>();
+    const matches = title.toLowerCase().match(/[a-z]*\d+[a-z]*/g) ?? [];
+    for (const code of matches) {
+      const digits = code.replace(/[a-z]/g, '');
+      const letters = code.replace(/\d/g, '');
+      if (digits.length < 3) continue; // too short to be a meaningful model number
+      if (letters && FuzzyMatcherService.MODEL_CODE_UNIT_SUFFIXES.has(letters)) continue;
+      codes.set(digits, code);
+    }
+    return codes;
+  }
+
   private normalizeStorage(val: string): string {
     const normalized = this.storageToGb(val);
     if (normalized === null) return val.trim().toLowerCase();

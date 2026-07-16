@@ -180,6 +180,8 @@ export class ReconciliationService {
 
     if (this.fuzzyMatcher.detectVariantConflict(a.title, b.title)) return true;
 
+    if (this.fuzzyMatcher.detectModelCodeSuffixConflict(a.title, b.title)) return true;
+
     if (this.hasIdentifierConflict(a, b)) return true;
 
     const attrsA = (a.attributes ?? {}) as Record<string, unknown>;

@@ -573,6 +573,10 @@ export class LiveIngestionService {
         continue;
       }
 
+      if (this.fuzzyMatcher.detectModelCodeSuffixConflict(listing.title, candidate.title)) {
+        continue;
+      }
+
       if (this.hasIdentifierConflict(listing, candidate)) {
         continue;
       }

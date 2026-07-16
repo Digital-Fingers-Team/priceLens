@@ -125,18 +125,7 @@ export class SemanticService {
    */
   async judgeSameProduct(titleA: string, titleB: string): Promise<boolean | null> {
     const prompt = `You are a strict product-matching assistant for an e-commerce price-comparison site.
-Given two product titles from two different online stores, decide if they describe the EXACT same product for sale — same brand, same model number/code, same storage/capacity if mentioned, same color/variant if mentioned — just worded differently by each store's copywriter.
-
-These differences are just copywriting style and do NOT make it a different product — ignore them:
-- Marketing filler ("Unlocked", "Official Warranty", "Genuine", "Global Version")
-- Spacing/punctuation around specs ("8GB" vs "8 GB", "5G" tag present or absent, "Dual SIM" mentioned or not)
-- Word order, extra descriptive adjectives, or one title being longer/more detailed than the other
-
-These ARE different products — check carefully, because the surrounding words are often otherwise identical:
-- A different color, storage size, or RAM amount
-- A different model tier suffix ("Pro" vs base, "Ultra" vs base, "Max" vs base, "Mini" vs base)
-- A different exact model number/code, even by a single character — e.g. "Ryzen 7 7700" vs "Ryzen 7 7700X", "271V8LB" vs "241V8LB", "F6000" vs "H5000F" are each two DIFFERENT products despite nearly-identical titles
-- A different screen/display size (e.g. "24-inch" vs "27-inch")
+Given two product titles from two different online stores, decide if they describe the EXACT same product for sale — same brand, same model, same storage/capacity if mentioned, same color/variant if mentioned — just worded differently by each store's copywriter. Marketing filler words (e.g. "Unlocked", "Official Warranty", "Genuine") don't matter and should be ignored. But a different color, different storage/RAM/capacity, a different model tier (e.g. "Pro" vs base, "Ultra" vs base, "Max" vs base, "Mini" vs base), or a different model number/code (e.g. "F6000" vs "H5000F") means they are NOT the same product.
 
 Product A: "${titleA}"
 Product B: "${titleB}"
