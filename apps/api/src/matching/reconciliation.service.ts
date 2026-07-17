@@ -273,6 +273,8 @@ export class ReconciliationService {
 
     if (this.hasIdentifierConflict(a, b)) return true;
 
+    if (this.fuzzyMatcher.detectConditionConflict(a.title, b.title)) return true;
+
     // Recomputed fresh from the title rather than trusting the stored
     // `attributes` column: older/previously-merged canonical rows can have
     // stale or never-populated storage/RAM/color/display data (a real false

@@ -163,6 +163,26 @@ export class FuzzyMatcherService {
     return Math.abs(a - b) >= 0.5 ? 'display_size_conflict' : null;
   }
 
+  /** Keywords marking a listing as used/refurbished rather than new retail stock. */
+  private static readonly USED_CONDITION_PATTERN =
+    /\b(used|refurbished|refurb|renewed|pre-?owned|second-?\s?hand|open-?box|as-?is|asis)\b/i;
+
+  /**
+   * Detect a new-vs-used/refurbished mismatch. A brand-new retail unit and a
+   * used/refurbished one are not the same product for price-comparison
+   * purposes even when brand/model/storage/color all agree — merging them
+   * produces a misleading "best price" (a real bug this caught: an official-
+   * warranty new iPhone 16 merged with an Alibaba "Used Excellent Condition"
+   * listing at roughly half the price under the same canonical product).
+   * Only fires when exactly one side is flagged as used — two listings that
+   * both say "used"/"refurbished" can still legitimately be compared.
+   */
+  detectConditionConflict(titleA: string, titleB: string): string | null {
+    const usedA = FuzzyMatcherService.USED_CONDITION_PATTERN.test(titleA);
+    const usedB = FuzzyMatcherService.USED_CONDITION_PATTERN.test(titleB);
+    return usedA !== usedB ? 'condition_conflict' : null;
+  }
+
   /** Storage/RAM/network-gen unit suffixes to ignore — these are formatting, not model identity. */
   private static readonly MODEL_CODE_UNIT_SUFFIXES = new Set([
     'gb', 'tb', 'mb', 'kb', 'mp', 'mah', 'mm', 'cm', 'in', 'inch',

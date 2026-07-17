@@ -218,6 +218,12 @@ export class LiveIngestionService {
     const foundSlugs = new Set(platforms.map((platform) => platform.slug));
     const skippedPlatforms: Array<{ slug: string; reason: string }> = [];
     const summaries: IngestionSummary[] = [];
+    // Products touched by this query on each store — a search for "iphone 16"
+    // typically returns a different color/storage mix per store, so without
+    // this, each variant ends up looking like it's only sold by one store.
+    // backfillCrossStore below re-searches the OTHER stores for the specific
+    // variants found here to merge them onto the same canonical product.
+    const touchedProductIds = new Set<string>();
 
     for (const requestedSlug of requestedPlatforms) {
       if (!this.connectorsBySlug.has(requestedSlug)) {
@@ -246,15 +252,26 @@ export class LiveIngestionService {
 
       try {
         summaries.push(
-          await this.runIngestionJob(platform, connector, limitPerQuery, [
-            { category, queries: [trimmedQuery] },
-          ]),
+          await this.runIngestionJob(
+            platform,
+            connector,
+            limitPerQuery,
+            [{ category, queries: [trimmedQuery] }],
+            {},
+            touchedProductIds,
+          ),
         );
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         skippedPlatforms.push({ slug: platform.slug, reason: `ingestion_failed:${message}` });
       }
     }
+
+    // The scheduled sweep's default cap (40 products) assumes a background job
+    // that's fine taking an hour+; an on-demand search from the search box is
+    // one query's worth of products (typically a dozen-ish variants) and needs
+    // to actually finish in a reasonable time, so cap much tighter here.
+    await this.backfillCrossStore(platforms, touchedProductIds, summaries, 8);
 
     return {
       startedAt: startedAt.toISOString(),
@@ -375,6 +392,7 @@ export class LiveIngestionService {
     platforms: Platform[],
     touchedProductIds: Set<string>,
     summaries: IngestionSummary[],
+    maxProductsOverride?: number,
   ): Promise<void> {
     const enabled = this.configService.get<boolean>('retailers.crossStoreBackfillEnabled', true);
     if (!enabled || touchedProductIds.size === 0) {
@@ -383,7 +401,7 @@ export class LiveIngestionService {
 
     const maxProducts = Math.max(
       0,
-      this.configService.get<number>('retailers.crossStoreBackfillMaxProducts', 40),
+      maxProductsOverride ?? this.configService.get<number>('retailers.crossStoreBackfillMaxProducts', 40),
     );
     const limitPerQuery = Math.max(
       1,
@@ -724,6 +742,10 @@ export class LiveIngestionService {
         continue;
       }
 
+      if (this.fuzzyMatcher.detectConditionConflict(listing.title, candidate.title)) {
+        continue;
+      }
+
       return candidate;
     }
 
@@ -769,6 +791,10 @@ export class LiveIngestionService {
       }
 
       if (this.hasIdentifierConflict(listing, candidate)) {
+        continue;
+      }
+
+      if (this.fuzzyMatcher.detectConditionConflict(listing.title, candidate.title)) {
         continue;
       }
 
