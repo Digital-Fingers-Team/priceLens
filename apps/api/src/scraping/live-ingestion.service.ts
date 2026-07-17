@@ -5,6 +5,7 @@ import { PrismaService } from '../database/prisma.service';
 import { NormalizerService } from '../matching/normalizer.service';
 import { FuzzyMatcherService } from '../matching/fuzzy-matcher.service';
 import { SemanticService } from '../matching/semantic.service';
+import { FxRatesService } from '../matching/fx-rates.service';
 import { AmazonConnector } from './connectors/amazon.connector';
 import { AlibabaConnector } from './connectors/alibaba.connector';
 import { AliExpressConnector } from './connectors/aliexpress.connector';
@@ -66,6 +67,7 @@ export class LiveIngestionService {
     private readonly normalizer: NormalizerService,
     private readonly fuzzyMatcher: FuzzyMatcherService,
     private readonly semantic: SemanticService,
+    private readonly fxRates: FxRatesService,
     private readonly amazonConnector: AmazonConnector,
     private readonly alibabaConnector: AlibabaConnector,
     private readonly aliExpressConnector: AliExpressConnector,
@@ -562,6 +564,16 @@ export class LiveIngestionService {
     // twice.
     const listingEmbedding = await this.semantic.embed(listing.title);
 
+    // `listing.priceUsd`/`listing.currency` are the raw scraped amount in the
+    // store's own currency (the field name is a historical misnomer — see
+    // RetailerListing). Converted once here to the base currency (EGP) so the
+    // `priceUsd` DB column — used for every cross-store comparison, sort, and
+    // merge decision — is genuinely comparable between e.g. a Carrefour AED
+    // listing and a 2B EGP listing. `rawPrice`/`rawCurrency` below stay
+    // untouched so the store's real, uncoverted price is still shown per-listing.
+    const normalizedPrice =
+      listing.priceUsd != null ? await this.fxRates.convert(listing.priceUsd, listing.currency) : null;
+
     const canonicalMatch = await this.findCanonicalMatch(category.id, normalized, extracted, listing);
     const matchedExistingCanonicalProduct = !!canonicalMatch;
 
@@ -596,7 +608,7 @@ export class LiveIngestionService {
         extractedBrand: extracted.brand ?? listing.brand,
         extractedModel: extracted.model ?? listing.model,
         extractedAttributes: this.toJson(extracted),
-        priceUsd: this.toDbDecimal(listing.priceUsd),
+        priceUsd: this.toDbDecimal(normalizedPrice),
         inStock: listing.inStock,
         rating: listing.rating,
         reviewCount: listing.reviewCount,
@@ -624,7 +636,7 @@ export class LiveIngestionService {
         extractedBrand: extracted.brand ?? listing.brand,
         extractedModel: extracted.model ?? listing.model,
         extractedAttributes: this.toJson(extracted),
-        priceUsd: this.toDbDecimal(listing.priceUsd),
+        priceUsd: this.toDbDecimal(normalizedPrice),
         inStock: listing.inStock,
         rating: listing.rating,
         reviewCount: listing.reviewCount,
@@ -637,7 +649,12 @@ export class LiveIngestionService {
       include: { canonicalProduct: true },
     });
 
-    const priceHistoryCreated = await this.appendPriceHistory(sourceListing.id, canonicalProduct.id, listing);
+    const priceHistoryCreated = await this.appendPriceHistory(
+      sourceListing.id,
+      canonicalProduct.id,
+      listing,
+      normalizedPrice,
+    );
 
     await this.prisma.matchDecision.create({
       data: {
@@ -939,8 +956,9 @@ export class LiveIngestionService {
     sourceListingId: string,
     canonicalProductId: string,
     listing: RetailerListing,
+    normalizedPrice: number | null,
   ): Promise<boolean> {
-    if (listing.priceUsd == null) {
+    if (normalizedPrice == null) {
       return false;
     }
 
@@ -951,7 +969,7 @@ export class LiveIngestionService {
       orderBy: { recordedAt: 'desc' },
     });
 
-    const currentPrice = this.toDbDecimal(listing.priceUsd);
+    const currentPrice = this.toDbDecimal(normalizedPrice);
     if (!currentPrice) {
       return false;
     }
@@ -960,13 +978,17 @@ export class LiveIngestionService {
       return false;
     }
 
+    // `priceUsd`/`currency` here are the normalized, base-currency values so
+    // the price-history chart can aggregate across stores in different
+    // currencies (see products.service.ts getPriceHistory). `originalPrice`
+    // keeps the store's raw, unconverted price for reference.
     await this.prisma.priceHistory.create({
       data: {
         canonicalProductId,
         sourceListingId,
         priceUsd: currentPrice,
-        currency: listing.currency,
-        originalPrice: currentPrice,
+        currency: this.fxRates.base,
+        originalPrice: this.toDbDecimal(listing.priceUsd),
         inStock: listing.inStock ?? true,
       },
     });

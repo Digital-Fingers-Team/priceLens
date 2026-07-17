@@ -52,12 +52,18 @@ export class AmazonConnector implements RetailerConnector {
       const cards = await page.evaluate(() => {
         const items = Array.from(document.querySelectorAll('div[data-component-type="s-search-result"]'));
         return items.map((item): RawAmazonCard => {
-          const titleEl = item.querySelector('h2 span') ?? item.querySelector('h2');
-          const priceEl = item.querySelector('.a-price .a-offscreen');
+          // Cards with a color/pattern swatch selector (very common for phones)
+          // put only the bare brand name in `h2 span` ("OPPO") -- the real full
+          // title lives in the product image's alt text instead, confirmed live
+          // against amazon.eg. h2 text is kept only as a fallback for cards
+          // without that swatch structure.
           const img = item.querySelector('img.s-image');
+          const h2 = item.querySelector('h2');
+          const title = img?.getAttribute('alt')?.trim() || h2?.textContent?.trim() || null;
+          const priceEl = item.querySelector('.a-price .a-offscreen');
           return {
             asin: item.getAttribute('data-asin'),
-            title: titleEl?.textContent?.trim() ?? null,
+            title,
             priceLabel: priceEl?.textContent?.trim() ?? null,
             imageUrl: img?.getAttribute('src') ?? null,
           };
@@ -87,7 +93,7 @@ export class AmazonConnector implements RetailerConnector {
       externalUrl: `${baseUrl.replace(/\/$/, '')}/dp/${card.asin}`,
       title: card.title,
       priceUsd: amount,
-      currency: currency ?? 'USD',
+      currency: currency ?? 'EGP',
       brand: null,
       model: null,
       imageUrl: card.imageUrl,

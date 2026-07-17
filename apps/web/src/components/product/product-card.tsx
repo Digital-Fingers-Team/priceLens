@@ -130,16 +130,16 @@ export function ProductCard({ product }: ProductCardProps) {
                 {hasPriceRange ? (
                   <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 min-w-0">
                     <span className="text-lg font-bold text-signal whitespace-nowrap">
-                      {formatCurrency(product.minPriceUsd)}
+                      {formatCurrency(product.minPriceUsd, product.priceStats?.currency)}
                     </span>
                     <span className="text-ink-500 text-sm">—</span>
                     <span className="text-sm font-medium text-ink-300 whitespace-nowrap">
-                      {formatCurrency(product.maxPriceUsd)}
+                      {formatCurrency(product.maxPriceUsd, product.priceStats?.currency)}
                     </span>
                   </div>
                 ) : (
                   <span className="text-lg font-bold text-signal">
-                    {formatCurrency(product.minPriceUsd)}
+                    {formatCurrency(product.minPriceUsd, product.priceStats?.currency)}
                   </span>
                 )}
               </>

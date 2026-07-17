@@ -44,9 +44,27 @@ export class NoonConnector implements RetailerConnector {
     try {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await page.waitForSelector('[class*="sellingPrice"]', { timeout: 15000 }).catch(() => undefined);
-      // Product images/titles lazy-load slightly after the price does; give
-      // them a moment too so cards don't come back as "placeholder".
-      await page.waitForTimeout(4000);
+      // Card titles hydrate in per-card, not all at once -- confirmed live that
+      // a fixed sleep (tried up to 9s) still sometimes catches every single
+      // card mid-hydration, with its <img alt> still the literal placeholder
+      // string "placeholder". Poll instead of guessing a duration: wait until
+      // real titles have actually landed on enough cards, capped at 15s so a
+      // stuck straggler can't hang the whole search (whatever hasn't hydrated
+      // by then is filtered out downstream anyway, same as a missing title).
+      await page
+        .waitForFunction(
+          () => {
+            const anchors = Array.from(document.querySelectorAll('a[class*="productBoxLink"]'));
+            if (anchors.length === 0) return false;
+            const hydrated = anchors.filter((anchor) => {
+              const alt = anchor.querySelector('img')?.getAttribute('alt');
+              return !!alt && alt.trim().toLowerCase() !== 'placeholder';
+            });
+            return hydrated.length >= Math.min(anchors.length, 5);
+          },
+          { timeout: 15000 },
+        )
+        .catch(() => undefined);
 
       const cards = await page.evaluate(() => {
         const anchors = Array.from(document.querySelectorAll('a[class*="productBoxLink"]'));
@@ -87,7 +105,10 @@ export class NoonConnector implements RetailerConnector {
     const title = card.title?.replace(/\s*-\s*Image\s*\d+$/i, '').trim();
     const price = this.parsePrice(card.price);
 
-    if (!externalId || !title) return null;
+    // Straggler cards that never finished hydrating within the poll's timeout
+    // still carry the literal placeholder alt text -- drop them rather than
+    // storing "placeholder" as a fake product title.
+    if (!externalId || !title || title.toLowerCase() === 'placeholder') return null;
 
     return {
       externalId,

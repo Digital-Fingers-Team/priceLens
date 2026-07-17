@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
+import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bull';
 import { Prisma, ProductTier } from '@prisma/client';
 import type { CanonicalProduct, SourceListing } from '@prisma/client';
@@ -112,10 +113,16 @@ export interface PriceHistoryResponse {
 
 @Injectable()
 export class ProductsService {
+  /** Currency every `priceUsd` column is normalized to at ingestion time (see FxRatesService). */
+  private readonly baseCurrency: string;
+
   constructor(
     private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
     @InjectQueue(INGESTION_QUEUE) private readonly ingestionQueue: Queue,
-  ) {}
+  ) {
+    this.baseCurrency = this.config.get<string>('pricing.fxBaseCurrency', 'EGP');
+  }
 
   async searchProducts(options: SearchProductsOptions) {
     const {
@@ -475,19 +482,25 @@ export class ProductsService {
       throw new NotFoundException(`Product with id "${productId}" not found`);
     }
 
-    const listings = product.sourceListings
-      .filter((listing) => listing.priceUsd != null)
-      .map((listing) => this.mapCurrentPriceListing(listing));
+    const withPrice = product.sourceListings.filter((listing) => listing.priceUsd != null);
+    const listings = withPrice.map((listing) => this.mapCurrentPriceListing(listing));
 
-    const prices = listings.map((listing) => listing.price);
+    // best/worst/avg rank listings against each other, so they must use the
+    // FX-normalized priceUsd (base currency) — NOT `listings[].price`, which is
+    // deliberately each store's raw, un-converted local price for display.
+    const normalizedPrices = withPrice
+      .map((listing) => this.toNumber(listing.priceUsd))
+      .filter((value): value is number => value != null);
 
     return {
       productId,
       listings,
-      bestPrice: prices.length ? Math.min(...prices) : null,
-      worstPrice: prices.length ? Math.max(...prices) : null,
-      avgPrice: prices.length ? prices.reduce((sum, price) => sum + price, 0) / prices.length : null,
-      currency: listings[0]?.currency ?? 'USD',
+      bestPrice: normalizedPrices.length ? Math.min(...normalizedPrices) : null,
+      worstPrice: normalizedPrices.length ? Math.max(...normalizedPrices) : null,
+      avgPrice: normalizedPrices.length
+        ? normalizedPrices.reduce((sum, price) => sum + price, 0) / normalizedPrices.length
+        : null,
+      currency: this.baseCurrency,
     };
   }
 
@@ -674,7 +687,10 @@ export class ProductsService {
         avg: stats.avgPrice,
         median: stats.medianPrice,
         current: stats.minPriceUsd,
-        currency: 'USD',
+        // min/max/avg are computed from priceUsd, which is FX-normalized to the
+        // base currency (see live-ingestion.service.ts), so this is always the
+        // base currency — never a per-listing rawCurrency.
+        currency: this.baseCurrency,
       },
       storeCount: this.countDistinctStores(product),
       ...(includeListings
@@ -694,7 +710,12 @@ export class ProductsService {
   private mapListing(
     listing: ProductWithRelations['sourceListings'][number],
   ) {
-    const price = this.toNumber(listing.priceUsd);
+    // `price`/`currency` are the store's own, unconverted price — what a buyer
+    // actually pays there — always paired with its own currency label so a
+    // Carrefour AED price is never shown next to an "EGP" label. `priceUsd` is
+    // the FX-normalized (base-currency) value used only for cross-store
+    // comparisons (best-deal ranking, sorting), never for display.
+    const rawPrice = this.toNumber(listing.rawPrice);
     return {
       id: listing.id,
       platformId: listing.platformId,
@@ -709,11 +730,11 @@ export class ProductsService {
       externalUrl: listing.externalUrl,
       url: listing.externalUrl,
       rawTitle: listing.rawTitle,
-      rawPrice: this.toNumber(listing.rawPrice),
+      rawPrice,
       rawCurrency: listing.rawCurrency,
       rawImageUrl: listing.rawImageUrl,
       priceUsd: this.toNumber(listing.priceUsd),
-      price,
+      price: rawPrice ?? this.toNumber(listing.priceUsd),
       currency: listing.rawCurrency,
       inStock: listing.inStock,
       rating: listing.rating,
@@ -729,7 +750,9 @@ export class ProductsService {
   private mapCurrentPriceListing(
     listing: ProductWithRelations['sourceListings'][number],
   ) {
-    const price = this.toNumber(listing.priceUsd);
+    // Same raw-price-first rule as mapListing: this is what the buyer pays at
+    // that specific store, so it must carry that store's own currency.
+    const price = this.toNumber(listing.rawPrice) ?? this.toNumber(listing.priceUsd);
     if (price == null) {
       throw new Error('Current price listing requires a numeric price');
     }

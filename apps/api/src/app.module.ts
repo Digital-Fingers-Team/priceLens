@@ -21,13 +21,14 @@ import redisConfig from './config/redis.config';
 import authConfig from './config/auth.config';
 import searchConfig from './config/search.config';
 import retailersConfig from './config/retailers.config';
+import pricingConfig from './config/pricing.config';
 
 @Module({
   imports: [
     // ─── Config ────────────────────────────────────────────────────────────
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, redisConfig, authConfig, searchConfig, retailersConfig],
+      load: [appConfig, databaseConfig, redisConfig, authConfig, searchConfig, retailersConfig, pricingConfig],
       // Shared with apps/web from the repo root — see /.env.example
       envFilePath: ['../../.env.local', '../../.env'],
       cache: true,

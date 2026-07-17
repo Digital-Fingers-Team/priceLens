@@ -89,13 +89,16 @@ export function ListingTable({ listings, showConfidence = false }: ListingTableP
                   </div>
                 </td>
 
-                {/* Price */}
+                {/* Price — the store's own, unconverted price (what you'd actually
+                    pay there), always paired with its own currency. The "Best
+                    Deal" badge above is decided from the FX-normalized priceUsd
+                    (see isBestDeal below), not from this displayed value. */}
                 <td className="px-4 py-3.5 text-right">
                   <span className={cn(
                     'font-bold text-base',
                     isBest ? 'text-signal' : 'text-ink-100',
                   )}>
-                    {formatCurrency(listing.priceUsd, listing.rawCurrency)}
+                    {formatCurrency(listing.rawPrice ?? listing.priceUsd, listing.rawCurrency)}
                   </span>
                 </td>
 

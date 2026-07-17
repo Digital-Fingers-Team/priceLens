@@ -11,15 +11,22 @@ interface RawCarrefourCard {
 }
 
 /**
- * Carrefour UAE isn't behind a hard anti-bot wall at all — the earlier
- * plain-HTTP connector failed only because (a) the site is a JS-rendered
- * Next.js storefront with nothing server-rendered for a non-browser
- * request, and (b) its search query param changed from `?text=` to
- * `?keyword=` since this connector was first written. A real Chrome +
- * persistent profile with the corrected URL works on the first visit, no
- * login/CAPTCHA/warm-up needed. The product card markup has no semantic
- * class names (Tailwind-only), so title/price are pulled from the card's
- * plain innerText via regex rather than fragile nested selectors.
+ * Points at Carrefour EGYPT (not UAE) so listings come back as genuine local
+ * Egyptian retail prices in EGP -- not a UAE price that then needs an FX
+ * conversion to guess the local price, which can't account for regional
+ * pricing/VAT differences anyway. Every other enabled connector already
+ * defaults to EGP; this was the one holdout (see FxRatesService, which still
+ * normalizes any non-EGP price as a safety net, but this is the correct fix
+ * at the source for Carrefour specifically.
+ *
+ * Not behind a hard anti-bot wall at all — the earlier plain-HTTP connector
+ * failed only because (a) the site is a JS-rendered Next.js storefront with
+ * nothing server-rendered for a non-browser request, and (b) its search query
+ * param changed from `?text=` to `?keyword=` since this connector was first
+ * written. A real Chrome + persistent profile with the corrected URL works on
+ * the first visit, no login/CAPTCHA/warm-up needed. The product card markup
+ * has no semantic class names (Tailwind-only), so title/price are pulled from
+ * the card's plain innerText via regex rather than fragile nested selectors.
  */
 @Injectable()
 export class CarrefourConnector implements RetailerConnector {
@@ -39,8 +46,8 @@ export class CarrefourConnector implements RetailerConnector {
     const trimmed = query.trim();
     if (!trimmed) return [];
 
-    const baseUrl = this.configService.get<string>('retailers.carrefourBaseUrl', 'https://www.carrefouruae.com');
-    const url = `${baseUrl.replace(/\/$/, '')}/mafuae/en/search?keyword=${encodeURIComponent(trimmed)}`;
+    const baseUrl = this.configService.get<string>('retailers.carrefourBaseUrl', 'https://www.carrefouregypt.com');
+    const url = `${baseUrl.replace(/\/$/, '')}/mafegy/en/search?keyword=${encodeURIComponent(trimmed)}`;
 
     const page = await this.browserSession.getPage(this.slug);
     try {
@@ -101,7 +108,7 @@ export class CarrefourConnector implements RetailerConnector {
       externalUrl,
       title,
       priceUsd: amount,
-      currency: currency ?? 'AED',
+      currency: currency ?? 'EGP',
       brand: null,
       model: null,
       imageUrl: card.imageUrl,

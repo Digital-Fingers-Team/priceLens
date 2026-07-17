@@ -116,14 +116,14 @@ export function ProductHeader({ product }: ProductHeaderProps) {
                 <div>
                   <p className="text-[10px] text-ink-500 mb-0.5">Best price</p>
                   <span className="text-4xl font-black text-signal tracking-tight">
-                    {formatCurrency(priceStats.min)}
+                    {formatCurrency(priceStats.min, priceStats.currency)}
                   </span>
                 </div>
                 {hasRange && (
                   <div>
                     <p className="text-[10px] text-ink-500 mb-0.5">Up to</p>
                     <span className="text-xl font-semibold text-ink-400">
-                      {formatCurrency(priceStats.max)}
+                      {formatCurrency(priceStats.max, priceStats.currency)}
                     </span>
                   </div>
                 )}
@@ -132,7 +132,7 @@ export function ProductHeader({ product }: ProductHeaderProps) {
               {/* Avg */}
               {priceStats.avg != null && (
                 <p className="text-xs text-ink-500">
-                  Avg: <span className="text-ink-300">{formatCurrency(priceStats.avg)}</span>
+                  Avg: <span className="text-ink-300">{formatCurrency(priceStats.avg, priceStats.currency)}</span>
                 </p>
               )}
             </div>

@@ -63,9 +63,20 @@ export class ReconciliationService {
     const threshold = this.config.get<number>('search.reconciliationSimilarityThreshold', 0.82);
     const neighborsPerProduct = this.config.get<number>('search.reconciliationNeighborsPerProduct', 5);
 
-    const pairs = await this.findCandidatePairs(threshold, maxPairs, neighborsPerProduct);
+    // Two complementary candidate sources, deduped. Trigram similarity catches
+    // near-identical titles; model-agreement catches genuine cross-store
+    // duplicates whose titles are worded so differently that trigram similarity
+    // falls below the threshold (a real case: "OPPO A6 Smartphone, 256 GB,
+    // Sapphire Blue, ... 8 GB RAM" vs "Oppo A6 - 8GB RAM - 256GB - Sapphire
+    // Blue" scored only 0.52 — below 0.82 — even though every structured
+    // attribute agrees). Model-agreement pairs go first so they aren't crowded
+    // out of the maxPairs budget by high-trigram-but-different variants.
+    const modelPairs = await this.findModelAgreementPairs(maxPairs);
+    const trigramPairs = await this.findCandidatePairs(threshold, maxPairs, neighborsPerProduct);
+    const pairs = this.dedupePairs([...modelPairs, ...trigramPairs]).slice(0, maxPairs);
     this.logger.log(
-      `Reconciliation start (dryRun=${dryRun}): ${pairs.length} candidate pair(s) above similarity ${threshold}`,
+      `Reconciliation start (dryRun=${dryRun}): ${pairs.length} candidate pair(s) ` +
+        `(${modelPairs.length} by model agreement, ${trigramPairs.length} by trigram >= ${threshold})`,
     );
 
     const merges: ProposedMerge[] = [];
@@ -175,6 +186,70 @@ export class ReconciliationService {
       ORDER BY similarity DESC
       LIMIT ${maxPairs}
     `;
+  }
+
+  /**
+   * Candidate pairs sharing the same category + brand + extracted model,
+   * regardless of title trigram similarity. This is the signal that actually
+   * identifies a cross-store duplicate: two stores rewrite the title around the
+   * model code so completely that trigram similarity misses them, but the
+   * brand+model still agree. Brand and model are recomputed fresh from the
+   * title (falling back to the stored `brand` column) because older rows predate
+   * model extraction for several phone brands and have an empty `model` column.
+   *
+   * These pairs are deliberately permissive — a same brand+model group still
+   * contains different storage/colour/RAM variants (e.g. every "OPPO A6"). That
+   * is intentional: `hasHardConflict` in the main loop rejects the variant
+   * mismatches, and only the genuinely-identical pairs survive to be merged.
+   */
+  private async findModelAgreementPairs(maxPairs: number): Promise<CandidatePair[]> {
+    const products = await this.prisma.canonicalProduct.findMany({
+      select: { id: true, title: true, brand: true, categoryId: true },
+    });
+
+    const groups = new Map<string, string[]>();
+    for (const product of products) {
+      const extracted = this.normalizer.extractAttributes(product.title);
+      const brand = (product.brand ?? extracted.brand)?.trim().toLowerCase();
+      const model = extracted.model?.trim().toLowerCase();
+      if (!brand || !model) continue;
+
+      const key = `${product.categoryId}|${brand}|${model}`;
+      const bucket = groups.get(key);
+      if (bucket) {
+        bucket.push(product.id);
+      } else {
+        groups.set(key, [product.id]);
+      }
+    }
+
+    const pairs: CandidatePair[] = [];
+    for (const ids of groups.values()) {
+      if (ids.length < 2) continue;
+      for (let i = 0; i < ids.length; i++) {
+        for (let j = i + 1; j < ids.length; j++) {
+          const [a_id, b_id] = ids[i] < ids[j] ? [ids[i], ids[j]] : [ids[j], ids[i]];
+          // similarity is nominal here — model agreement, not title text, is
+          // what qualified this pair; it only affects log output.
+          pairs.push({ a_id, b_id, similarity: 1 });
+          if (pairs.length >= maxPairs) return pairs;
+        }
+      }
+    }
+    return pairs;
+  }
+
+  /** Collapse duplicate (a_id, b_id) pairs, keeping the first (higher-priority) occurrence. */
+  private dedupePairs(pairs: CandidatePair[]): CandidatePair[] {
+    const seen = new Set<string>();
+    const result: CandidatePair[] = [];
+    for (const pair of pairs) {
+      const key = `${pair.a_id}|${pair.b_id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push(pair);
+    }
+    return result;
   }
 
   /**

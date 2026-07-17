@@ -106,6 +106,7 @@ export function ProductDetailClient({ slug }: ProductDetailClientProps) {
           avg={product.priceStats.avg}
           week52Low={week52?.low ?? null}
           week52High={week52?.high ?? null}
+          currency={product.priceStats.currency}
         />
 
         <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
@@ -123,13 +124,13 @@ export function ProductDetailClient({ slug }: ProductDetailClientProps) {
               <div className="rounded-lg border border-ink-800 bg-ink-950/40 p-3">
                 <p className="text-ink-500 text-xs">All-time low</p>
                 <p className="text-ink-100 font-semibold mt-1">
-                  {formatCurrency(allTime?.min)}
+                  {formatCurrency(allTime?.min, product.priceStats.currency)}
                 </p>
               </div>
               <div className="rounded-lg border border-ink-800 bg-ink-950/40 p-3">
                 <p className="text-ink-500 text-xs">All-time high</p>
                 <p className="text-ink-100 font-semibold mt-1">
-                  {formatCurrency(allTime?.max)}
+                  {formatCurrency(allTime?.max, product.priceStats.currency)}
                 </p>
               </div>
               <div className="rounded-lg border border-ink-800 bg-ink-950/40 p-3">
@@ -139,7 +140,7 @@ export function ProductDetailClient({ slug }: ProductDetailClientProps) {
               <div className="rounded-lg border border-ink-800 bg-ink-950/40 p-3">
                 <p className="text-ink-500 text-xs">Current median</p>
                 <p className="text-ink-100 font-semibold mt-1">
-                  {formatCurrency(product.priceStats.median)}
+                  {formatCurrency(product.priceStats.median, product.priceStats.currency)}
                 </p>
               </div>
             </div>

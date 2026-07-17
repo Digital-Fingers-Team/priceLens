@@ -14,7 +14,10 @@ export default registerAs('retailers', () => ({
   crossStoreBackfillMaxProducts: parseInt(process.env.CROSS_STORE_BACKFILL_MAX_PRODUCTS ?? '40', 10),
   crossStoreBackfillLimitPerQuery: parseInt(process.env.CROSS_STORE_BACKFILL_LIMIT_PER_QUERY ?? '5', 10),
   amazonEnabled: process.env.AMAZON_ENABLED !== 'false',
-  amazonBaseUrl: process.env.AMAZON_BASE_URL ?? 'https://www.amazon.com',
+  // Egypt storefront -- amazon.com doesn't carry OPPO phones (and most of the
+  // catalog this app cares about) at all; confirmed live that amazon.eg does,
+  // with genuine EGP prices. See amazon.connector.ts.
+  amazonBaseUrl: process.env.AMAZON_BASE_URL ?? 'https://www.amazon.eg',
   alibabaEnabled: process.env.ALIBABA_ENABLED !== 'false',
   alibabaBaseUrl: process.env.ALIBABA_BASE_URL ?? 'https://www.alibaba.com',
   // Unlike Alibaba, AliExpress does not serve a CAPTCHA to the real-Chrome +
@@ -36,7 +39,9 @@ export default registerAs('retailers', () => ({
   jumiaEnabled: process.env.JUMIA_ENABLED !== 'false',
   jumiaBaseUrl: process.env.JUMIA_BASE_URL ?? 'https://www.jumia.com.eg',
   carrefourEnabled: process.env.CARREFOUR_ENABLED !== 'false',
-  carrefourBaseUrl: process.env.CARREFOUR_BASE_URL ?? 'https://www.carrefouruae.com',
+  // Egypt storefront (not UAE) so listings are genuine local EGP retail prices
+  // rather than a UAE price needing FX conversion -- see carrefour.connector.ts.
+  carrefourBaseUrl: process.env.CARREFOUR_BASE_URL ?? 'https://www.carrefouregypt.com',
   twoBEnabled: process.env.TWOB_ENABLED !== 'false',
   twoBBaseUrl: process.env.TWOB_BASE_URL ?? 'https://2b.com.eg',
   elarabyEnabled: process.env.ELARABY_ENABLED !== 'false',

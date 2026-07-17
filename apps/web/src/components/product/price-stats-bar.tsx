@@ -6,6 +6,7 @@ interface PriceStatsBarProps {
   avg: number | null;
   week52Low?: number | null;
   week52High?: number | null;
+  currency?: string | null;
 }
 
 function StatCell({
@@ -38,33 +39,34 @@ export function PriceStatsBar({
   avg,
   week52Low,
   week52High,
+  currency,
 }: PriceStatsBarProps) {
   return (
     <div className="rounded-xl border border-ink-700 bg-ink-900 overflow-hidden">
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-y sm:divide-y-0 divide-ink-700">
         <StatCell
           label="Best Price"
-          value={formatCurrency(min)}
+          value={formatCurrency(min, currency)}
           highlight="green"
         />
         <StatCell
           label="Highest"
-          value={formatCurrency(max)}
+          value={formatCurrency(max, currency)}
           highlight="red"
         />
         <StatCell
           label="Average"
-          value={formatCurrency(avg)}
+          value={formatCurrency(avg, currency)}
           highlight="neutral"
         />
         <StatCell
           label="52-wk Low"
-          value={formatCurrency(week52Low)}
+          value={formatCurrency(week52Low, currency)}
           highlight="green"
         />
         <StatCell
           label="52-wk High"
-          value={formatCurrency(week52High)}
+          value={formatCurrency(week52High, currency)}
           highlight="red"
         />
       </div>
