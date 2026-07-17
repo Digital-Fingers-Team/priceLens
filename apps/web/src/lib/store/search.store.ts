@@ -25,12 +25,16 @@ export const useSearchStore = create<SearchState>((set) => ({
 
   setFilter: (key, value) =>
     set((state) => ({
-      filters: { ...state.filters, [key]: value, page: key !== 'page' ? 1 : state.filters.page },
+      filters: {
+        ...state.filters,
+        [key]: value,
+        ...(key !== 'page' ? { page: 1 } : {}),
+      },
     })),
 
   setFilters: (filters) =>
     set((state) => ({
-      filters: { ...state.filters, ...filters, page: 1 },
+      filters: { ...state.filters, ...filters, page: filters.page ?? 1 },
     })),
 
   resetFilters: () => set({ filters: DEFAULT_FILTERS }),
