@@ -682,11 +682,6 @@ export class LiveIngestionService {
       mpn: listing.identifiers.mpn ?? undefined,
     });
 
-    // Computed once and threaded through both the match lookup and (if nothing
-    // matches) the new-product creation, so we never embed the same listing
-    // twice.
-    const listingEmbedding = await this.semantic.embed(listing.title);
-
     // `listing.priceUsd`/`listing.currency` are the raw scraped amount in the
     // store's own currency (the field name is a historical misnomer — see
     // RetailerListing). Converted once here to the base currency (EGP) so the
@@ -702,7 +697,7 @@ export class LiveIngestionService {
 
     const canonicalProduct =
       canonicalMatch ??
-      (await this.createCanonicalProduct(category, listing, normalized, extracted, listingEmbedding));
+      (await this.createCanonicalProduct(category, listing, normalized, extracted));
 
     const sourceListing = await this.prisma.sourceListing.upsert({
       where: {
@@ -1031,7 +1026,6 @@ export class LiveIngestionService {
     listing: RetailerListing,
     normalized: ReturnType<NormalizerService['normalizeTitle']>,
     extracted: ReturnType<NormalizerService['extractAttributes']>,
-    listingEmbedding: number[] | null,
   ) {
     const baseSlug = this.toSlug(
       [listing.brand ?? extracted.brand, listing.model ?? extracted.model, listing.title]
@@ -1061,12 +1055,6 @@ export class LiveIngestionService {
         isVerified: false,
       },
     });
-
-    // Stored so the next listing that might be this same product on another
-    // store doesn't need to re-embed every existing candidate's title to compare.
-    if (listingEmbedding) {
-      await this.semantic.storeCanonicalEmbedding(product.id, listingEmbedding);
-    }
 
     return product;
   }
