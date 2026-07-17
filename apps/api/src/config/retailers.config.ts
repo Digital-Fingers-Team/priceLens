@@ -23,8 +23,13 @@ export default registerAs('retailers', () => ({
   // the rest of the catalog -- products under minStoresPerProduct that nobody
   // has viewed recently -- so coverage still improves in the background.
   storeCoverageSweepEnabled: process.env.STORE_COVERAGE_SWEEP_ENABLED !== 'false',
-  storeCoverageSweepCron: process.env.STORE_COVERAGE_SWEEP_CRON ?? '30 */2 * * *',
-  storeCoverageSweepBatchSize: parseInt(process.env.STORE_COVERAGE_SWEEP_BATCH_SIZE ?? '25', 10),
+  // Catalog currently has ~2,700 products stuck under target coverage (mostly
+  // still at 1 store) -- 25/2h would take ~9 days to work through once. Bumped
+  // to clear it in under 2 days without going as aggressive as an unattended
+  // full sweep (see the LIVE_INGESTION_SCHEDULE_ENABLED comment below for why
+  // that one stays off: real-browser scraping is too slow/heavy to hammer).
+  storeCoverageSweepCron: process.env.STORE_COVERAGE_SWEEP_CRON ?? '*/45 * * * *',
+  storeCoverageSweepBatchSize: parseInt(process.env.STORE_COVERAGE_SWEEP_BATCH_SIZE ?? '60', 10),
   amazonEnabled: process.env.AMAZON_ENABLED !== 'false',
   // Egypt storefront -- amazon.com doesn't carry OPPO phones (and most of the
   // catalog this app cares about) at all; confirmed live that amazon.eg does,
