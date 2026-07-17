@@ -96,7 +96,11 @@ export class NoonConnector implements RetailerConnector {
       this.logger.warn(`Search failed for "${query}" (${this.slug}): ${message}`);
       return [];
     } finally {
-      await this.browserSession.closeStore(this.slug);
+      // Close only this call's tab -- the browser context is shared and reused
+      // by concurrent searches for this store (see BrowserSessionService);
+      // closeStore() here would tear down the whole context mid-use by any
+      // other in-flight call for the same store.
+      await page.close().catch(() => undefined);
     }
   }
 
