@@ -206,6 +206,17 @@ export class ProductsService {
         .map((id) => productsById.get(id))
         .filter((product) => !!product)
         .map((product) => this.mapSearchHit(product as ProductWithRelations));
+
+      // Same coverage guarantee as the product detail page (getBySlug below), but
+      // for the listing/grid view: a card showing "1 store" wouldn't otherwise
+      // get expanded until someone opens that specific product. triggerStoreExpansion
+      // already dedups per product (Bull jobId) and cools down for 5 minutes, so
+      // firing it for every under-covered hit on the page is safe to repeat per search.
+      for (const product of products) {
+        if (this.countDistinctStores(product as ProductWithRelations) < this.minStoresPerProduct) {
+          void this.triggerStoreExpansion(product.id);
+        }
+      }
     }
 
     return {

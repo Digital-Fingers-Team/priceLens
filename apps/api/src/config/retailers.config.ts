@@ -18,6 +18,13 @@ export default registerAs('retailers', () => ({
   // this, a background job searches the remaining stores by the product's specs
   // to try to reach it (capped by however many stores are actually enabled).
   minStoresPerProduct: parseInt(process.env.MIN_STORES_PER_PRODUCT ?? '7', 10),
+  // Reactive expansion (above) only fires for products someone actually browses
+  // to (product detail page, or now a search hit). This periodic sweep catches
+  // the rest of the catalog -- products under minStoresPerProduct that nobody
+  // has viewed recently -- so coverage still improves in the background.
+  storeCoverageSweepEnabled: process.env.STORE_COVERAGE_SWEEP_ENABLED !== 'false',
+  storeCoverageSweepCron: process.env.STORE_COVERAGE_SWEEP_CRON ?? '30 */2 * * *',
+  storeCoverageSweepBatchSize: parseInt(process.env.STORE_COVERAGE_SWEEP_BATCH_SIZE ?? '25', 10),
   amazonEnabled: process.env.AMAZON_ENABLED !== 'false',
   // Egypt storefront -- amazon.com doesn't carry OPPO phones (and most of the
   // catalog this app cares about) at all; confirmed live that amazon.eg does,

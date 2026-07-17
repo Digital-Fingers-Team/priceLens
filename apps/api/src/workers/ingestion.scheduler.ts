@@ -2,10 +2,16 @@ import { InjectQueue } from '@nestjs/bull';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bull';
-import { INGESTION_QUEUE, RUN_LIVE_INGESTION_JOB, RUN_RECONCILIATION_JOB } from './ingestion.processor';
+import {
+  INGESTION_QUEUE,
+  RUN_LIVE_INGESTION_JOB,
+  RUN_RECONCILIATION_JOB,
+  RUN_STORE_COVERAGE_SWEEP_JOB,
+} from './ingestion.processor';
 
 const REPEATABLE_JOB_ID = 'scheduled-live-ingestion';
 const RECONCILIATION_JOB_ID = 'scheduled-reconciliation';
+const STORE_COVERAGE_SWEEP_JOB_ID = 'scheduled-store-coverage-sweep';
 
 @Injectable()
 export class IngestionScheduler implements OnModuleInit {
@@ -41,6 +47,7 @@ export class IngestionScheduler implements OnModuleInit {
     this.logger.log(`Scheduled live ingestion to run on cron "${cron}"`);
 
     await this.scheduleReconciliation();
+    await this.scheduleStoreCoverageSweep();
   }
 
   /**
@@ -64,5 +71,28 @@ export class IngestionScheduler implements OnModuleInit {
       },
     );
     this.logger.log(`Scheduled reconciliation to run on cron "${cron}"`);
+  }
+
+  /**
+   * Catches products that fall under minStoresPerProduct without anyone browsing
+   * to them -- the reactive triggers (product detail view, search hit) only reach
+   * products someone actually looks at. See LiveIngestionService.runStoreCoverageSweep.
+   */
+  private async scheduleStoreCoverageSweep() {
+    if (!this.configService.get<boolean>('retailers.storeCoverageSweepEnabled', true)) {
+      this.logger.log('Scheduled store coverage sweep is disabled (STORE_COVERAGE_SWEEP_ENABLED=false)');
+      return;
+    }
+
+    const cron = this.configService.get<string>('retailers.storeCoverageSweepCron', '30 */2 * * *');
+    await this.queue.add(
+      RUN_STORE_COVERAGE_SWEEP_JOB,
+      {},
+      {
+        jobId: STORE_COVERAGE_SWEEP_JOB_ID,
+        repeat: { cron },
+      },
+    );
+    this.logger.log(`Scheduled store coverage sweep to run on cron "${cron}"`);
   }
 }

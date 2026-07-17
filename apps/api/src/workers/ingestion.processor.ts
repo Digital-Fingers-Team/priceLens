@@ -9,6 +9,7 @@ export const RUN_LIVE_INGESTION_JOB = 'run-live-ingestion';
 export const RUN_QUERY_INGESTION_JOB = 'run-query-ingestion';
 export const RUN_RECONCILIATION_JOB = 'run-reconciliation';
 export const RUN_STORE_EXPANSION_JOB = 'run-store-expansion';
+export const RUN_STORE_COVERAGE_SWEEP_JOB = 'run-store-coverage-sweep';
 
 interface RunQueryIngestionData extends LiveIngestionOptions {
   query: string;
@@ -56,6 +57,17 @@ export class IngestionProcessor {
     this.logger.log(`Starting store expansion for product ${productId} (job ${job.id})`);
     await this.liveIngestionService.expandProductStores(productId, targetStores);
     this.logger.log(`Finished store expansion for product ${productId} (job ${job.id})`);
+  }
+
+  @Process(RUN_STORE_COVERAGE_SWEEP_JOB)
+  async handleRunStoreCoverageSweep(job: Job<{ maxProducts?: number }>) {
+    this.logger.log(`Starting store coverage sweep (job ${job.id})`);
+    const { scanned, expanded } = await this.liveIngestionService.runStoreCoverageSweep(
+      job.data?.maxProducts,
+    );
+    this.logger.log(
+      `Finished store coverage sweep (job ${job.id}): ${expanded}/${scanned} product(s) processed`,
+    );
   }
 
   @Process(RUN_QUERY_INGESTION_JOB)

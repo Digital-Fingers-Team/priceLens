@@ -7,6 +7,7 @@ import {
   INGESTION_QUEUE,
   RUN_LIVE_INGESTION_JOB,
   RUN_RECONCILIATION_JOB,
+  RUN_STORE_COVERAGE_SWEEP_JOB,
 } from '../workers/ingestion.processor';
 
 interface RunLiveIngestionBody {
@@ -17,6 +18,10 @@ interface RunLiveIngestionBody {
 interface RunReconciliationBody {
   dryRun?: boolean;
   maxPairs?: number;
+}
+
+interface RunStoreCoverageSweepBody {
+  maxProducts?: number;
 }
 
 @Controller('admin')
@@ -63,5 +68,25 @@ export class AdminController {
     );
 
     return { queued: true, jobId: String(job.id), dryRun: dryRun ?? 'env-default' };
+  }
+
+  @Post('store-coverage-sweep')
+  @Roles(UserRole.ADMIN)
+  async runStoreCoverageSweep(@Body() body: RunStoreCoverageSweepBody = {}) {
+    const maxProducts = typeof body.maxProducts === 'number' ? body.maxProducts : undefined;
+
+    // Scrapes every under-covered product's missing stores -- can run for a
+    // while, so queue it rather than block the request.
+    const job = await this.ingestionQueue.add(
+      RUN_STORE_COVERAGE_SWEEP_JOB,
+      { maxProducts },
+      {
+        jobId: `manual-store-coverage-sweep:${Date.now()}`,
+        removeOnComplete: true,
+        removeOnFail: true,
+      },
+    );
+
+    return { queued: true, jobId: String(job.id) };
   }
 }

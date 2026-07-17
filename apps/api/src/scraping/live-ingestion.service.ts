@@ -591,6 +591,54 @@ export class LiveIngestionService {
   }
 
   /**
+   * Catalog-wide counterpart to expandProductStores: the reactive triggers (product
+   * detail view, search hit) only reach products someone actually browses to, so a
+   * product nobody has looked at recently can sit under-covered indefinitely. This
+   * runs on a cron, scans for canonical products below minStoresPerProduct, and
+   * expands the worst-covered ones first -- bounded per run by
+   * storeCoverageSweepBatchSize so one sweep doesn't try to fix the whole catalog
+   * (and every store it scrapes) in a single pass.
+   */
+  async runStoreCoverageSweep(maxProductsOverride?: number): Promise<{ scanned: number; expanded: number }> {
+    const enabled = this.configService.get<boolean>('retailers.storeCoverageSweepEnabled', true);
+    if (!enabled) {
+      return { scanned: 0, expanded: 0 };
+    }
+
+    const minStores = this.configService.get<number>('retailers.minStoresPerProduct', 7);
+    const maxProducts = Math.max(
+      1,
+      maxProductsOverride ?? this.configService.get<number>('retailers.storeCoverageSweepBatchSize', 25),
+    );
+
+    const underCovered = await this.prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT cp.id
+      FROM canonical_products cp
+      JOIN source_listings sl
+        ON sl.canonical_product_id = cp.id
+        AND sl.price_usd IS NOT NULL AND sl.price_usd > 0 AND sl.in_stock IS NOT FALSE
+      GROUP BY cp.id
+      HAVING COUNT(DISTINCT sl.platform_id) < ${minStores}
+      ORDER BY COUNT(DISTINCT sl.platform_id) ASC, cp.updated_at ASC
+      LIMIT ${maxProducts}
+    `);
+
+    let expanded = 0;
+    for (const { id } of underCovered) {
+      try {
+        await this.expandProductStores(id, minStores);
+        expanded += 1;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.warn(`Store coverage sweep failed for product ${id}: ${message}`);
+      }
+    }
+
+    this.logger.log(`Store coverage sweep: scanned ${underCovered.length}, expanded ${expanded}`);
+    return { scanned: underCovered.length, expanded };
+  }
+
+  /**
    * Build a specific search query that identifies one product across stores:
    * brand + model + storage, drawn from the canonical's columns and (as a
    * fallback for older rows) a fresh extraction from its title. Returns null
