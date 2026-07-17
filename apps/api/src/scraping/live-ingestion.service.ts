@@ -486,6 +486,111 @@ export class LiveIngestionService {
   }
 
   /**
+   * On-demand, single-product version of backfillCrossStore. Given one canonical
+   * product, keep searching the stores that don't yet carry it — using its
+   * specific "brand model storage" query — until it's covered by at least
+   * `targetStores` distinct stores or every enabled store has been tried.
+   *
+   * Only stores that actually return a listing WITH A PRICE count toward
+   * coverage: retailers surface out-of-stock results with no price, and those are
+   * skipped here (matching the persist path elsewhere), so a store is only counted
+   * once it's a real price source for this product. The target naturally caps at
+   * however many stores are enabled — if only four connectors are live, it stops
+   * at four rather than looping forever chasing seven.
+   */
+  async expandProductStores(
+    productId: string,
+    targetStoresOverride?: number,
+    limitPerQueryOverride?: number,
+  ): Promise<void> {
+    const enabled = this.configService.get<boolean>('retailers.crossStoreBackfillEnabled', true);
+    if (!enabled) {
+      return;
+    }
+
+    const targetStores = Math.max(
+      1,
+      targetStoresOverride ?? this.configService.get<number>('retailers.minStoresPerProduct', 7),
+    );
+    const limitPerQuery = Math.max(
+      1,
+      limitPerQueryOverride ?? this.configService.get<number>('retailers.crossStoreBackfillLimitPerQuery', 5),
+    );
+
+    const product = await this.prisma.canonicalProduct.findUnique({
+      where: { id: productId },
+      include: {
+        category: true,
+        sourceListings: { select: { platformId: true, priceUsd: true } },
+      },
+    });
+    if (!product) {
+      return;
+    }
+
+    // A priceless (out-of-stock) listing doesn't make a store a real price
+    // source, so it doesn't count toward coverage.
+    const coveringPlatformIds = new Set(
+      product.sourceListings
+        .filter((listing) => listing.priceUsd != null && Number(listing.priceUsd) > 0)
+        .map((listing) => listing.platformId),
+    );
+    if (coveringPlatformIds.size >= targetStores) {
+      return;
+    }
+
+    const query = this.buildProductQuery(product);
+    if (!query) {
+      return;
+    }
+
+    const platforms = await this.prisma.platform.findMany({
+      where: { isActive: true },
+      orderBy: { name: 'asc' },
+    });
+
+    const missingPlatforms = platforms.filter((platform) => {
+      const connector = this.connectorsBySlug.get(platform.slug);
+      return connector?.isEnabled && !coveringPlatformIds.has(platform.id);
+    });
+
+    for (const platform of missingPlatforms) {
+      if (coveringPlatformIds.size >= targetStores) {
+        break;
+      }
+      const connector = this.connectorsBySlug.get(platform.slug);
+      if (!connector) {
+        continue;
+      }
+
+      try {
+        const listings = await connector.searchListings(query, limitPerQuery);
+        let coveredByThisStore = false;
+
+        for (const listing of listings) {
+          if (listing.priceUsd == null || !Number.isFinite(listing.priceUsd) || listing.priceUsd <= 0) {
+            continue;
+          }
+
+          const result = await this.persistListing(platform, product.category, listing, connector.slug);
+          // Only a listing that merged onto THIS product means this store now
+          // carries it — a different match is normal ingestion, but not coverage.
+          if (result.canonicalProductId === productId) {
+            coveredByThisStore = true;
+          }
+        }
+
+        if (coveredByThisStore) {
+          coveringPlatformIds.add(platform.id);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.warn(`Store expansion for "${query}" on ${platform.slug} failed: ${message}`);
+      }
+    }
+  }
+
+  /**
    * Build a specific search query that identifies one product across stores:
    * brand + model + storage, drawn from the canonical's columns and (as a
    * fallback for older rows) a fresh extraction from its title. Returns null

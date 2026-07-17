@@ -5,7 +5,11 @@ import { Queue } from 'bull';
 import { Prisma, ProductTier } from '@prisma/client';
 import type { CanonicalProduct, SourceListing } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
-import { INGESTION_QUEUE, RUN_QUERY_INGESTION_JOB } from '../workers/ingestion.processor';
+import {
+  INGESTION_QUEUE,
+  RUN_QUERY_INGESTION_JOB,
+  RUN_STORE_EXPANSION_JOB,
+} from '../workers/ingestion.processor';
 
 type SortBy = 'relevance' | 'minPriceUsd' | 'maxPriceUsd' | 'listingCount' | 'updatedAt';
 type SortDir = 'asc' | 'desc';
@@ -116,12 +120,16 @@ export class ProductsService {
   /** Currency every `priceUsd` column is normalized to at ingestion time (see FxRatesService). */
   private readonly baseCurrency: string;
 
+  /** Every product should be comparable across at least this many priced stores. */
+  private readonly minStoresPerProduct: number;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     @InjectQueue(INGESTION_QUEUE) private readonly ingestionQueue: Queue,
   ) {
     this.baseCurrency = this.config.get<string>('pricing.fxBaseCurrency', 'EGP');
+    this.minStoresPerProduct = this.config.get<number>('retailers.minStoresPerProduct', 7);
   }
 
   async searchProducts(options: SearchProductsOptions) {
@@ -381,6 +389,39 @@ export class ProductsService {
     }
   }
 
+  /** Per-product cooldown so repeated views of a short-store product don't re-queue the search. */
+  private static readonly STORE_EXPANSION_COOLDOWN_MS = 5 * 60 * 1000;
+  private readonly lastStoreExpansionAt = new Map<string, number>();
+
+  /**
+   * Queues a background job that searches the stores which don't yet carry this
+   * product (by its brand/model/storage specs) to push it toward the target store
+   * count. Deduped by product id (Bull returns the in-flight job) and throttled by
+   * a cooldown so browsing the same product doesn't pile up scrapes.
+   */
+  private async triggerStoreExpansion(productId: string): Promise<boolean> {
+    const lastRun = this.lastStoreExpansionAt.get(productId);
+    if (lastRun != null && Date.now() - lastRun < ProductsService.STORE_EXPANSION_COOLDOWN_MS) {
+      return false;
+    }
+
+    try {
+      await this.ingestionQueue.add(
+        RUN_STORE_EXPANSION_JOB,
+        { productId, targetStores: this.minStoresPerProduct },
+        {
+          jobId: `store-expansion:${productId}`,
+          removeOnComplete: true,
+          removeOnFail: true,
+        },
+      );
+      this.lastStoreExpansionAt.set(productId, Date.now());
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async suggest(q: string, limit = 6) {
     const query = q.trim().toLowerCase();
     if (query.length < 2) return [];
@@ -441,21 +482,38 @@ export class ProductsService {
       throw new NotFoundException(`Product with slug "${slug}" not found`);
     }
 
+    // Drop priceless / out-of-stock listings so the detail page only shows stores
+    // that actually have a price for this product right now.
+    product.sourceListings = product.sourceListings.filter((listing) =>
+      this.hasUsablePrice(listing),
+    );
+
+    // Keep every product comparable across the target number of stores: if it's
+    // short, kick off a background spec-based search of the remaining stores.
+    if (this.countDistinctStores(product as ProductWithRelations) < this.minStoresPerProduct) {
+      void this.triggerStoreExpansion(product.id);
+    }
+
     return this.mapProduct(product as ProductWithRelations, true);
   }
 
   async getListings(productId: string, page = 1, limit = 50) {
+    // Out-of-stock listings come back with no price; exclude them so callers only
+    // see stores the product can actually be bought from.
+    const where: Prisma.SourceListingWhereInput = {
+      canonicalProductId: productId,
+      priceUsd: { not: null },
+      NOT: { inStock: false },
+    };
     const [items, total] = await this.prisma.$transaction([
       this.prisma.sourceListing.findMany({
-        where: { canonicalProductId: productId },
+        where,
         include: { platform: true },
         orderBy: [{ priceUsd: 'asc' }, { lastSeenAt: 'desc' }],
         skip: (page - 1) * limit,
         take: limit,
       }),
-      this.prisma.sourceListing.count({
-        where: { canonicalProductId: productId },
-      }),
+      this.prisma.sourceListing.count({ where }),
     ]);
 
     return {
@@ -702,9 +760,23 @@ export class ProductsService {
     };
   }
 
+  /**
+   * A store only counts when it actually has a price for the product. Retailers
+   * return out-of-stock items with no price; those aren't a real price source, so
+   * they're excluded from the store count everywhere it's shown.
+   */
+  private hasUsablePrice(listing: { priceUsd: unknown; inStock?: boolean | null }): boolean {
+    const price = this.toNumber(listing.priceUsd);
+    return price != null && price > 0 && listing.inStock !== false;
+  }
+
   /** A product with three listings from one retailer is still sold at one store. */
   private countDistinctStores(product: ProductWithRelations): number {
-    return new Set(product.sourceListings.map((listing) => listing.platformId)).size;
+    return new Set(
+      product.sourceListings
+        .filter((listing) => this.hasUsablePrice(listing))
+        .map((listing) => listing.platformId),
+    ).size;
   }
 
   private mapListing(

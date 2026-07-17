@@ -13,6 +13,11 @@ export default registerAs('retailers', () => ({
   crossStoreBackfillEnabled: process.env.CROSS_STORE_BACKFILL_ENABLED !== 'false',
   crossStoreBackfillMaxProducts: parseInt(process.env.CROSS_STORE_BACKFILL_MAX_PRODUCTS ?? '40', 10),
   crossStoreBackfillLimitPerQuery: parseInt(process.env.CROSS_STORE_BACKFILL_LIMIT_PER_QUERY ?? '5', 10),
+  // Target number of distinct stores every product should be compared across.
+  // When a product detail is viewed and it's covered by fewer priced stores than
+  // this, a background job searches the remaining stores by the product's specs
+  // to try to reach it (capped by however many stores are actually enabled).
+  minStoresPerProduct: parseInt(process.env.MIN_STORES_PER_PRODUCT ?? '7', 10),
   amazonEnabled: process.env.AMAZON_ENABLED !== 'false',
   // Egypt storefront -- amazon.com doesn't carry OPPO phones (and most of the
   // catalog this app cares about) at all; confirmed live that amazon.eg does,
