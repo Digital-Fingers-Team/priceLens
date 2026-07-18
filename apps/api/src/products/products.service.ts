@@ -400,8 +400,14 @@ export class ProductsService {
     }
   }
 
-  /** Per-product cooldown so repeated views of a short-store product don't re-queue the search. */
-  private static readonly STORE_EXPANSION_COOLDOWN_MS = 5 * 60 * 1000;
+  /**
+   * Per-product cooldown so repeated views of a short-store product don't re-queue
+   * the search. Concurrent views are already deduped by Bull's jobId (see
+   * triggerStoreExpansion below), so this only paces re-attempts *after* a prior
+   * run finished — kept short (not zero) so a permanently-undercovered product
+   * getting hammered with views doesn't re-scrape every missing store on every hit.
+   */
+  private static readonly STORE_EXPANSION_COOLDOWN_MS = 30 * 1000;
   private readonly lastStoreExpansionAt = new Map<string, number>();
 
   /**

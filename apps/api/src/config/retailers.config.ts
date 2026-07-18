@@ -24,12 +24,15 @@ export default registerAs('retailers', () => ({
   // has viewed recently -- so coverage still improves in the background.
   storeCoverageSweepEnabled: process.env.STORE_COVERAGE_SWEEP_ENABLED !== 'false',
   // Catalog currently has ~2,700 products stuck under target coverage (mostly
-  // still at 1 store) -- 25/2h would take ~9 days to work through once. Bumped
-  // to clear it in under 2 days without going as aggressive as an unattended
-  // full sweep (see the LIVE_INGESTION_SCHEDULE_ENABLED comment below for why
-  // that one stays off: real-browser scraping is too slow/heavy to hammer).
+  // still at 1 store). Batch size bumped 60 -> 500: this job's Bull processor
+  // has no explicit concurrency, which defaults to 1 -- one store request at a
+  // time regardless of batch size -- so a bigger batch just means one sweep
+  // works through more of the backlog before finishing, not more simultaneous
+  // load on any store. (See the LIVE_INGESTION_SCHEDULE_ENABLED comment below
+  // for why the *other* sweep, the full category x store one, stays off instead:
+  // real-browser scraping there is too slow/heavy to run unattended at all.)
   storeCoverageSweepCron: process.env.STORE_COVERAGE_SWEEP_CRON ?? '*/45 * * * *',
-  storeCoverageSweepBatchSize: parseInt(process.env.STORE_COVERAGE_SWEEP_BATCH_SIZE ?? '60', 10),
+  storeCoverageSweepBatchSize: parseInt(process.env.STORE_COVERAGE_SWEEP_BATCH_SIZE ?? '500', 10),
   amazonEnabled: process.env.AMAZON_ENABLED !== 'false',
   // Egypt storefront -- amazon.com doesn't carry OPPO phones (and most of the
   // catalog this app cares about) at all; confirmed live that amazon.eg does,
