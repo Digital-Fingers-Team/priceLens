@@ -459,10 +459,11 @@ model AffiliateClick {
   affiliateUrl       String   @map("affiliate_url")
   clickedAt          DateTime @default(now()) @map("clicked_at")
 
-  sourceListing    SourceListing     @relation(fields: [sourceListingId], references: [id], onDelete: Cascade)
-  canonicalProduct CanonicalProduct? @relation(fields: [canonicalProductId], references: [id], onDelete: SetNull)
-  platform         Platform          @relation(fields: [platformId], references: [id], onDelete: Cascade)
-  user             User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  sourceListing    SourceListing         @relation(fields: [sourceListingId], references: [id], onDelete: Cascade)
+  canonicalProduct CanonicalProduct?     @relation(fields: [canonicalProductId], references: [id], onDelete: SetNull)
+  platform         Platform              @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  user             User?                 @relation(fields: [userId], references: [id], onDelete: SetNull)
+  conversions      AffiliateConversion[]
 
   @@index([sourceListingId])
   @@index([canonicalProductId])
@@ -470,4 +471,39 @@ model AffiliateClick {
   @@index([userId])
   @@index([clickedAt])
   @@map("affiliate_clicks")
+}
+
+enum ConversionStatus {
+  PENDING
+  APPROVED
+  REVERSED
+}
+
+// A sale/action reported by an affiliate network (Impact, etc) against a
+// click we generated. Matched back to AffiliateClick via clickId -- whatever
+// sub-id/click-id value the network's report or postback carries, which our
+// AffiliateProvider implementations already embed in the outbound URL (e.g.
+// Amazon's ascsubtag, Noon's click_id, Jumia's subid). Note: this only works
+// for a given store if that store's *actual* affiliate program is tracked by
+// the network in question -- see ConversionProvider / ImpactConversionProvider.
+model AffiliateConversion {
+  id               String           @id @default(uuid())
+  clickId          String           @map("click_id")
+  networkKey       String           @map("network_key") @db.VarChar(64)
+  externalActionId String           @map("external_action_id")
+  status           ConversionStatus @default(PENDING)
+  saleAmount       Decimal?         @map("sale_amount") @db.Decimal(12, 2)
+  commissionAmount Decimal?         @map("commission_amount") @db.Decimal(12, 2)
+  currency         String           @default("USD") @db.VarChar(3)
+  occurredAt       DateTime         @map("occurred_at")
+  reportedAt       DateTime         @default(now()) @map("reported_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  click AffiliateClick @relation(fields: [clickId], references: [id], onDelete: Cascade)
+
+  @@unique([networkKey, externalActionId])
+  @@index([clickId])
+  @@index([status])
+  @@index([occurredAt])
+  @@map("affiliate_conversions")
 }
