@@ -135,6 +135,7 @@ async function bootstrap() {
       .addTag('watchlist', 'User watchlist')
       .addTag('alerts', 'Price drop alerts')
       .addTag('admin', 'Admin and moderation tools')
+      .addTag('affiliate', 'Affiliate link tracking and store redirects')
       .build();
 
     const document = SwaggerModule.createDocument(app, config);

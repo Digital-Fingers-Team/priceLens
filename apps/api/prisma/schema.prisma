@@ -20,17 +20,17 @@ enum UserRole {
 }
 
 enum MatchStatus {
-  ACCEPTED      // confidence >= HIGH_THRESHOLD
-  PENDING       // confidence in [MED_THRESHOLD, HIGH_THRESHOLD)
-  REJECTED      // confidence < LOW_THRESHOLD
+  ACCEPTED // confidence >= HIGH_THRESHOLD
+  PENDING // confidence in [MED_THRESHOLD, HIGH_THRESHOLD)
+  REJECTED // confidence < LOW_THRESHOLD
   MANUAL_ACCEPT // human approved in review queue
   MANUAL_REJECT // human rejected in review queue
 }
 
 enum AlertType {
-  PRICE_DROP_ABSOLUTE   // e.g. drop by $10
-  PRICE_DROP_PERCENT    // e.g. drop by 10%
-  PRICE_TARGET          // e.g. below $299
+  PRICE_DROP_ABSOLUTE // e.g. drop by $10
+  PRICE_DROP_PERCENT // e.g. drop by 10%
+  PRICE_TARGET // e.g. below $299
 }
 
 enum AlertStatus {
@@ -48,9 +48,9 @@ enum ScrapingJobStatus {
 }
 
 enum ConnectorType {
-  PLAYWRIGHT    // browser automation
-  HTTP_API      // direct API integration
-  RSS_FEED      // RSS/Atom ingestion
+  PLAYWRIGHT // browser automation
+  HTTP_API // direct API integration
+  RSS_FEED // RSS/Atom ingestion
   MANUAL_IMPORT // CSV / manual upload
 }
 
@@ -65,23 +65,24 @@ enum ProductTier {
 // ─── Users & Auth ───────────────────────────────────────────────────────────
 
 model User {
-  id             String    @id @default(uuid())
-  email          String    @unique
-  username       String    @unique @db.VarChar(32)
-  passwordHash   String    @map("password_hash")
-  role           UserRole  @default(USER)
-  emailVerified  Boolean   @default(false) @map("email_verified")
-  avatarUrl      String?   @map("avatar_url")
-  displayName    String?   @map("display_name") @db.VarChar(64)
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
-  lastLoginAt    DateTime? @map("last_login_at")
-  deletedAt      DateTime? @map("deleted_at") // soft delete
+  id            String    @id @default(uuid())
+  email         String    @unique
+  username      String    @unique @db.VarChar(32)
+  passwordHash  String    @map("password_hash")
+  role          UserRole  @default(USER)
+  emailVerified Boolean   @default(false) @map("email_verified")
+  avatarUrl     String?   @map("avatar_url")
+  displayName   String?   @map("display_name") @db.VarChar(64)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  lastLoginAt   DateTime? @map("last_login_at")
+  deletedAt     DateTime? @map("deleted_at") // soft delete
 
   sessions        Session[]
   watchlistItems  WatchlistItem[]
   priceAlerts     PriceAlert[]
   reviewDecisions ReviewDecision[]
+  affiliateClicks AffiliateClick[]
 
   @@index([email])
   @@index([username])
@@ -116,8 +117,8 @@ model Category {
   searchTerms String[] @map("search_terms")
   createdAt   DateTime @default(now()) @map("created_at")
 
-  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
-  children Category[] @relation("CategoryTree")
+  parent   Category?          @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[]         @relation("CategoryTree")
   products CanonicalProduct[]
 
   @@index([parentId])
@@ -139,8 +140,10 @@ model Platform {
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
 
-  sourceListings SourceListing[]
-  scrapingJobs   ScrapingJob[]
+  sourceListings  SourceListing[]
+  scrapingJobs    ScrapingJob[]
+  affiliateConfig AffiliateConfig?
+  affiliateClicks AffiliateClick[]
 
   @@map("platforms")
 }
@@ -148,22 +151,22 @@ model Platform {
 // ─── Canonical Products ──────────────────────────────────────────────────────
 
 model CanonicalProduct {
-  id              String      @id @default(uuid())
-  categoryId      String      @map("category_id")
-  slug            String      @unique
+  id              String  @id @default(uuid())
+  categoryId      String  @map("category_id")
+  slug            String  @unique
   title           String
-  normalizedTitle String      @map("normalized_title")
+  normalizedTitle String  @map("normalized_title")
   brand           String?
   model           String?
   sku             String?
-  gtin            String?     @unique
-  upc             String?     @unique
-  ean             String?     @unique
+  gtin            String? @unique
+  upc             String? @unique
+  ean             String? @unique
   mpn             String?
 
-  attributes    Json    @default("{}")
-  imageUrl      String? @map("image_url")
-  thumbnailUrl  String? @map("thumbnail_url")
+  attributes   Json    @default("{}")
+  imageUrl     String? @map("image_url")
+  thumbnailUrl String? @map("thumbnail_url")
 
   titleEmbedding Unsupported("vector(768)")? @map("title_embedding")
 
@@ -173,12 +176,13 @@ model CanonicalProduct {
   createdAt   DateTime    @default(now()) @map("created_at")
   updatedAt   DateTime    @updatedAt @map("updated_at")
 
-  category       Category        @relation(fields: [categoryId], references: [id])
-  sourceListings SourceListing[]
-  priceHistory   PriceHistory[]
-  watchlistItems WatchlistItem[]
-  priceAlerts    PriceAlert[]
-  reviewQueues   ReviewQueue[]
+  category        Category         @relation(fields: [categoryId], references: [id])
+  sourceListings  SourceListing[]
+  priceHistory    PriceHistory[]
+  watchlistItems  WatchlistItem[]
+  priceAlerts     PriceAlert[]
+  reviewQueues    ReviewQueue[]
+  affiliateClicks AffiliateClick[]
 
   @@index([categoryId])
   @@index([brand, model])
@@ -231,6 +235,7 @@ model SourceListing {
   priceHistory     PriceHistory[]
   matchDecisions   MatchDecision[]
   reviewQueues     ReviewQueue[]
+  affiliateClicks  AffiliateClick[]
 
   @@unique([platformId, externalId])
   @@index([canonicalProductId])
@@ -416,4 +421,53 @@ model PriceAlert {
   @@index([userId])
   @@index([canonicalProductId, status])
   @@map("price_alerts")
+}
+
+// ─── Affiliate System ────────────────────────────────────────────────────────
+
+// Per-store affiliate settings (affiliate/partner ID + extra tracking query
+// params to merge into generated links). Link *generation logic* itself lives
+// in code (one AffiliateProvider class per store, keyed by providerKey) --
+// this table only holds the data half so ops can rotate an affiliate ID
+// without a deploy.
+model AffiliateConfig {
+  id             String   @id @default(uuid())
+  platformId     String   @unique @map("platform_id")
+  providerKey    String   @map("provider_key") @db.VarChar(64)
+  affiliateId    String   @map("affiliate_id")
+  trackingParams Json     @default("{}") @map("tracking_params")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  platform Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+
+  @@map("affiliate_configs")
+}
+
+// One row per "Go to Store" click. id doubles as the click id embedded into
+// the generated affiliate URL (e.g. as a subId param) so a later conversion
+// postback from the affiliate network can be reconciled back to this row.
+model AffiliateClick {
+  id                 String   @id @default(uuid())
+  sourceListingId    String   @map("source_listing_id")
+  canonicalProductId String?  @map("canonical_product_id")
+  platformId         String   @map("platform_id")
+  userId             String?  @map("user_id")
+  ipHash             String   @map("ip_hash")
+  userAgent          String?  @map("user_agent")
+  affiliateUrl       String   @map("affiliate_url")
+  clickedAt          DateTime @default(now()) @map("clicked_at")
+
+  sourceListing    SourceListing     @relation(fields: [sourceListingId], references: [id], onDelete: Cascade)
+  canonicalProduct CanonicalProduct? @relation(fields: [canonicalProductId], references: [id], onDelete: SetNull)
+  platform         Platform          @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  user             User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([sourceListingId])
+  @@index([canonicalProductId])
+  @@index([platformId])
+  @@index([userId])
+  @@index([clickedAt])
+  @@map("affiliate_clicks")
 }

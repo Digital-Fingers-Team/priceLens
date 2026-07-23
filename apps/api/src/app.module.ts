@@ -15,6 +15,7 @@ import { AdminModule } from './admin/admin.module';
 import { WatchlistModule } from './watchlist/watchlist.module';
 import { PricesModule } from './prices/prices.module';
 import { WorkersModule } from './workers/workers.module';
+import { AffiliateModule } from './affiliate/affiliate.module';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
 import redisConfig from './config/redis.config';
@@ -22,13 +23,14 @@ import authConfig from './config/auth.config';
 import searchConfig from './config/search.config';
 import retailersConfig from './config/retailers.config';
 import pricingConfig from './config/pricing.config';
+import affiliateConfig from './config/affiliate.config';
 
 @Module({
   imports: [
     // ─── Config ────────────────────────────────────────────────────────────
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, redisConfig, authConfig, searchConfig, retailersConfig, pricingConfig],
+      load: [appConfig, databaseConfig, redisConfig, authConfig, searchConfig, retailersConfig, pricingConfig, affiliateConfig],
       // Shared with apps/web from the repo root — see /.env.example
       envFilePath: ['../../.env.local', '../../.env'],
       cache: true,
@@ -90,6 +92,7 @@ import pricingConfig from './config/pricing.config';
     WatchlistModule,
     PricesModule,
     WorkersModule,
+    AffiliateModule,
   ],
 })
 export class AppModule {}
