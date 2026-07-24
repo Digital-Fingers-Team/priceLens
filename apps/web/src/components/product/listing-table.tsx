@@ -1,4 +1,5 @@
 'use client';
+import Image from 'next/image';
 import { ExternalLink, Star, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 import type { SourceListing } from '@/types/product.types';
 import { Badge } from '@/components/ui/badge';
@@ -72,10 +73,12 @@ export function ListingTable({ listings, showConfidence = false }: ListingTableP
                 <td className="px-4 py-3.5">
                   <div className="flex items-center gap-2.5">
                     {listing.platform.logoUrl ? (
-                      <img
+                      <Image
                         src={listing.platform.logoUrl}
                         alt={listing.platform.name}
                         className="w-5 h-5 rounded object-contain"
+                        width={20}
+                        height={20}
                       />
                     ) : (
                       <div className="w-5 h-5 rounded bg-ink-700 flex items-center justify-center text-[10px] font-bold text-ink-400">

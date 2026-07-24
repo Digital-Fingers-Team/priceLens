@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { Check, Copy, Share2, MessageCircleMore, Link as LinkIcon } from 'lucide-react';
+import { Copy, Share2, MessageCircleMore, Link as LinkIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useUiStore } from '@/lib/store/ui.store';
 

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowRight, Share2, Sparkles, Tag, TrendingDown } from 'lucide-react';
+import { ArrowRight, Share2, Sparkles, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const COLLECTIONS = [
