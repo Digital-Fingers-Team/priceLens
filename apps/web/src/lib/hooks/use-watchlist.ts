@@ -5,6 +5,7 @@ import { useUiStore } from '@/lib/store/ui.store';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { getStoredTokens } from '@/lib/api/client';
 import type { AlertType } from '@/types/product.types';
+import { isGuestWatched, toggleGuestWatchlist } from '@/lib/utils/guest-watchlist';
 
 export function useWatchlist() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -20,7 +21,11 @@ export function useWatchlist() {
 
 export function useIsWatched(productId: string) {
   const { data: watchlist } = useWatchlist();
-  return watchlist?.some((item) => item.canonicalProductId === productId) ?? false;
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  if (isAuthenticated) {
+    return watchlist?.some((item) => item.canonicalProductId === productId) ?? false;
+  }
+  return isGuestWatched(productId);
 }
 
 export function useToggleWatchlist() {
@@ -35,6 +40,11 @@ export function useToggleWatchlist() {
       productId: string;
       isWatched: boolean;
     }) => {
+      const isAuthenticated = useAuthStore.getState().isAuthenticated;
+      if (!isAuthenticated) {
+        toggleGuestWatchlist(productId);
+        return;
+      }
       if (isWatched) {
         await watchlistApi.remove(productId);
       } else {
@@ -46,8 +56,11 @@ export function useToggleWatchlist() {
     onMutate: async ({ productId, isWatched }) => {
       await queryClient.cancelQueries({ queryKey: QUERY_KEYS.watchlist() });
       const previous = queryClient.getQueryData(QUERY_KEYS.watchlist());
+      const isAuthenticated = useAuthStore.getState().isAuthenticated;
 
-      if (isWatched) {
+      if (!isAuthenticated) {
+        toggleGuestWatchlist(productId);
+      } else if (isWatched) {
         queryClient.setQueryData(QUERY_KEYS.watchlist(), (old: { canonicalProductId: string }[] | undefined) =>
           old?.filter((item) => item.canonicalProductId !== productId),
         );
@@ -62,7 +75,9 @@ export function useToggleWatchlist() {
     },
 
     onSuccess: (_data, { isWatched }) => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.watchlist() });
+      if (useAuthStore.getState().isAuthenticated) {
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.watchlist() });
+      }
       addToast(
         isWatched ? 'Removed from watchlist' : 'Added to watchlist',
         'success',

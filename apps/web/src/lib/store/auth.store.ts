@@ -9,6 +9,7 @@ interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
   isAuthenticated: boolean;
+  hasHydrated: boolean;
   setAuth: (user: AuthUser, accessToken: string, refreshToken: string) => void;
   clearAuth: () => void;
 }
@@ -20,6 +21,7 @@ export const useAuthStore = create<AuthState>()(
       accessToken: null,
       refreshToken: null,
       isAuthenticated: false,
+      hasHydrated: false,
 
       setAuth: (user, accessToken, refreshToken) => {
         setStoredTokens(accessToken, refreshToken);
@@ -38,11 +40,13 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'pl-auth',
-      // Only persist non-sensitive UI state — tokens are in localStorage via client.ts
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state) state.hasHydrated = true;
+      },
     },
   ),
 );

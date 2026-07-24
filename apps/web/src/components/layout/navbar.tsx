@@ -57,6 +57,11 @@ export function Navbar() {
                     Watchlist
                   </Button>
                 </Link>
+                <Link href="/collections">
+                  <Button variant="ghost" size="sm">
+                    Collections
+                  </Button>
+                </Link>
 
                 {isAdmin && (
                   <Link href="/admin">
@@ -115,6 +120,10 @@ export function Navbar() {
                 <Link href="/watchlist" onClick={() => setMobileOpen(false)}
                   className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-ink-200 hover:bg-ink-800 text-sm">
                   <Heart className="w-4 h-4" /> Watchlist
+                </Link>
+                <Link href="/collections" onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-ink-200 hover:bg-ink-800 text-sm">
+                  <TrendingUp className="w-4 h-4" /> Collections
                 </Link>
                 {isAdmin && (
                   <Link href="/admin" onClick={() => setMobileOpen(false)}

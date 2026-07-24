@@ -1,14 +1,15 @@
 'use client';
 import Image from 'next/image';
-import { ShieldCheck, Heart, Bell, Store, Tag } from 'lucide-react';
+import { ShieldCheck, Heart, Bell, Store, Tag, BadgeCheck, Clock3 } from 'lucide-react';
 import type { CanonicalProduct } from '@/types/product.types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatRelativeTime } from '@/lib/utils/format';
 import { TIER_LABELS } from '@/config/constants';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { useIsWatched, useToggleWatchlist } from '@/lib/hooks/use-watchlist';
 import { useUiStore } from '@/lib/store/ui.store';
+import { ShareActions } from '@/components/product/share-actions';
 
 interface ProductHeaderProps {
   product: CanonicalProduct;
@@ -25,11 +26,8 @@ export function ProductHeader({ product }: ProductHeaderProps) {
   const listingCount = product._count?.sourceListings ?? product.sourceListings?.length ?? 0;
   const storeCount =
     product.storeCount ??
-    (product.sourceListings?.length
-      ? new Set(product.sourceListings.map((l) => l.platform.id)).size
-      : 0);
+    (product.sourceListings?.length ? new Set(product.sourceListings.map((l) => l.platform.id)).size : 0);
 
-  // Attributes can contain nested objects; only flat values render as chips.
   const attrs = Object.fromEntries(
     Object.entries((product.attributes ?? {}) as Record<string, unknown>).filter(
       ([, val]) => typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean',
@@ -38,7 +36,6 @@ export function ProductHeader({ product }: ProductHeaderProps) {
 
   return (
     <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
-      {/* Image */}
       <div className="relative aspect-square rounded-2xl overflow-hidden bg-ink-800 border border-ink-700">
         {product.imageUrl ? (
           <Image
@@ -56,10 +53,7 @@ export function ProductHeader({ product }: ProductHeaderProps) {
         )}
       </div>
 
-      {/* Info */}
       <div className="flex flex-col gap-5">
-
-        {/* Brand + badges */}
         <div className="flex items-center flex-wrap gap-2">
           {product.brand && (
             <span className="text-sm font-semibold text-ink-400 uppercase tracking-wider">
@@ -73,16 +67,13 @@ export function ProductHeader({ product }: ProductHeaderProps) {
           )}
           <Badge variant="outline">{TIER_LABELS[product.tier] ?? product.tier}</Badge>
           <Badge variant="default">
-            <Tag className="w-3 h-3 mr-1" />{product.category.name}
+            <Tag className="w-3 h-3 mr-1" />
+            {product.category.name}
           </Badge>
         </div>
 
-        {/* Title */}
-        <h1 className="text-2xl sm:text-3xl font-bold text-ink-50 leading-tight">
-          {product.title}
-        </h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-ink-50 leading-tight">{product.title}</h1>
 
-        {/* Key attributes */}
         {Object.keys(attrs).length > 0 && (
           <div className="flex flex-wrap gap-2">
             {Object.entries(attrs).slice(0, 6).map(([key, val]) => (
@@ -97,7 +88,6 @@ export function ProductHeader({ product }: ProductHeaderProps) {
           </div>
         )}
 
-        {/* Price section — always shows range, never just one price */}
         <div className="rounded-xl border border-ink-700 bg-ink-900 p-5 space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider">
@@ -111,7 +101,6 @@ export function ProductHeader({ product }: ProductHeaderProps) {
 
           {priceStats.min != null ? (
             <div className="space-y-1">
-              {/* Best price */}
               <div className="flex items-baseline gap-3">
                 <div>
                   <p className="text-[10px] text-ink-500 mb-0.5">Best price</p>
@@ -129,7 +118,6 @@ export function ProductHeader({ product }: ProductHeaderProps) {
                 )}
               </div>
 
-              {/* Avg */}
               {priceStats.avg != null && (
                 <p className="text-xs text-ink-500">
                   Avg: <span className="text-ink-300">{formatCurrency(priceStats.avg, priceStats.currency)}</span>
@@ -141,14 +129,33 @@ export function ProductHeader({ product }: ProductHeaderProps) {
           )}
         </div>
 
-        {/* Identifiers */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+          <div className="rounded-xl border border-ink-700 bg-ink-900 p-3">
+            <p className="text-[10px] uppercase tracking-wider text-ink-500">Verified status</p>
+            <p className="mt-1 font-medium text-ink-100 flex items-center gap-2">
+              <BadgeCheck className="w-4 h-4 text-signal" />
+              {product.isVerified ? 'Canonical match confirmed' : 'Under review'}
+            </p>
+          </div>
+          <div className="rounded-xl border border-ink-700 bg-ink-900 p-3">
+            <p className="text-[10px] uppercase tracking-wider text-ink-500">Last updated</p>
+            <p className="mt-1 font-medium text-ink-100 flex items-center gap-2">
+              <Clock3 className="w-4 h-4 text-signal" />
+              {formatRelativeTime(product.updatedAt)}
+            </p>
+          </div>
+          <div className="rounded-xl border border-ink-700 bg-ink-900 p-3">
+            <p className="text-[10px] uppercase tracking-wider text-ink-500">Why users trust it</p>
+            <p className="mt-1 font-medium text-ink-100">Multiple retailers, live price history, and verified matching.</p>
+          </div>
+        </div>
+
         <div className="flex flex-wrap gap-3 text-xs text-ink-500">
           {product.gtin && <span>GTIN: <span className="text-ink-400 font-mono">{product.gtin}</span></span>}
           {product.upc && <span>UPC: <span className="text-ink-400 font-mono">{product.upc}</span></span>}
           {product.mpn && <span>MPN: <span className="text-ink-400 font-mono">{product.mpn}</span></span>}
         </div>
 
-        {/* Actions */}
         <div className="flex flex-wrap gap-3 pt-1">
           {isAuthenticated ? (
             <>
@@ -159,7 +166,7 @@ export function ProductHeader({ product }: ProductHeaderProps) {
                 leftIcon={<Heart className={isWatched ? 'w-5 h-5 fill-current text-red-400' : 'w-5 h-5'} />}
                 onClick={() => toggleWatchlist({ productId: product.id, isWatched })}
               >
-                {isWatched ? 'Watching' : 'Watch Price'}
+                {isWatched ? 'Watching' : 'Watch for free'}
               </Button>
               <Button
                 variant="outline"
@@ -171,11 +178,22 @@ export function ProductHeader({ product }: ProductHeaderProps) {
               </Button>
             </>
           ) : (
-            <Button variant="outline" size="lg" leftIcon={<Heart className="w-5 h-5" />}>
-              Sign in to watch
+            <Button
+              variant="outline"
+              size="lg"
+              leftIcon={<Heart className="w-5 h-5" />}
+              onClick={() => toggleWatchlist({ productId: product.id, isWatched: isWatched })}
+            >
+              Save without signing in
             </Button>
           )}
         </div>
+
+        <ShareActions
+          title={product.title}
+          url={`/products/${product.slug}`}
+          summary={`${product.title} starts at ${formatCurrency(product.priceStats.min, product.priceStats.currency)} on PriceLens.`}
+        />
       </div>
     </section>
   );

@@ -17,6 +17,7 @@ export function Footer() {
 
           <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-ink-500">
             <Link href="/search" className="hover:text-ink-200 transition-colors">Browse</Link>
+            <Link href="/collections" className="hover:text-ink-200 transition-colors">Collections</Link>
             <Link href="/watchlist" className="hover:text-ink-200 transition-colors">Watchlist</Link>
             <Link href="/login" className="hover:text-ink-200 transition-colors">Sign in</Link>
           </nav>
