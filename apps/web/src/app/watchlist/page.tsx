@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useEffect } from 'react';
 import { Heart, Bell, Trash2, Store } from 'lucide-react';
 import { useWatchlist, useToggleWatchlist } from '@/lib/hooks/use-watchlist';
 import { useAuthStore } from '@/lib/store/auth.store';
@@ -8,13 +9,24 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, formatRelativeTime } from '@/lib/utils/format';
 import { useUiStore } from '@/lib/store/ui.store';
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 export default function WatchlistPage() {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, hasHydrated } = useAuthStore();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (hasHydrated && !isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [hasHydrated, isAuthenticated, router]);
+
+  if (!hasHydrated) {
+    return null;
+  }
 
   if (!isAuthenticated) {
-    redirect('/login');
+    return null;
   }
 
   return (

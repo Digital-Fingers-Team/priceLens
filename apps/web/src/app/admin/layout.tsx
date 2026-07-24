@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
-import { usePathname, redirect } from 'next/navigation';
+import { useEffect } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { LayoutDashboard, ClipboardList } from 'lucide-react';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { cn } from '@/lib/utils/cn';
@@ -11,11 +12,23 @@ const NAV = [
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { user, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated, hasHydrated } = useAuthStore();
   const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!hasHydrated) return;
+    if (!isAuthenticated || (user?.role !== 'ADMIN' && user?.role !== 'MODERATOR')) {
+      router.replace('/login');
+    }
+  }, [hasHydrated, isAuthenticated, router, user?.role]);
+
+  if (!hasHydrated) {
+    return null;
+  }
 
   if (!isAuthenticated || (user?.role !== 'ADMIN' && user?.role !== 'MODERATOR')) {
-    redirect('/login');
+    return null;
   }
 
   return (
