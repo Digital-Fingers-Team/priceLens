@@ -4,6 +4,7 @@ import './globals.css';
 import { Providers } from '@/components/layout/providers';
 import { Navbar } from '@/components/layout/navbar';
 import { Footer } from '@/components/layout/footer';
+import { baseMetadata } from '@/lib/seo';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -12,20 +13,11 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: { default: 'PriceLens', template: '%s | PriceLens' },
-  description:
-    'Compare prices across Amazon, Noon, Jumia, and more. Find the best deal in seconds.',
-  keywords: ['price comparison', 'best price', 'price tracker', 'deal finder'],
+  ...baseMetadata,
   icons: {
     icon: '/favicon.svg',
   },
-  openGraph: {
-    type: 'website',
-    siteName: 'PriceLens',
-    title: 'PriceLens — Price Comparison Engine',
-    description: 'Compare product prices across all major retailers in real-time.',
-  },
-  robots: { index: true, follow: true },
+  manifest: '/manifest.webmanifest',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
