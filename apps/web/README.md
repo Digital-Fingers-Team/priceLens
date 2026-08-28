@@ -274,7 +274,7 @@ pnpm build
 
 1. Copy and fill production env files:
 ```bash
-cp apps/api/.env.example apps/api/.env.production
+cp .env.example .env
 # Fill in production values — strong secrets, real DB URLs
 ```
 

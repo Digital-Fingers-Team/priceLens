@@ -1,0 +1,45 @@
+# syntax=docker/dockerfile:1
+
+FROM node:22-bookworm-slim AS deps
+RUN corepack enable && corepack prepare pnpm@11.4.0 --activate
+WORKDIR /repo
+
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+COPY apps/api/package.json apps/api/package.json
+COPY apps/web/package.json apps/web/package.json
+RUN pnpm config set fetch-timeout 600000 && pnpm config set fetch-retries 5
+RUN pnpm install --frozen-lockfile --filter @pricelens/web...
+
+FROM node:22-bookworm-slim AS build
+RUN corepack enable && corepack prepare pnpm@11.4.0 --activate
+WORKDIR /repo
+
+COPY --from=deps /repo/node_modules ./node_modules
+COPY --from=deps /repo/pnpm-workspace.yaml /repo/package.json /repo/pnpm-lock.yaml ./
+COPY apps/web/package.json apps/web/package.json
+COPY apps/web apps/web
+
+# NEXT_PUBLIC_* values are compiled into the Next.js client bundle.
+ARG NEXT_PUBLIC_API_URL=http://127.0.0.1:3001/api/v1
+ARG NEXT_PUBLIC_SITE_URL=
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL}
+RUN pnpm --filter @pricelens/web build
+
+FROM node:22-bookworm-slim AS runtime
+ENV NODE_ENV=production
+WORKDIR /repo
+
+RUN corepack enable && corepack prepare pnpm@11.4.0 --activate
+COPY --from=deps /repo/node_modules ./node_modules
+COPY --from=build /repo/pnpm-workspace.yaml /repo/package.json /repo/pnpm-lock.yaml ./
+COPY --from=build /repo/apps/web/package.json apps/web/package.json
+COPY --from=build /repo/apps/web/.next apps/web/.next
+COPY --from=build /repo/apps/web/public apps/web/public
+COPY --from=build /repo/apps/web/next.config.js apps/web/next.config.js
+
+RUN chown -R node:node /repo
+USER node
+WORKDIR /repo/apps/web
+EXPOSE 3000
+CMD ["pnpm", "start"]
