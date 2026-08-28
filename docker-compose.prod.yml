@@ -2,7 +2,7 @@ version: '3.9'
 
 services:
   postgres:
-    image: pgvector/pgvector:pg16
+    image: docker.io/pgvector/pgvector:pg16
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -19,7 +19,7 @@ services:
       retries: 5
 
   redis:
-    image: redis:7-alpine
+    image: docker.io/library/redis:7-alpine
     restart: always
     command: redis-server --requirepass ${REDIS_PASSWORD}
     volumes:
@@ -33,7 +33,7 @@ services:
       retries: 5
 
   meilisearch:
-    image: getmeili/meilisearch:v1.6
+    image: docker.io/getmeili/meilisearch:v1.6
     restart: always
     environment:
       MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
@@ -73,10 +73,10 @@ services:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
         NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
     restart: always
-    ports:
-      - "3000:3000"
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    ports:
+      - "3000:3000"
     networks:
       - external
     depends_on:
