@@ -16,23 +16,41 @@ export default registerAs('retailers', () => ({
   // Target number of distinct stores every product should be compared across.
   // When a product detail is viewed and it's covered by fewer priced stores than
   // this, a background job searches the remaining stores by the product's specs
-  // to try to reach it (capped by however many stores are actually enabled).
-  minStoresPerProduct: parseInt(process.env.MIN_STORES_PER_PRODUCT ?? '7', 10),
+  // to try to reach it.
+  //
+  // This is a *wish*, not a reachable goal: it is clamped at runtime to the
+  // number of connectors actually enabled (see resolveCoverageTarget). Setting
+  // it above that count previously made the coverage sweep's exit condition
+  // unsatisfiable, so every product stayed permanently "under-covered" and the
+  // sweep re-scraped the whole catalog on every run, forever.
+  minStoresPerProduct: parseInt(process.env.MIN_STORES_PER_PRODUCT ?? '4', 10),
   // Reactive expansion (above) only fires for products someone actually browses
   // to (product detail page, or now a search hit). This periodic sweep catches
   // the rest of the catalog -- products under minStoresPerProduct that nobody
   // has viewed recently -- so coverage still improves in the background.
   storeCoverageSweepEnabled: process.env.STORE_COVERAGE_SWEEP_ENABLED !== 'false',
-  // Catalog currently has ~2,700 products stuck under target coverage (mostly
-  // still at 1 store). Batch size bumped 60 -> 500: this job's Bull processor
-  // has no explicit concurrency, which defaults to 1 -- one store request at a
-  // time regardless of batch size -- so a bigger batch just means one sweep
-  // works through more of the backlog before finishing, not more simultaneous
-  // load on any store. (See the LIVE_INGESTION_SCHEDULE_ENABLED comment below
-  // for why the *other* sweep, the full category x store one, stays off instead:
-  // real-browser scraping there is too slow/heavy to run unattended at all.)
-  storeCoverageSweepCron: process.env.STORE_COVERAGE_SWEEP_CRON ?? '*/45 * * * *',
-  storeCoverageSweepBatchSize: parseInt(process.env.STORE_COVERAGE_SWEEP_BATCH_SIZE ?? '500', 10),
+  // Concurrency is 1, but that bounds only *simultaneous* load -- not total
+  // work. Each product costs one real-browser search per missing store, so a
+  // batch of N takes roughly N x (stores x seconds) of wall clock. At 500+ on
+  // a */45 cron the sweep could not finish inside its own interval, so runs
+  // overlapped and Chromium never went idle. Keep batch x interval such that a
+  // run comfortably completes before the next one is due; runStoreCoverageSweep
+  // also refuses to start while one is already in flight.
+  storeCoverageSweepCron: process.env.STORE_COVERAGE_SWEEP_CRON ?? '0 */6 * * *',
+  storeCoverageSweepBatchSize: parseInt(process.env.STORE_COVERAGE_SWEEP_BATCH_SIZE ?? '100', 10),
+  // How long to leave a product alone after the sweep has tried to expand it.
+  // Without this, any product that cannot reach the target -- because no other
+  // store carries it -- is re-scraped on every run for as long as it exists.
+  storeCoverageRetryCooldownHours: parseInt(
+    process.env.STORE_COVERAGE_RETRY_COOLDOWN_HOURS ?? '168',
+    10,
+  ),
+  // A connector that keeps failing (CAPTCHA wall, blocked, markup changed) costs
+  // a full browser page load per attempt and returns nothing. After this many
+  // consecutive failures it is skipped until the cooldown expires, instead of
+  // being retried for every product in the batch.
+  connectorFailureThreshold: parseInt(process.env.CONNECTOR_FAILURE_THRESHOLD ?? '5', 10),
+  connectorCooldownMinutes: parseInt(process.env.CONNECTOR_COOLDOWN_MINUTES ?? '30', 10),
   amazonEnabled: process.env.AMAZON_ENABLED !== 'false',
   // Egypt storefront -- amazon.com doesn't carry OPPO phones (and most of the
   // catalog this app cares about) at all; confirmed live that amazon.eg does,

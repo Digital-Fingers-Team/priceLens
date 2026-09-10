@@ -176,6 +176,13 @@ model CanonicalProduct {
   createdAt   DateTime    @default(now()) @map("created_at")
   updatedAt   DateTime    @updatedAt @map("updated_at")
 
+  // When the store-coverage sweep last *attempted* to expand this product.
+  // Distinct from updatedAt (which @updatedAt bumps on any write, including
+  // ordinary listing refreshes): the sweep needs to know when it last spent
+  // scraping effort here, so a product it cannot expand — because no further
+  // store actually carries it — is not re-scraped on every single run.
+  lastCoverageAttemptAt DateTime? @map("last_coverage_attempt_at")
+
   category        Category         @relation(fields: [categoryId], references: [id])
   sourceListings  SourceListing[]
   priceHistory    PriceHistory[]
@@ -188,6 +195,7 @@ model CanonicalProduct {
   @@index([brand, model])
   @@index([gtin])
   @@index([normalizedTitle])
+  @@index([lastCoverageAttemptAt])
   @@map("canonical_products")
 }
 

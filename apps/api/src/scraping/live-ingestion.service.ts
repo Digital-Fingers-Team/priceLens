@@ -62,6 +62,18 @@ export class LiveIngestionService {
   private readonly logger = new Logger(LiveIngestionService.name);
   private readonly connectorsBySlug: Map<string, RetailerConnector>;
 
+  /** Guards against two scheduled coverage sweeps overlapping. */
+  private coverageSweepInFlight = false;
+
+  /**
+   * Consecutive-failure tally per connector slug, and the time its circuit
+   * re-opens. In memory on purpose: a restart is a reasonable moment to give a
+   * struggling store another chance, and this only needs to hold for the length
+   * of a sweep.
+   */
+  private readonly connectorFailures = new Map<string, number>();
+  private readonly connectorCooldownUntil = new Map<string, number>();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly normalizer: NormalizerService,
@@ -562,9 +574,24 @@ export class LiveIngestionService {
       if (!connector) {
         continue;
       }
+      if (this.isConnectorInCooldown(platform.slug)) {
+        continue;
+      }
 
       try {
         const listings = await connector.searchListings(query, limitPerQuery);
+        // A connector that returns nothing at all is the signal we can act on:
+        // the blocked paths (CAPTCHA wall, bot shell, changed markup) log and
+        // return an empty array rather than throwing, so counting only
+        // exceptions would never trip the breaker on exactly the stores that
+        // are costing the most and returning the least. Any non-empty result
+        // means the connector is working, even if nothing merges onto this
+        // product -- a store simply not carrying an item is not a failure.
+        if (listings.length === 0) {
+          this.recordConnectorFailure(platform.slug, 'returned no listings');
+        } else {
+          this.recordConnectorSuccess(platform.slug);
+        }
         let coveredByThisStore = false;
 
         for (const listing of listings) {
@@ -585,9 +612,56 @@ export class LiveIngestionService {
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        this.recordConnectorFailure(platform.slug, message);
         this.logger.warn(`Store expansion for "${query}" on ${platform.slug} failed: ${message}`);
       }
     }
+  }
+
+  /**
+   * True while a connector's circuit is open. Each attempt against a blocked
+   * store costs a full real-browser page load and yields nothing, so once a
+   * store has failed repeatedly it is left alone for a cooldown rather than
+   * retried once per product for the whole batch.
+   */
+  private isConnectorInCooldown(slug: string): boolean {
+    const until = this.connectorCooldownUntil.get(slug);
+    if (until == null) {
+      return false;
+    }
+    if (Date.now() >= until) {
+      // Cooldown served -- let the next attempt through and judge it fresh.
+      this.connectorCooldownUntil.delete(slug);
+      this.connectorFailures.set(slug, 0);
+      return false;
+    }
+    return true;
+  }
+
+  private recordConnectorFailure(slug: string, reason: string): void {
+    const threshold = Math.max(
+      1,
+      this.configService.get<number>('retailers.connectorFailureThreshold', 5),
+    );
+    const cooldownMinutes = Math.max(
+      1,
+      this.configService.get<number>('retailers.connectorCooldownMinutes', 30),
+    );
+
+    const failures = (this.connectorFailures.get(slug) ?? 0) + 1;
+    this.connectorFailures.set(slug, failures);
+
+    if (failures >= threshold && !this.connectorCooldownUntil.has(slug)) {
+      this.connectorCooldownUntil.set(slug, Date.now() + cooldownMinutes * 60 * 1000);
+      this.logger.warn(
+        `Connector "${slug}" failed ${failures} times in a row (last: ${reason}) -- ` +
+          `pausing it for ${cooldownMinutes}m.`,
+      );
+    }
+  }
+
+  private recordConnectorSuccess(slug: string): void {
+    this.connectorFailures.set(slug, 0);
   }
 
   /**
@@ -605,37 +679,112 @@ export class LiveIngestionService {
       return { scanned: 0, expanded: 0 };
     }
 
-    const minStores = this.configService.get<number>('retailers.minStoresPerProduct', 7);
-    const maxProducts = Math.max(
-      1,
-      maxProductsOverride ?? this.configService.get<number>('retailers.storeCoverageSweepBatchSize', 25),
-    );
-
-    const underCovered = await this.prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
-      SELECT cp.id
-      FROM canonical_products cp
-      JOIN source_listings sl
-        ON sl.canonical_product_id = cp.id
-        AND sl.price_usd IS NOT NULL AND sl.price_usd > 0 AND sl.in_stock IS NOT FALSE
-      GROUP BY cp.id
-      HAVING COUNT(DISTINCT sl.platform_id) < ${minStores}
-      ORDER BY COUNT(DISTINCT sl.platform_id) ASC, cp.updated_at ASC
-      LIMIT ${maxProducts}
-    `);
-
-    let expanded = 0;
-    for (const { id } of underCovered) {
-      try {
-        await this.expandProductStores(id, minStores);
-        expanded += 1;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        this.logger.warn(`Store coverage sweep failed for product ${id}: ${message}`);
-      }
+    // A sweep can outlast its own cron interval on a slow day. Bull will happily
+    // start the next occurrence anyway, and two concurrent sweeps compete for
+    // the same shared browser contexts, so the run time degrades further each
+    // time one piles up. Skip rather than queue: the next tick will pick up
+    // wherever this run left off, because progress is persisted per product.
+    if (this.coverageSweepInFlight) {
+      this.logger.warn('Store coverage sweep is already running -- skipping this occurrence');
+      return { scanned: 0, expanded: 0 };
     }
+    this.coverageSweepInFlight = true;
 
-    this.logger.log(`Store coverage sweep: scanned ${underCovered.length}, expanded ${expanded}`);
-    return { scanned: underCovered.length, expanded };
+    try {
+      const minStores = await this.resolveCoverageTarget();
+      const maxProducts = Math.max(
+        1,
+        maxProductsOverride ?? this.configService.get<number>('retailers.storeCoverageSweepBatchSize', 100),
+      );
+      const cooldownHours = Math.max(
+        0,
+        this.configService.get<number>('retailers.storeCoverageRetryCooldownHours', 168),
+      );
+      const cooldownCutoff = new Date(Date.now() - cooldownHours * 60 * 60 * 1000);
+
+      // Products are eligible when they are below the (reachable) target AND we
+      // have not already spent scraping effort on them inside the cooldown
+      // window. Without the second condition a product no other store carries
+      // is re-scraped on every run for as long as it exists -- which is what
+      // pinned this box at 100% CPU: the target was unreachable, so the
+      // candidate set was the entire catalog, permanently.
+      const underCovered = await this.prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+        SELECT cp.id
+        FROM canonical_products cp
+        JOIN source_listings sl
+          ON sl.canonical_product_id = cp.id
+          AND sl.price_usd IS NOT NULL AND sl.price_usd > 0 AND sl.in_stock IS NOT FALSE
+        WHERE cp.last_coverage_attempt_at IS NULL
+           OR cp.last_coverage_attempt_at < ${cooldownCutoff}
+        GROUP BY cp.id
+        HAVING COUNT(DISTINCT sl.platform_id) < ${minStores}
+        ORDER BY COUNT(DISTINCT sl.platform_id) ASC, cp.last_coverage_attempt_at ASC NULLS FIRST
+        LIMIT ${maxProducts}
+      `);
+
+      let expanded = 0;
+      for (const { id } of underCovered) {
+        try {
+          await this.expandProductStores(id, minStores);
+          expanded += 1;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          this.logger.warn(`Store coverage sweep failed for product ${id}: ${message}`);
+        } finally {
+          // Stamped whether or not the expansion found anything, and whether or
+          // not it threw. The stamp records that effort was spent here, which
+          // is what the cooldown is about -- recording only successes would let
+          // the products that always fail come straight back next run.
+          await this.markCoverageAttempt(id);
+        }
+      }
+
+      this.logger.log(
+        `Store coverage sweep: scanned ${underCovered.length}, expanded ${expanded} ` +
+          `(target ${minStores} stores, ${cooldownHours}h retry cooldown)`,
+      );
+      return { scanned: underCovered.length, expanded };
+    } finally {
+      this.coverageSweepInFlight = false;
+    }
+  }
+
+  /**
+   * The configured store target clamped to what is actually achievable: a
+   * product can never be covered by more stores than there are enabled
+   * connectors for active platforms. Asking for more than that makes the
+   * sweep's exit condition unsatisfiable rather than ambitious.
+   */
+  private async resolveCoverageTarget(): Promise<number> {
+    const configured = Math.max(1, this.configService.get<number>('retailers.minStoresPerProduct', 4));
+    const activePlatforms = await this.prisma.platform.findMany({
+      where: { isActive: true },
+      select: { slug: true },
+    });
+    const reachable = activePlatforms.filter(
+      (platform) => this.connectorsBySlug.get(platform.slug)?.isEnabled,
+    ).length;
+
+    if (reachable > 0 && configured > reachable) {
+      this.logger.warn(
+        `minStoresPerProduct is ${configured} but only ${reachable} connector(s) are enabled ` +
+          `for active platforms -- clamping the coverage target to ${reachable}.`,
+      );
+      return reachable;
+    }
+    return configured;
+  }
+
+  private async markCoverageAttempt(productId: string): Promise<void> {
+    try {
+      await this.prisma.canonicalProduct.update({
+        where: { id: productId },
+        data: { lastCoverageAttemptAt: new Date() },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Could not record coverage attempt for product ${productId}: ${message}`);
+    }
   }
 
   /**

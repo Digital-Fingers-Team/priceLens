@@ -15,13 +15,59 @@ import type { BrowserContext, Page } from 'patchright';
 export class BrowserSessionService implements OnModuleDestroy {
   private readonly logger = new Logger(BrowserSessionService.name);
   private readonly contexts = new Map<string, Promise<BrowserContext>>();
+  /** Pages a persistent profile launched with, awaiting disposal by getPage(). */
+  private readonly pendingStrayPages = new Map<string, Page[]>();
   private loggedBrowserChoice = false;
 
   constructor(private readonly configService: ConfigService) {}
 
   async getPage(storeSlug: string): Promise<Page> {
     const context = await this.getContext(storeSlug);
-    return context.newPage();
+    const page = await context.newPage();
+    // Safe now: `page` keeps the context alive while the pages the profile
+    // started with are disposed of. See launchContext for why this cannot
+    // happen at launch time.
+    await this.closeStrayPages(storeSlug);
+    return page;
+  }
+
+  /**
+   * Trims the pages a freshly launched persistent profile came with, once per
+   * context, keeping exactly one.
+   *
+   * That kept page is load-bearing, not waste: a persistent context dies when
+   * its last page closes, and every connector closes its own page in a finally.
+   * With no blank page left behind, the first search tears the whole browser
+   * down and every later getPage() fails with "Target page, context or browser
+   * has been closed". So one blank page stays as the context's keepalive, and
+   * only the surplus -- restored session tabs, which is where this actually
+   * accumulates -- is closed.
+   *
+   * Only the exact pages captured at launch are touched, so pages opened by
+   * concurrent searches against this shared context are never affected.
+   */
+  private async closeStrayPages(storeSlug: string): Promise<void> {
+    const strays = this.pendingStrayPages.get(storeSlug);
+    if (!strays) return;
+    this.pendingStrayPages.delete(storeSlug);
+
+    const surplus = strays.slice(1);
+    if (surplus.length === 0) return;
+
+    const closed = await Promise.all(
+      surplus.map((page) =>
+        page
+          .close()
+          .then(() => true)
+          .catch(() => false),
+      ),
+    );
+    const count = closed.filter(Boolean).length;
+    if (count > 0) {
+      this.logger.log(
+        `Closed ${count} surplus page(s) in the "${storeSlug}" profile (kept 1 as keepalive).`,
+      );
+    }
   }
 
   private getContext(storeSlug: string): Promise<BrowserContext> {
@@ -91,12 +137,29 @@ export class BrowserSessionService implements OnModuleDestroy {
         `(headless=${headless}, browser=${target.executablePath ?? target.channel ?? 'default'})`,
     );
 
-    return chromium.launchPersistentContext(profileDir, {
+    const context = await chromium.launchPersistentContext(profileDir, {
       ...target,
       args,
       headless,
       viewport: { width: 1366, height: 850 },
     });
+
+    // A persistent context opens with pages already present: the blank page
+    // Chrome always creates, plus anything the profile restores from its last
+    // session. Callers only ever close the page they asked for via getPage(),
+    // so these are never closed and each holds a renderer process (~150MB) for
+    // the lifetime of the process.
+    //
+    // They cannot be closed here: closing the last remaining page of a
+    // persistent context tears the context down with it. So record them and let
+    // getPage() close them once it has a real page open to hold the context
+    // alive. Recording the exact Page objects (rather than re-reading
+    // context.pages() later) matters because searches for the same store run
+    // concurrently against this shared context -- anything opened afterwards
+    // belongs to an in-flight caller and must not be touched.
+    this.pendingStrayPages.set(storeSlug, context.pages());
+
+    return context;
   }
 
   /**
@@ -109,6 +172,7 @@ export class BrowserSessionService implements OnModuleDestroy {
     if (!contextPromise) return;
 
     this.contexts.delete(storeSlug);
+    this.pendingStrayPages.delete(storeSlug);
     try {
       const context = await contextPromise;
       await context.close();
@@ -129,5 +193,6 @@ export class BrowserSessionService implements OnModuleDestroy {
       }
     }
     this.contexts.clear();
+    this.pendingStrayPages.clear();
   }
 }
