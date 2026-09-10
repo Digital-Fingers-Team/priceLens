@@ -62,14 +62,15 @@ ENV NODE_ENV=production
 
 WORKDIR /repo
 
-RUN corepack enable && corepack prepare pnpm@11.4.0 --activate
-
 COPY --from=deps /repo/node_modules ./node_modules
 COPY --from=build /repo/pnpm-workspace.yaml /repo/package.json /repo/pnpm-lock.yaml ./
 COPY --from=build /repo/apps/web/package.json apps/web/package.json
 COPY --from=build /repo/apps/web/.next apps/web/.next
 COPY --from=build /repo/apps/web/public apps/web/public
 COPY --from=build /repo/apps/web/next.config.js apps/web/next.config.js
+
+RUN NEXT_DIR=$(find /repo/node_modules/.pnpm -maxdepth 3 -type d -path '*/node_modules/next' | head -n 1) && \
+    test -n "$NEXT_DIR" && ln -s "$NEXT_DIR" /repo/node_modules/next
 
 RUN chown -R node:node /repo
 
@@ -79,4 +80,4 @@ WORKDIR /repo/apps/web
 
 EXPOSE 3000
 
-CMD ["pnpm", "start"]
+CMD ["node", "/repo/node_modules/next/dist/bin/next", "start", "-p", "3000"]

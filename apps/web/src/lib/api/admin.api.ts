@@ -40,15 +40,12 @@ export const adminApi = {
     return res.data.data;
   },
 
-  triggerRematch: async (batchSize = 100) => {
-    const res = await apiClient.post('/admin/rematch', null, {
-      params: { batchSize },
-    });
-    return res.data.data;
-  },
-
-  triggerScrape: async (query: string) => {
-    const res = await apiClient.post('/scraping/trigger', { query });
+  // Re-runs duplicate/match reconciliation across the catalog. This is queued
+  // server-side and reported back as a job, not a synchronous count.
+  triggerReconcile: async (maxPairs = 100) => {
+    const res = await apiClient.post<
+      ApiResponse<{ queued: boolean; jobId: string }>
+    >('/admin/reconcile', { maxPairs });
     return res.data.data;
   },
 

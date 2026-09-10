@@ -1,7 +1,8 @@
 // apps/api/src/app.module.ts
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { CacheModule } from '@nestjs/cache-manager';
 import { BullModule } from '@nestjs/bull';
 
@@ -93,6 +94,12 @@ import affiliateConfig from './config/affiliate.config';
     PricesModule,
     WorkersModule,
     AffiliateModule,
+  ],
+  providers: [
+    // ThrottlerModule only supplies configuration — without the guard actually
+    // registered, every @Throttle decorator in the app is inert and endpoints
+    // like login and the scrape-triggering search are unthrottled.
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
 export class AppModule {}

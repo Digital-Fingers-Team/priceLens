@@ -2,7 +2,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { AuthUser } from '@/types/auth.types';
-import { setStoredTokens, clearStoredTokens } from '@/lib/api/client';
+import { setStoredTokens, clearStoredTokens, getStoredTokens } from '@/lib/api/client';
 
 interface AuthState {
   user: AuthUser | null;
@@ -45,7 +45,20 @@ export const useAuthStore = create<AuthState>()(
         isAuthenticated: state.isAuthenticated,
       }),
       onRehydrateStorage: () => (state) => {
-        if (state) state.hasHydrated = true;
+        if (!state) return;
+        // Tokens live in localStorage (they are deliberately not persisted by
+        // this store), so re-attach them after rehydration. Without this the
+        // store reports isAuthenticated with null tokens, and logout posts an
+        // empty refreshToken — leaving the session live on the server.
+        const { access, refresh } = getStoredTokens();
+        state.accessToken = access;
+        state.refreshToken = refresh;
+        // Tokens are the source of truth: if they are gone, so is the session.
+        if (!access || !refresh) {
+          state.user = null;
+          state.isAuthenticated = false;
+        }
+        state.hasHydrated = true;
       },
     },
   ),

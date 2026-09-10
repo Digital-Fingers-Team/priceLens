@@ -7,11 +7,13 @@ import {
   RUN_LIVE_INGESTION_JOB,
   RUN_RECONCILIATION_JOB,
   RUN_STORE_COVERAGE_SWEEP_JOB,
+  RUN_PRICE_ALERTS_JOB,
 } from './ingestion.processor';
 
 const REPEATABLE_JOB_ID = 'scheduled-live-ingestion';
 const RECONCILIATION_JOB_ID = 'scheduled-reconciliation';
 const STORE_COVERAGE_SWEEP_JOB_ID = 'scheduled-store-coverage-sweep';
+const PRICE_ALERTS_JOB_ID = 'scheduled-price-alerts';
 
 @Injectable()
 export class IngestionScheduler implements OnModuleInit {
@@ -93,6 +95,21 @@ export class IngestionScheduler implements OnModuleInit {
         repeat: { cron },
       },
     );
+
+    // Price alerts are cheap to evaluate and users expect them to be timely,
+    // so run them far more often than the scraping sweeps.
+    const priceAlertCron = this.configService.get<string>('retailers.priceAlertCron', '*/30 * * * *');
+
+    await this.queue.add(
+      RUN_PRICE_ALERTS_JOB,
+      {},
+      {
+        jobId: PRICE_ALERTS_JOB_ID,
+        repeat: { cron: priceAlertCron },
+      },
+    );
+
+    this.logger.log(`Scheduled price alert evaluation (${priceAlertCron})`);
     this.logger.log(`Scheduled store coverage sweep to run on cron "${cron}"`);
   }
 }

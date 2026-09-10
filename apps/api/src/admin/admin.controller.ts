@@ -1,7 +1,9 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
-import { Roles } from '../common/decorators';
+import { CurrentUser, Roles } from '../common/decorators';
+import { AdminService, ResolveReviewItemInput } from './admin.service';
+import type { User } from '@prisma/client';
 import { UserRole } from '@prisma/client';
 import {
   INGESTION_QUEUE,
@@ -26,7 +28,38 @@ interface RunStoreCoverageSweepBody {
 
 @Controller('admin')
 export class AdminController {
-  constructor(@InjectQueue(INGESTION_QUEUE) private readonly ingestionQueue: Queue) {}
+  constructor(
+    @InjectQueue(INGESTION_QUEUE) private readonly ingestionQueue: Queue,
+    private readonly adminService: AdminService,
+  ) {}
+
+  @Get('dashboard')
+  @Roles(UserRole.MODERATOR, UserRole.ADMIN)
+  async getDashboard() {
+    return this.adminService.getDashboardStats();
+  }
+
+  @Get('review-queue')
+  @Roles(UserRole.MODERATOR, UserRole.ADMIN)
+  async getReviewQueue(@Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.adminService.getReviewQueue(Number(page) || 1, Number(limit) || 20);
+  }
+
+  @Patch('review-queue/:id/resolve')
+  @Roles(UserRole.MODERATOR, UserRole.ADMIN)
+  async resolveReviewItem(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: User,
+    @Body() body: ResolveReviewItemInput,
+  ) {
+    return this.adminService.resolveReviewItem(id, user.id, body);
+  }
+
+  @Get('platforms')
+  @Roles(UserRole.MODERATOR, UserRole.ADMIN)
+  async getPlatforms() {
+    return this.adminService.getPlatforms();
+  }
 
   @Post('ingest/live')
   @Roles(UserRole.ADMIN)

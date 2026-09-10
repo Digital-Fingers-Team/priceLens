@@ -5,6 +5,7 @@ import { authApi } from '@/lib/api/auth.api';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { useUiStore } from '@/lib/store/ui.store';
 import type { LoginCredentials, RegisterCredentials } from '@/types/auth.types';
+import { getApiErrorMessage } from '@/lib/utils/api-error';
 
 export function useLogin() {
   const setAuth = useAuthStore((s) => s.setAuth);
@@ -19,8 +20,7 @@ export function useLogin() {
       router.push('/');
     },
     onError: (err: AxiosError<{ error?: { message?: string } }>) => {
-      const msg = err?.response?.data?.error?.message ?? 'Login failed';
-      addToast(msg, 'error');
+      addToast(getApiErrorMessage(err, 'Login failed'), 'error');
     },
   });
 }
@@ -38,8 +38,7 @@ export function useRegister() {
       router.push('/');
     },
     onError: (err: AxiosError<{ error?: { message?: string } }>) => {
-      const msg = err?.response?.data?.error?.message ?? 'Registration failed';
-      addToast(msg, 'error');
+      addToast(getApiErrorMessage(err, 'Registration failed'), 'error');
     },
   });
 }

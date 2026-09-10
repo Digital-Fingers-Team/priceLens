@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, formatRelativeTime } from '@/lib/utils/format';
 import { useUiStore } from '@/lib/store/ui.store';
 import { useRouter } from 'next/navigation';
+import { AlertsSection } from './_components/alerts-section';
 
 export default function WatchlistPage() {
   const { isAuthenticated, hasHydrated } = useAuthStore();
@@ -35,6 +36,7 @@ export default function WatchlistPage() {
         <Heart className="w-6 h-6 text-red-400" />
         <h1 className="text-2xl font-bold text-ink-100">My Watchlist</h1>
       </div>
+      <AlertsSection />
       <WatchlistContent />
     </div>
   );

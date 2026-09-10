@@ -77,9 +77,20 @@ export class SemanticService {
    * callers can tell "confirmed different" apart from "couldn't ask" and fall
    * back to the plain fuzzy-score threshold instead.
    */
+  private warnedOpenRouterUnconfigured = false;
+
   async judgeSameProduct(titleA: string, titleB: string): Promise<boolean | null> {
     if (!this.openRouterFallbackEnabled || !this.openRouterApiKey) {
-      this.logger.warn('Match judgement skipped: OpenRouter not configured (OPENROUTER_API_KEY unset or fallback disabled)');
+      // Logged once per process: this fires for every candidate pair, and at
+      // thousands of repetitions it buries genuine errors in the log.
+      if (!this.warnedOpenRouterUnconfigured) {
+        this.warnedOpenRouterUnconfigured = true;
+        this.logger.warn(
+          'Match judgement disabled: OpenRouter not configured (OPENROUTER_API_KEY unset or ' +
+            'fallback disabled). Reconciliation will rely on model agreement plus the ' +
+            'hard-conflict guards. This message is logged once.',
+        );
+      }
       return null;
     }
 

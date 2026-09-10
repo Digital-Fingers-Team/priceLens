@@ -140,39 +140,67 @@ async function resetSeedData(prisma: PrismaClient): Promise<void> {
 }
 
 async function seedUsers(prisma: PrismaClient): Promise<void> {
-  const adminHash = await bcrypt.hash('admin_dev_password_change_me', 12);
-  await prisma.user.upsert({
-    where: { email: 'admin@pricelens.dev' },
-    update: {
-      role: UserRole.ADMIN,
-      emailVerified: true,
-      displayName: 'PriceLens Admin',
-    },
-    create: {
-      email: 'admin@pricelens.dev',
-      username: 'admin',
-      passwordHash: adminHash,
-      role: UserRole.ADMIN,
-      emailVerified: true,
-      displayName: 'PriceLens Admin',
-    },
-  });
+  const isProduction = process.env.NODE_ENV === 'production';
 
-  const modHash = await bcrypt.hash('moderator_dev_password', 12);
-  await prisma.user.upsert({
-    where: { email: 'mod@pricelens.dev' },
-    update: {
-      role: UserRole.MODERATOR,
-      emailVerified: true,
-      displayName: 'PriceLens Moderator',
+  // Weak, publicly-documented defaults are fine for local development but must
+  // never reach a real deployment, so in production the passwords have to be
+  // supplied explicitly and the staff accounts are skipped otherwise.
+  const staff = [
+    {
+      envVar: 'SEED_ADMIN_PASSWORD',
+      devPassword: 'admin_dev_password_change_me',
+      email: process.env.SEED_ADMIN_EMAIL ?? 'admin@pricelens.dev',
+      username: 'admin',
+      displayName: 'PriceLens Admin',
+      role: UserRole.ADMIN,
     },
-    create: {
-      email: 'mod@pricelens.dev',
+    {
+      envVar: 'SEED_MODERATOR_PASSWORD',
+      devPassword: 'moderator_dev_password',
+      email: process.env.SEED_MODERATOR_EMAIL ?? 'mod@pricelens.dev',
       username: 'moderator',
-      passwordHash: modHash,
-      role: UserRole.MODERATOR,
-      emailVerified: true,
       displayName: 'PriceLens Moderator',
+      role: UserRole.MODERATOR,
     },
-  });
+  ];
+
+  for (const account of staff) {
+    const supplied = process.env[account.envVar];
+
+    if (isProduction && !supplied) {
+      console.warn(
+        `[seed] ${account.envVar} is not set — skipping the ${account.role} account. ` +
+          'Set it to provision staff access in production.',
+      );
+      continue;
+    }
+
+    const password = supplied ?? account.devPassword;
+
+    if (isProduction && password.length < 12) {
+      throw new Error(`[seed] ${account.envVar} must be at least 12 characters in production.`);
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    await prisma.user.upsert({
+      where: { email: account.email },
+      // Never silently reset the password of an account that already exists.
+      update: {
+        role: account.role,
+        emailVerified: true,
+        displayName: account.displayName,
+      },
+      create: {
+        email: account.email,
+        username: account.username,
+        passwordHash,
+        role: account.role,
+        emailVerified: true,
+        displayName: account.displayName,
+      },
+    });
+
+    console.log(`[seed] Ensured ${account.role} account ${account.email}`);
+  }
 }

@@ -1,5 +1,20 @@
+const PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:3001/api/v1';
+
+/**
+ * Browser requests go to the public URL, but server-side rendering runs inside
+ * the container, where that public hostname is not routable — those fetches
+ * used to time out and silently degrade (product pages rendered as "not found"
+ * and were marked noindex). On the server, prefer an internal address.
+ *
+ * API_INTERNAL_URL is a server-only variable, so it is never exposed to or
+ * inlined into the client bundle.
+ */
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:3001/api/v1';
+  typeof window === 'undefined'
+    ? process.env.API_INTERNAL_URL ?? PUBLIC_API_URL
+    : PUBLIC_API_URL;
+
+export const PUBLIC_API_BASE_URL = PUBLIC_API_URL;
 
 export const QUERY_KEYS = {
   search: (filters: unknown) => ['search', filters] as const,

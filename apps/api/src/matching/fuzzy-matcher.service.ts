@@ -256,8 +256,16 @@ export class FuzzyMatcherService {
     for (const code of matches) {
       const digits = code.replace(/[a-z]/g, '');
       const letters = code.replace(/\d/g, '');
-      if (digits.length < 3) continue; // too short to be a meaningful model number
       if (letters && FuzzyMatcherService.MODEL_CODE_UNIT_SUFFIXES.has(letters)) continue;
+
+      // A token carrying several letters alongside a digit is a product code
+      // even when it has only one or two digits ("MDHA4", "MW103", "A2337").
+      // The 3-digit floor below still applies to bare numbers and single-letter
+      // tokens, so specs and chip names ("13", "256", "M4") stay excluded —
+      // comparing those would flag identical models as conflicting.
+      const isLetterLedCode = letters.length >= 2 && digits.length >= 1;
+      if (!isLetterLedCode && digits.length < 3) continue;
+
       codes.set(digits, code);
     }
     return codes;

@@ -292,7 +292,48 @@ export class ReconciliationService {
       return true;
     }
 
+    // The stored `attributes` column is checked as well as the title, because a
+    // variant is often recorded only in structured data (a listing titled
+    // "... 256GB" whose attributes say 512GB, or a title that omits capacity
+    // entirely). Checking the title alone let those merge into one product.
+    // Either source showing a conflict blocks the merge: leaving a duplicate in
+    // the catalog is far cheaper to fix than collapsing two real variants into
+    // one, which destroys their separate price histories.
+    const storedA = this.readVariantAttributes(a);
+    const storedB = this.readVariantAttributes(b);
+    if (
+      this.fuzzyMatcher.detectStorageConflict(storedA.storage, storedB.storage) ||
+      this.fuzzyMatcher.detectRamConflict(storedA.ram, storedB.ram) ||
+      this.fuzzyMatcher.detectColorConflict(storedA.color, storedB.color) ||
+      this.fuzzyMatcher.detectDisplaySizeConflict(storedA.displaySize, storedB.displaySize)
+    ) {
+      return true;
+    }
+
     return false;
+  }
+
+  /** Variant-defining fields as recorded on the canonical row itself. */
+  private readVariantAttributes(row: CanonicalRow): {
+    storage?: string;
+    ram?: string;
+    color?: string;
+    displaySize?: string;
+  } {
+    const attributes = (row.attributes ?? {}) as Record<string, unknown>;
+    const read = (key: string): string | undefined => {
+      const value = attributes[key];
+      if (value == null) return undefined;
+      const text = String(value).trim();
+      return text.length > 0 ? text : undefined;
+    };
+
+    return {
+      storage: read('storage'),
+      ram: read('ram'),
+      color: read('color'),
+      displaySize: read('displaySize') ?? read('display_size') ?? read('screenSize'),
+    };
   }
 
   private hasIdentifierConflict(a: CanonicalRow, b: CanonicalRow): boolean {

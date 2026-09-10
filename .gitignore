@@ -50,3 +50,10 @@ Thumbs.db
 
 # Misc
 *.tsbuildinfo
+
+# Local secret material — must never be committed
+.admin-seed-credentials
+.db-password
+.meili-key
+.env.bak.*
+build-all.sh

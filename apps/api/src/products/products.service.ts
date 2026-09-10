@@ -115,6 +115,22 @@ export interface PriceHistoryResponse {
   }>;
 }
 
+const DEFAULT_PAGE_SIZE = 20;
+const MAX_PAGE_SIZE = 100;
+
+/** Coerces untrusted pagination input into a usable positive integer. */
+function clampPageSize(value: unknown, fallback: number, max: number): number {
+  const parsed = Math.floor(Number(value));
+  if (!Number.isFinite(parsed) || parsed < 1) return fallback;
+  return Math.min(parsed, max);
+}
+
+function clampPageNumber(value: unknown): number {
+  const parsed = Math.floor(Number(value));
+  if (!Number.isFinite(parsed) || parsed < 1) return 1;
+  return parsed;
+}
+
 @Injectable()
 export class ProductsService {
   /** Currency every `priceUsd` column is normalized to at ingestion time (see FxRatesService). */
@@ -148,8 +164,12 @@ export class ProductsService {
     } = options;
 
     const normalizedQuery = q.trim().toLowerCase();
-    const rawPage = Math.max(page, 1);
-    const offset = (rawPage - 1) * limit;
+    // `page`/`limit` arrive straight from public query-string input, so a
+    // non-numeric or oversized value must not reach the SQL or blow up the
+    // response shape (NaN previously produced `LIMIT NaN` and a null page).
+    const safeLimit = clampPageSize(limit, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+    const rawPage = clampPageNumber(page);
+    const offset = (rawPage - 1) * safeLimit;
 
     const whereClause = this.buildSearchWhereSql(normalizedQuery, brand, categoryId, tier);
     const havingClause = this.buildHavingSql(minPrice, maxPrice);
@@ -169,7 +189,7 @@ export class ProductsService {
         GROUP BY cp.id
         ${havingClause}
         ORDER BY ${orderBySql}
-        LIMIT ${limit} OFFSET ${offset}
+        LIMIT ${safeLimit} OFFSET ${offset}
       `),
       this.prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
         SELECT COUNT(*)::bigint as count FROM (
@@ -185,7 +205,7 @@ export class ProductsService {
     ]);
 
     const total = Number(countRows[0]?.count ?? 0);
-    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const totalPages = Math.max(1, Math.ceil(total / safeLimit));
     const currentPage = Math.min(rawPage, totalPages);
 
     let liveFetchTriggered = false;
@@ -225,7 +245,7 @@ export class ProductsService {
       query: q.trim(),
       processingTimeMs: 0,
       page: currentPage,
-      limit,
+      limit: safeLimit,
       liveFetchTriggered,
     };
   }
@@ -515,6 +535,8 @@ export class ProductsService {
   }
 
   async getListings(productId: string, page = 1, limit = 50) {
+    limit = clampPageSize(limit, 50, MAX_PAGE_SIZE);
+    page = clampPageNumber(page);
     // Out-of-stock listings come back with no price; exclude them so callers only
     // see stores the product can actually be bought from.
     const where: Prisma.SourceListingWhereInput = {

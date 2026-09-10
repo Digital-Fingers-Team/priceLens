@@ -41,7 +41,15 @@ export default function RegisterPage() {
   } = useForm<RegisterForm>({ resolver: zodResolver(registerSchema) });
 
   function onSubmit(data: RegisterForm) {
-    register_(data);
+    // confirmPassword is a client-side-only field; the API rejects unknown
+    // properties (forbidNonWhitelisted), so it must not be sent.
+    const { confirmPassword: _confirmPassword, displayName, ...rest } = data;
+    void _confirmPassword;
+    register_({
+      ...rest,
+      // an untouched optional input yields '', which fails the API's IsString/MaxLength
+      ...(displayName?.trim() ? { displayName: displayName.trim() } : {}),
+    });
   }
 
   return (

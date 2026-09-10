@@ -86,6 +86,22 @@ export function useToggleWatchlist() {
   });
 }
 
+/**
+ * The user's price alerts. Alerts were previously write-only — they could be
+ * created but never listed back, so a triggered alert was invisible.
+ */
+export function useAlerts() {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const hasAccessToken = !!getStoredTokens().access;
+
+  return useQuery({
+    queryKey: QUERY_KEYS.alerts(),
+    queryFn: () => watchlistApi.getAlerts(),
+    enabled: isAuthenticated && hasAccessToken,
+    staleTime: 30 * 1000,
+  });
+}
+
 export function useCreateAlert() {
   const queryClient = useQueryClient();
   const addToast = useUiStore((s) => s.addToast);

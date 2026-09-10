@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as fs from 'fs';
 import * as path from 'path';
 import type { BrowserContext, Page } from 'patchright';
 
@@ -14,6 +15,7 @@ import type { BrowserContext, Page } from 'patchright';
 export class BrowserSessionService implements OnModuleDestroy {
   private readonly logger = new Logger(BrowserSessionService.name);
   private readonly contexts = new Map<string, Promise<BrowserContext>>();
+  private loggedBrowserChoice = false;
 
   constructor(private readonly configService: ConfigService) {}
 
@@ -31,16 +33,67 @@ export class BrowserSessionService implements OnModuleDestroy {
     return context;
   }
 
+  /**
+   * Chrome is preferred (bot-detection systems treat plain Chromium as more
+   * suspicious), but the container image falls back to distro Chromium when the
+   * Chrome download is unavailable. Requesting `channel: 'chrome'` in that case
+   * fails the launch outright, so resolve whatever browser is actually present.
+   */
+  private resolveBrowserLaunchTarget(): { channel?: string; executablePath?: string } {
+    const configured = process.env.BROWSER_EXECUTABLE_PATH;
+    if (configured) {
+      if (!fs.existsSync(configured)) {
+        this.logger.warn(`BROWSER_EXECUTABLE_PATH is set to "${configured}" but no file exists there.`);
+      }
+      return { executablePath: configured };
+    }
+
+    const chromePaths = [
+      '/opt/google/chrome/chrome',
+      '/usr/bin/google-chrome',
+      '/usr/bin/google-chrome-stable',
+    ];
+    if (chromePaths.some((candidate) => fs.existsSync(candidate))) {
+      return { channel: 'chrome' };
+    }
+
+    const chromiumPaths = ['/usr/bin/chromium', '/usr/bin/chromium-browser'];
+    const chromiumPath = chromiumPaths.find((candidate) => fs.existsSync(candidate));
+    if (chromiumPath) {
+      // Chromium is the expected browser on arm64, where Google publishes no
+      // Linux build — so this is a normal configuration, not a degraded one.
+      // Logged once rather than on every store launch.
+      if (!this.loggedBrowserChoice) {
+        this.loggedBrowserChoice = true;
+        this.logger.log(`Using Chromium at ${chromiumPath} (Google Chrome not present)`);
+      }
+      return { executablePath: chromiumPath };
+    }
+
+    // Nothing detected on disk (typical on a developer machine, where Chrome is
+    // installed somewhere Playwright resolves itself).
+    return { channel: 'chrome' };
+  }
+
   private async launchContext(storeSlug: string): Promise<BrowserContext> {
     const { chromium } = await import('patchright');
     const profileRoot = this.configService.get<string>('retailers.browserProfileDir', '.browser-profiles');
     const headless = this.configService.get<boolean>('retailers.browserHeadless', false);
     const profileDir = path.join(profileRoot, storeSlug);
+    const target = this.resolveBrowserLaunchTarget();
 
-    this.logger.log(`Launching persistent Chrome profile for "${storeSlug}" at ${profileDir} (headless=${headless})`);
+    // Chrome's sandbox cannot be used as uid 0, which is how the API container runs.
+    const needsNoSandbox = typeof process.getuid === 'function' && process.getuid() === 0;
+    const args = needsNoSandbox ? ['--no-sandbox', '--disable-dev-shm-usage'] : [];
+
+    this.logger.log(
+      `Launching persistent browser profile for "${storeSlug}" at ${profileDir} ` +
+        `(headless=${headless}, browser=${target.executablePath ?? target.channel ?? 'default'})`,
+    );
 
     return chromium.launchPersistentContext(profileDir, {
-      channel: 'chrome',
+      ...target,
+      args,
       headless,
       viewport: { width: 1366, height: 850 },
     });

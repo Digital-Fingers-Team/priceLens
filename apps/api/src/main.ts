@@ -1,5 +1,6 @@
 // apps/api/src/main.ts
 import { NestFactory, Reflector } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe, ClassSerializerInterceptor, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 const helmet: any = require('helmet');
@@ -11,7 +12,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
     logger: ['error', 'warn', 'log', 'debug', 'verbose'],
   });
@@ -40,6 +41,15 @@ async function bootstrap() {
       },
     });
   });
+
+  // ─── Proxy ──────────────────────────────────────────────────────────────
+  // The API runs behind the nginx reverse proxy, so without this every request
+  // carries the proxy's IP: rate limiting would bucket all users together as a
+  // single client, and session audit rows would record the proxy instead of the
+  // real client. Trust exactly one hop — the proxy in front of us — so a
+  // client-supplied X-Forwarded-For cannot be used to spoof an address.
+  const trustProxyHops = parseInt(process.env.TRUST_PROXY_HOPS ?? '1', 10);
+  app.set('trust proxy', Number.isFinite(trustProxyHops) ? trustProxyHops : 1);
 
   // ─── Security ───────────────────────────────────────────────────────────
   app.use(

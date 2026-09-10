@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bull';
 import { LiveIngestionService, LiveIngestionOptions } from '../scraping/live-ingestion.service';
 import { ReconciliationOptions, ReconciliationService } from '../matching/reconciliation.service';
+import { PriceAlertService } from '../watchlist/price-alert.service';
 
 export const INGESTION_QUEUE = 'ingestion';
 export const RUN_LIVE_INGESTION_JOB = 'run-live-ingestion';
@@ -10,6 +11,7 @@ export const RUN_QUERY_INGESTION_JOB = 'run-query-ingestion';
 export const RUN_RECONCILIATION_JOB = 'run-reconciliation';
 export const RUN_STORE_EXPANSION_JOB = 'run-store-expansion';
 export const RUN_STORE_COVERAGE_SWEEP_JOB = 'run-store-coverage-sweep';
+export const RUN_PRICE_ALERTS_JOB = 'run-price-alerts';
 
 interface RunQueryIngestionData extends LiveIngestionOptions {
   query: string;
@@ -27,7 +29,18 @@ export class IngestionProcessor {
   constructor(
     private readonly liveIngestionService: LiveIngestionService,
     private readonly reconciliationService: ReconciliationService,
+    private readonly priceAlertService: PriceAlertService,
   ) {}
+
+  @Process(RUN_PRICE_ALERTS_JOB)
+  async handlePriceAlerts() {
+    this.logger.log('Evaluating active price alerts');
+    const result = await this.priceAlertService.evaluateActiveAlerts();
+    this.logger.log(
+      `Price alert evaluation finished: ${result.checked} checked, ${result.triggered} triggered`,
+    );
+    return result;
+  }
 
   @Process(RUN_RECONCILIATION_JOB)
   async handleRunReconciliation(job: Job<ReconciliationOptions>) {
