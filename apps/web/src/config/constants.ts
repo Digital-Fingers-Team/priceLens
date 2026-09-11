@@ -1,4 +1,6 @@
-const PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:3001/api/v1';
+// Same-origin by default. Pointing this at 127.0.0.1 means the visitor's own
+// machine once it is compiled into the browser bundle, which fails silently.
+const PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL ?? '/api/v1';
 
 /**
  * Browser requests go to the public URL, but server-side rendering runs inside

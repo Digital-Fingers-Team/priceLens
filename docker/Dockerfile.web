@@ -47,7 +47,12 @@ COPY apps/web/package.json apps/web/package.json
 COPY apps/web apps/web
 
 # NEXT_PUBLIC_* values are compiled into the Next.js client bundle.
-ARG NEXT_PUBLIC_API_URL=http://127.0.0.1:3001/api/v1
+# Defaults to a same-origin relative path, NOT a localhost URL. A localhost
+# default is baked into the client bundle and then resolves against the
+# visitor's own machine, so forgetting --build-arg produced an image that
+# built, started and served pages while every API call failed in the browser.
+# "/api/v1" is simply correct behind the proxy, and wrong loudly otherwise.
+ARG NEXT_PUBLIC_API_URL=/api/v1
 ARG NEXT_PUBLIC_SITE_URL=
 
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
