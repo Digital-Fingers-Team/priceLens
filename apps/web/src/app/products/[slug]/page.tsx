@@ -2,6 +2,9 @@ import type { Metadata } from 'next';
 import { ProductDetailClient } from './_product-detail-client';
 import { productApi } from '@/lib/api/product.api';
 import { absoluteUrl } from '@/lib/seo';
+import type { CanonicalProduct } from '@/types/product.types';
+
+export const revalidate = 300;
 
 function formatPrice(value: number | null, currency: string) {
   if (value == null) return null;
@@ -51,12 +54,63 @@ export async function generateMetadata(
   } catch {
     return {
       title: 'Product not found',
-      description: 'The requested product could not be found on PriceLens.',
+      description: 'The requested product could not be found on Pricelens.',
       robots: { index: false, follow: false },
     };
   }
 }
 
-export default function ProductPage({ params }: { params: { slug: string } }) {
-  return <ProductDetailClient slug={params.slug} />;
+export default async function ProductPage({ params }: { params: { slug: string } }) {
+  // Fetched here, not only in the browser: this same object seeds the client
+  // query, so the HTML that leaves the server already contains the heading,
+  // the prices and the listings. It also feeds the structured data below --
+  // without which a price comparison result cannot show a price in Google.
+  let product: CanonicalProduct | undefined;
+  try {
+    product = await productApi.getBySlug(params.slug);
+  } catch {
+    // The client view renders its own not-found state, and generateMetadata
+    // has already marked the page noindex.
+  }
+
+  let jsonLd: Record<string, unknown> | null = null;
+  if (product) {
+    const { min, max, currency } = product.priceStats;
+    const offerCount =
+      product._count?.sourceListings ?? product.sourceListings?.length ?? 0;
+
+    jsonLd = {
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: product.title,
+      url: absoluteUrl(`/products/${params.slug}`),
+      ...(product.imageUrl ? { image: product.imageUrl } : {}),
+      ...(product.brand ? { brand: { '@type': 'Brand', name: product.brand } } : {}),
+      ...(product.model ? { model: product.model } : {}),
+      ...(min != null
+        ? {
+            offers: {
+              '@type': 'AggregateOffer',
+              priceCurrency: currency,
+              lowPrice: min,
+              ...(max != null ? { highPrice: max } : {}),
+              offerCount,
+              availability: 'https://schema.org/InStock',
+            },
+          }
+        : {}),
+    };
+  }
+
+  return (
+    <>
+      {jsonLd ? (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      ) : null}
+      <ProductDetailClient slug={params.slug} initialProduct={product} />
+    </>
+  );
 }

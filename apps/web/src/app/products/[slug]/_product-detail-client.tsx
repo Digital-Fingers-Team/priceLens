@@ -12,9 +12,12 @@ import { Button } from '@/components/ui/button';
 import { usePriceStats } from '@/lib/hooks/use-price-history';
 import { formatCurrency } from '@/lib/utils/format';
 import { useProduct } from '@/lib/hooks/use-product';
+import type { CanonicalProduct } from '@/types/product.types';
 
 interface ProductDetailClientProps {
   slug: string;
+  /** Fetched on the server so the first paint is the product, not a skeleton. */
+  initialProduct?: CanonicalProduct;
 }
 
 function ProductDetailSkeleton() {
@@ -37,8 +40,8 @@ function ProductDetailSkeleton() {
   );
 }
 
-export function ProductDetailClient({ slug }: ProductDetailClientProps) {
-  const { data: product, isLoading, isError, refetch } = useProduct(slug);
+export function ProductDetailClient({ slug, initialProduct }: ProductDetailClientProps) {
+  const { data: product, isLoading, isError, refetch } = useProduct(slug, initialProduct);
   const { data: stats } = usePriceStats(product?.id ?? '');
 
   if (isLoading) {
