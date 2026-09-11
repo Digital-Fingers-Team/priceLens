@@ -92,8 +92,13 @@ services:
     restart: always
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./docker/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro,z
+      # Shared with certbot: the challenge webroot, and the certificates it
+      # writes. Renewal is therefore a reload, never a restart.
+      - ./docker/certbot/www:/var/www/certbot:ro,z
+      - ./docker/certbot/conf:/etc/letsencrypt:ro,z
     networks:
       - external
     depends_on:

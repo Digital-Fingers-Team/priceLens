@@ -57,3 +57,7 @@ Thumbs.db
 .meili-key
 .env.bak.*
 build-all.sh
+
+# TLS material: private keys and the ACME challenge webroot. Certificates are
+# issued on the host, never carried in the repo.
+docker/certbot/
