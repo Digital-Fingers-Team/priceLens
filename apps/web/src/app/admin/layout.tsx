@@ -33,9 +33,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-      <div className="flex gap-8 items-start">
+      <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 items-stretch lg:items-start">
         {/* Sidebar */}
-        <aside className="w-48 shrink-0 space-y-1 sticky top-24">
+        <aside className="w-full lg:w-48 shrink-0 space-y-1 lg:sticky lg:top-24">
           <p className="text-[10px] font-bold text-ink-600 uppercase tracking-widest px-3 mb-3">
             Admin Panel
           </p>

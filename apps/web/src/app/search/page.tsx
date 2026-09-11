@@ -82,7 +82,10 @@ export default function SearchPage() {
         </div>
       )}
 
-      <div className="flex gap-8 items-start">
+      {/* Stacks below lg. The sidebar is w-full/shrink-0 by design, so leaving
+          this a row on phones let it claim the entire width and push the
+          results grid off the side of the screen. */}
+      <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 items-stretch lg:items-start">
         {/* Sidebar filters */}
         <SearchFilters />
 

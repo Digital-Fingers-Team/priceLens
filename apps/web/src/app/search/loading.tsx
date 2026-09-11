@@ -6,9 +6,10 @@ export default function SearchLoading() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
       <Skeleton className="h-10 w-full max-w-2xl rounded-xl" />
       <Skeleton className="h-4 w-48" />
-      <div className="flex gap-8">
-        {/* Filters skeleton */}
-        <div className="w-56 shrink-0 space-y-6 hidden md:block">
+      <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
+        {/* Filters skeleton -- lg:w-80 and the lg breakpoint mirror the real
+            sidebar, so the layout does not jump when the results arrive. */}
+        <div className="lg:w-80 shrink-0 space-y-6 hidden lg:block">
           {Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="space-y-2">
               <Skeleton className="h-3 w-20" />
@@ -19,7 +20,7 @@ export default function SearchLoading() {
           ))}
         </div>
         {/* Grid skeleton */}
-        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 9 }).map((_, i) => (
             <ProductCardSkeleton key={i} />
           ))}
