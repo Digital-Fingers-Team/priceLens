@@ -15,7 +15,13 @@ const inter = Inter({
 export const metadata: Metadata = {
   ...baseMetadata,
   icons: {
-    icon: '/favicon.svg',
+    icon: [
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    // Apple composites a transparent icon onto black; this one carries the
+    // white background from the brand assets instead.
+    apple: '/apple-touch-icon.png',
   },
   manifest: '/manifest.webmanifest',
 };

@@ -16,13 +16,13 @@ export const metadata: Metadata = {
     canonical: '/',
   },
   openGraph: {
-    title: 'PriceLens',
+    title: 'Pricelens',
     description:
       'Search and compare live product prices across Amazon, Noon, Jumia, and more.',
     url: absoluteUrl('/'),
   },
   twitter: {
-    title: 'PriceLens',
+    title: 'Pricelens',
     description:
       'Search and compare live product prices across Amazon, Noon, Jumia, and more.',
   },
@@ -90,7 +90,7 @@ export default function HomePage() {
                 Turn product research into something people actually forward to friends.
               </h2>
               <p className="text-ink-400">
-                PriceLens works best when people can compare, save, and share without friction. Collections give them a reason to come back.
+                Pricelens works best when people can compare, save, and share without friction. Collections give them a reason to come back.
               </p>
             </div>
             <Link href="/collections">

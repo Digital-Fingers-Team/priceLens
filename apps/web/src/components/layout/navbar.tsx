@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Heart, User, LogOut, Shield, Menu, X, TrendingUp } from 'lucide-react';
@@ -33,14 +34,28 @@ export function Navbar() {
           {/* Logo */}
           <Link
             href="/"
-            className="flex items-center gap-2 shrink-0 group"
+            className="flex items-center shrink-0 group"
+            aria-label="Pricelens home"
           >
-            <div className="w-8 h-8 rounded-lg bg-signal flex items-center justify-center">
-              <TrendingUp className="w-4 h-4 text-ink-950" />
-            </div>
-            <span className="font-bold text-ink-50 text-lg tracking-tight hidden sm:block">
-              Price<span className="text-signal">Lens</span>
-            </span>
+            {/* The wordmark needs room the phone header does not have, so the
+                lens mark alone stands in below sm -- same asset family, so it
+                still reads as the logo rather than a different icon. */}
+            <Image
+              src="/icon-512.png"
+              alt=""
+              width={512}
+              height={512}
+              priority
+              className="h-8 w-8 sm:hidden"
+            />
+            <Image
+              src="/logo-wordmark.png"
+              alt="Pricelens"
+              width={960}
+              height={241}
+              priority
+              className="hidden sm:block h-7 w-auto"
+            />
           </Link>
 
           {/* Desktop search */}

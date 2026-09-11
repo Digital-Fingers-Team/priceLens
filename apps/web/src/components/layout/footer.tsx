@@ -23,7 +23,7 @@ export function Footer() {
           </nav>
 
           <p className="text-xs text-ink-600">
-            © {new Date().getFullYear()} PriceLens. Price data updated continuously.
+            © {new Date().getFullYear()} Pricelens. Price data updated continuously.
           </p>
         </div>
       </div>

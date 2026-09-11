@@ -192,7 +192,7 @@ export function ProductHeader({ product }: ProductHeaderProps) {
         <ShareActions
           title={product.title}
           url={`/products/${product.slug}`}
-          summary={`${product.title} starts at ${formatCurrency(product.priceStats.min, product.priceStats.currency)} on PriceLens.`}
+          summary={`${product.title} starts at ${formatCurrency(product.priceStats.min, product.priceStats.currency)} on Pricelens.`}
         />
       </div>
     </section>
