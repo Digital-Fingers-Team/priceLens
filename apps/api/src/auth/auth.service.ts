@@ -13,6 +13,7 @@ import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { RegisterDto } from './dto/auth.dto';
 import { TokenPayload, AuthTokens } from './interfaces/auth.interfaces';
+import { NotificationChannelsService } from '../notifications/notification-channels.service';
 
 @Injectable()
 export class AuthService {
@@ -22,6 +23,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
+    private readonly notificationChannels: NotificationChannelsService,
   ) {}
 
   async register(dto: RegisterDto, ip?: string, userAgent?: string): Promise<AuthTokens> {
@@ -50,6 +52,11 @@ export class AuthService {
         role: UserRole.USER,
       },
     });
+
+    // Give every account a working alert destination immediately. The address
+    // is pre-verified because registration already proved control of it, and
+    // without this a new user would set an alert and never hear anything.
+    await this.notificationChannels.ensureDefaultChannels(user.id, user.email);
 
     this.logger.log(`New user registered: ${user.email}`);
     return this.createSessionAndTokens(user, ip, userAgent);

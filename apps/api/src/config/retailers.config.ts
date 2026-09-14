@@ -37,6 +37,15 @@ export default registerAs('retailers', () => ({
   // run comfortably completes before the next one is due; runStoreCoverageSweep
   // also refuses to start while one is already in flight.
   storeCoverageSweepCron: process.env.STORE_COVERAGE_SWEEP_CRON ?? '0 */6 * * *',
+
+  // Alerts are cheap to evaluate and users expect them promptly, so they run
+  // far more often than the scraping sweeps. (Previously this key was read by
+  // the scheduler but never declared here, so the env var was silently inert.)
+  priceAlertCron: process.env.PRICE_ALERT_CRON ?? '*/30 * * * *',
+  // Retries transiently-failed notification deliveries.
+  notificationRetryCron: process.env.NOTIFICATION_RETRY_CRON ?? '*/15 * * * *',
+  // Expires subscriptions whose period elapsed without a renewal webhook.
+  subscriptionMaintenanceCron: process.env.SUBSCRIPTION_MAINTENANCE_CRON ?? '17 * * * *',
   storeCoverageSweepBatchSize: parseInt(process.env.STORE_COVERAGE_SWEEP_BATCH_SIZE ?? '100', 10),
   // How long to leave a product alone after the sweep has tried to expand it.
   // Without this, any product that cannot reach the target -- because no other

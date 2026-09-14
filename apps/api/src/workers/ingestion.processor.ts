@@ -4,6 +4,8 @@ import { Job } from 'bull';
 import { LiveIngestionService, LiveIngestionOptions } from '../scraping/live-ingestion.service';
 import { ReconciliationOptions, ReconciliationService } from '../matching/reconciliation.service';
 import { PriceAlertService } from '../watchlist/price-alert.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { SubscriptionsService } from '../billing/subscriptions.service';
 
 export const INGESTION_QUEUE = 'ingestion';
 export const RUN_LIVE_INGESTION_JOB = 'run-live-ingestion';
@@ -12,6 +14,8 @@ export const RUN_RECONCILIATION_JOB = 'run-reconciliation';
 export const RUN_STORE_EXPANSION_JOB = 'run-store-expansion';
 export const RUN_STORE_COVERAGE_SWEEP_JOB = 'run-store-coverage-sweep';
 export const RUN_PRICE_ALERTS_JOB = 'run-price-alerts';
+export const RUN_NOTIFICATION_RETRY_JOB = 'run-notification-retry';
+export const RUN_SUBSCRIPTION_MAINTENANCE_JOB = 'run-subscription-maintenance';
 
 interface RunQueryIngestionData extends LiveIngestionOptions {
   query: string;
@@ -30,14 +34,42 @@ export class IngestionProcessor {
     private readonly liveIngestionService: LiveIngestionService,
     private readonly reconciliationService: ReconciliationService,
     private readonly priceAlertService: PriceAlertService,
+    private readonly notificationsService: NotificationsService,
+    private readonly subscriptionsService: SubscriptionsService,
   ) {}
+
+  /**
+   * Retries notification deliveries that failed transiently (SMTP timeout,
+   * Telegram 5xx). Bounded by maxDeliveryAttempts, so a permanently bad
+   * address drains out instead of being retried forever.
+   */
+  @Process(RUN_NOTIFICATION_RETRY_JOB)
+  async handleNotificationRetry() {
+    const result = await this.notificationsService.retryFailedDeliveries();
+    if (result.retried > 0) {
+      this.logger.log(`Notification retry: ${result.recovered}/${result.retried} recovered`);
+    }
+    return result;
+  }
+
+  /**
+   * Reconciles subscriptions whose paid period has elapsed without a renewal
+   * webhook arriving. EntitlementsService already refuses to honour an expired
+   * period, so this only brings stored state back in line.
+   */
+  @Process(RUN_SUBSCRIPTION_MAINTENANCE_JOB)
+  async handleSubscriptionMaintenance() {
+    const expired = await this.subscriptionsService.expireLapsedSubscriptions();
+    return { expired };
+  }
 
   @Process(RUN_PRICE_ALERTS_JOB)
   async handlePriceAlerts() {
     this.logger.log('Evaluating active price alerts');
     const result = await this.priceAlertService.evaluateActiveAlerts();
     this.logger.log(
-      `Price alert evaluation finished: ${result.checked} checked, ${result.triggered} triggered`,
+      `Price alert evaluation finished: ${result.checked} checked, ${result.triggered} triggered, ` +
+        `${result.notified} notified`,
     );
     return result;
   }

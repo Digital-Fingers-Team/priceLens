@@ -1,10 +1,31 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { AlertType, Prisma } from '@prisma/client';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { AlertStatus, AlertType, Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
+import { EntitlementsService } from '../billing/entitlements.service';
+import { PlanLimitExceededException, UpgradeRequiredException } from '../billing/billing.errors';
+import { isWithinLimit } from '../billing/plan-limits';
+
+export interface CreateAlertInput {
+  alertType: AlertType;
+  thresholdValue: number;
+  repeatable?: boolean;
+  cooldownHours?: number;
+}
 
 @Injectable()
 export class WatchlistService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(WatchlistService.name);
+  /** Prices are stored normalised to the FX base currency, not USD. */
+  private readonly currency: string;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly entitlements: EntitlementsService,
+    config: ConfigService,
+  ) {
+    this.currency = config.get<string>('pricing.fxBaseCurrency', 'EGP');
+  }
 
   async getWatchlist(userId: string) {
     const items = await this.prisma.watchlistItem.findMany({
@@ -42,6 +63,24 @@ export class WatchlistService {
   }
 
   async addToWatchlist(userId: string, productId: string, note?: string) {
+    // Only a *new* item consumes allowance -- re-adding something already
+    // tracked (which this method upserts) must never be blocked, or a user at
+    // their cap could not edit a note on an existing item.
+    const [{ limits }, alreadyTracked] = await Promise.all([
+      this.entitlements.getEntitlements(userId),
+      this.prisma.watchlistItem.findUnique({
+        where: { userId_canonicalProductId: { userId, canonicalProductId: productId } },
+        select: { id: true },
+      }),
+    ]);
+
+    if (!alreadyTracked) {
+      const current = await this.prisma.watchlistItem.count({ where: { userId } });
+      if (!isWithinLimit(current, limits.trackedProducts)) {
+        throw new PlanLimitExceededException('tracked products', current, limits.trackedProducts as number);
+      }
+    }
+
     const product = await this.prisma.canonicalProduct.findUnique({
       where: { id: productId },
       include: {
@@ -134,6 +173,8 @@ export class WatchlistService {
       canonicalProduct: alert.canonicalProduct,
       alertType: alert.alertType,
       thresholdValue: this.toNumber(alert.thresholdValue) ?? 0,
+      repeatable: alert.repeatable,
+      cooldownHours: alert.cooldownHours,
       status: alert.status,
       lastCheckedAt: alert.lastCheckedAt?.toISOString() ?? null,
       triggeredAt: alert.triggeredAt?.toISOString() ?? null,
@@ -142,9 +183,38 @@ export class WatchlistService {
     }));
   }
 
-  async createAlert(userId: string, productId: string, alertType: AlertType, thresholdValue: number) {
-    if (!Number.isFinite(thresholdValue) || thresholdValue <= 0) {
+  async createAlert(userId: string, productId: string, input: CreateAlertInput) {
+    const { alertType, thresholdValue } = input;
+
+    // RESTOCK has no numeric threshold -- it fires on a stock transition --
+    // so it is the one type where a zero value is legitimate.
+    const needsThreshold = alertType !== AlertType.RESTOCK;
+    if (needsThreshold && (!Number.isFinite(thresholdValue) || thresholdValue <= 0)) {
       throw new BadRequestException('thresholdValue must be a positive number');
+    }
+
+    // Percentage-based types are bounded: a "90% drop" alert would never fire
+    // and silently look broken to the user.
+    if (
+      [AlertType.PRICE_DROP_PERCENT, AlertType.PRICE_INCREASE, AlertType.MAJOR_DISCOUNT].includes(alertType) &&
+      thresholdValue > 95
+    ) {
+      throw new BadRequestException('A percentage threshold must be between 1 and 95');
+    }
+
+    const { limits } = await this.entitlements.getEntitlements(userId);
+
+    if (!limits.alertTypes.includes(alertType)) {
+      throw new UpgradeRequiredException(
+        `${alertType} alerts are not included in your current plan.`,
+      );
+    }
+
+    const activeCount = await this.prisma.priceAlert.count({
+      where: { userId, status: AlertStatus.ACTIVE },
+    });
+    if (!isWithinLimit(activeCount, limits.activeAlerts)) {
+      throw new PlanLimitExceededException('active alerts', activeCount, limits.activeAlerts as number);
     }
 
     const product = await this.prisma.canonicalProduct.findUnique({
@@ -161,12 +231,20 @@ export class WatchlistService {
       throw new NotFoundException(`Product with id "${productId}" not found`);
     }
 
+    // Seed the stock state so a RESTOCK alert cannot fire on its first
+    // evaluation just because the product happens to be available now.
+    const currentStock =
+      alertType === AlertType.RESTOCK ? await this.getCurrentStockState(productId) : null;
+
     const alert = await this.prisma.priceAlert.create({
       data: {
         userId,
         canonicalProductId: productId,
         alertType,
-        thresholdValue: this.toDecimal(thresholdValue),
+        thresholdValue: this.toDecimal(needsThreshold ? thresholdValue : 0),
+        repeatable: input.repeatable ?? false,
+        cooldownHours: Math.min(Math.max(input.cooldownHours ?? 24, 1), 720),
+        lastSeenInStock: currentStock,
       },
     });
 
@@ -177,6 +255,8 @@ export class WatchlistService {
       canonicalProduct: product,
       alertType: alert.alertType,
       thresholdValue: this.toNumber(alert.thresholdValue) ?? thresholdValue,
+      repeatable: alert.repeatable,
+      cooldownHours: alert.cooldownHours,
       status: alert.status,
       lastCheckedAt: alert.lastCheckedAt?.toISOString() ?? null,
       triggeredAt: alert.triggeredAt?.toISOString() ?? null,
@@ -276,12 +356,62 @@ export class WatchlistService {
         avg,
         median,
         current: prices[0] ?? null,
-        currency: 'USD',
+        currency: this.currency,
       },
       _count: {
         sourceListings: product._count.sourceListings,
       },
     };
+  }
+
+  /**
+   * Re-arm a one-shot alert that has already fired. Without this a triggered
+   * alert is dead weight the user has to delete and recreate.
+   */
+  async reactivateAlert(userId: string, alertId: string) {
+    const alert = await this.prisma.priceAlert.findFirst({ where: { id: alertId, userId } });
+    if (!alert) throw new NotFoundException('Price alert not found');
+
+    const { limits } = await this.entitlements.getEntitlements(userId);
+    if (alert.status !== AlertStatus.ACTIVE) {
+      const activeCount = await this.prisma.priceAlert.count({
+        where: { userId, status: AlertStatus.ACTIVE },
+      });
+      if (!isWithinLimit(activeCount, limits.activeAlerts)) {
+        throw new PlanLimitExceededException('active alerts', activeCount, limits.activeAlerts as number);
+      }
+    }
+
+    const updated = await this.prisma.priceAlert.update({
+      where: { id: alert.id },
+      data: {
+        status: AlertStatus.ACTIVE,
+        triggeredAt: null,
+        triggeredPrice: null,
+        lastNotifiedAt: null,
+        ...(alert.alertType === AlertType.RESTOCK
+          ? { lastSeenInStock: await this.getCurrentStockState(alert.canonicalProductId) }
+          : {}),
+      },
+    });
+
+    return { id: updated.id, status: updated.status };
+  }
+
+  /** BOOL_OR across live listings; null when no store publishes stock. */
+  private async getCurrentStockState(productId: string): Promise<boolean | null> {
+    const rows = await this.prisma.sourceListing.findMany({
+      where: {
+        canonicalProductId: productId,
+        matchStatus: { in: ['ACCEPTED', 'MANUAL_ACCEPT'] },
+        priceUsd: { not: null },
+      },
+      select: { inStock: true },
+    });
+
+    if (rows.length === 0) return null;
+    if (rows.every((row) => row.inStock === null)) return null;
+    return rows.some((row) => row.inStock === true);
   }
 
   private toNumber(value: Prisma.Decimal | number | null | undefined) {

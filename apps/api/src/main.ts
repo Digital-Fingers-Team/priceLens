@@ -15,6 +15,10 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
     logger: ['error', 'warn', 'log', 'debug', 'verbose'],
+    // Stripe signs the webhook over the exact request bytes, so the raw body
+    // has to survive JSON parsing. Nest keeps it on request.rawBody, which
+    // StripeWebhookController reads; every other route is unaffected.
+    rawBody: true,
   });
 
   const logger = new Logger('Bootstrap');

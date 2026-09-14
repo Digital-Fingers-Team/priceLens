@@ -17,6 +17,10 @@ import { WatchlistModule } from './watchlist/watchlist.module';
 import { PricesModule } from './prices/prices.module';
 import { WorkersModule } from './workers/workers.module';
 import { AffiliateModule } from './affiliate/affiliate.module';
+import { BillingModule } from './billing/billing.module';
+import { FeatureGuard } from './billing/feature.guard';
+import { NotificationsModule } from './notifications/notifications.module';
+import { IntelligenceModule } from './intelligence/intelligence.module';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
 import redisConfig from './config/redis.config';
@@ -25,13 +29,26 @@ import searchConfig from './config/search.config';
 import retailersConfig from './config/retailers.config';
 import pricingConfig from './config/pricing.config';
 import affiliateConfig from './config/affiliate.config';
+import billingConfig from './config/billing.config';
+import notificationsConfig from './config/notifications.config';
 
 @Module({
   imports: [
     // ─── Config ────────────────────────────────────────────────────────────
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, redisConfig, authConfig, searchConfig, retailersConfig, pricingConfig, affiliateConfig],
+      load: [
+        appConfig,
+        databaseConfig,
+        redisConfig,
+        authConfig,
+        searchConfig,
+        retailersConfig,
+        pricingConfig,
+        affiliateConfig,
+        billingConfig,
+        notificationsConfig,
+      ],
       // Shared with apps/web from the repo root — see /.env.example
       envFilePath: ['../../.env.local', '../../.env'],
       cache: true,
@@ -94,12 +111,21 @@ import affiliateConfig from './config/affiliate.config';
     PricesModule,
     WorkersModule,
     AffiliateModule,
+    // Billing and Notifications are @Global and are imported before the
+    // feature modules that depend on them.
+    BillingModule,
+    NotificationsModule,
+    IntelligenceModule,
   ],
   providers: [
     // ThrottlerModule only supplies configuration — without the guard actually
     // registered, every @Throttle decorator in the app is inert and endpoints
     // like login and the scrape-triggering search are unthrottled.
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // Enforces @RequiresFeature globally, so a paid feature is gated by a
+    // decorator next to the route rather than by remembering to wire a guard
+    // into each module.
+    { provide: APP_GUARD, useClass: FeatureGuard },
   ],
 })
 export class AppModule {}

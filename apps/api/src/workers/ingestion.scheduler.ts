@@ -8,12 +8,16 @@ import {
   RUN_RECONCILIATION_JOB,
   RUN_STORE_COVERAGE_SWEEP_JOB,
   RUN_PRICE_ALERTS_JOB,
+  RUN_NOTIFICATION_RETRY_JOB,
+  RUN_SUBSCRIPTION_MAINTENANCE_JOB,
 } from './ingestion.processor';
 
 const REPEATABLE_JOB_ID = 'scheduled-live-ingestion';
 const RECONCILIATION_JOB_ID = 'scheduled-reconciliation';
 const STORE_COVERAGE_SWEEP_JOB_ID = 'scheduled-store-coverage-sweep';
 const PRICE_ALERTS_JOB_ID = 'scheduled-price-alerts';
+const NOTIFICATION_RETRY_JOB_ID = 'scheduled-notification-retry';
+const SUBSCRIPTION_MAINTENANCE_JOB_ID = 'scheduled-subscription-maintenance';
 
 @Injectable()
 export class IngestionScheduler implements OnModuleInit {
@@ -50,6 +54,32 @@ export class IngestionScheduler implements OnModuleInit {
 
     await this.scheduleReconciliation();
     await this.scheduleStoreCoverageSweep();
+    await this.scheduleOperationalJobs();
+  }
+
+  /**
+   * Jobs that keep the subscription and notification systems honest.
+   *
+   * Both are idempotent and cheap, and both exist because external systems are
+   * unreliable -- a missed Stripe webhook, a flaky SMTP host -- so unlike the
+   * scrapers they are not behind an enable/disable flag.
+   */
+  private async scheduleOperationalJobs() {
+    const retryCron = this.configService.get<string>('retailers.notificationRetryCron', '*/15 * * * *');
+    await this.queue.add(
+      RUN_NOTIFICATION_RETRY_JOB,
+      {},
+      { jobId: NOTIFICATION_RETRY_JOB_ID, repeat: { cron: retryCron } },
+    );
+
+    const maintenanceCron = this.configService.get<string>('retailers.subscriptionMaintenanceCron', '17 * * * *');
+    await this.queue.add(
+      RUN_SUBSCRIPTION_MAINTENANCE_JOB,
+      {},
+      { jobId: SUBSCRIPTION_MAINTENANCE_JOB_ID, repeat: { cron: maintenanceCron } },
+    );
+
+    this.logger.log(`Scheduled notification retry (${retryCron}) and subscription maintenance (${maintenanceCron})`);
   }
 
   /**
