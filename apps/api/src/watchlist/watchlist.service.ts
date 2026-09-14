@@ -6,6 +6,17 @@ import { EntitlementsService } from '../billing/entitlements.service';
 import { PlanLimitExceededException, UpgradeRequiredException } from '../billing/billing.errors';
 import { isWithinLimit } from '../billing/plan-limits';
 
+/**
+ * Types whose threshold is a percentage. Declared as a typed Set because a
+ * bare array literal narrows to its own literal union and then refuses the
+ * wider AlertType.
+ */
+const PERCENTAGE_THRESHOLD_TYPES: ReadonlySet<AlertType> = new Set([
+  AlertType.PRICE_DROP_PERCENT,
+  AlertType.PRICE_INCREASE,
+  AlertType.MAJOR_DISCOUNT,
+]);
+
 export interface CreateAlertInput {
   alertType: AlertType;
   thresholdValue: number;
@@ -195,10 +206,7 @@ export class WatchlistService {
 
     // Percentage-based types are bounded: a "90% drop" alert would never fire
     // and silently look broken to the user.
-    if (
-      [AlertType.PRICE_DROP_PERCENT, AlertType.PRICE_INCREASE, AlertType.MAJOR_DISCOUNT].includes(alertType) &&
-      thresholdValue > 95
-    ) {
+    if (PERCENTAGE_THRESHOLD_TYPES.has(alertType) && thresholdValue > 95) {
       throw new BadRequestException('A percentage threshold must be between 1 and 95');
     }
 

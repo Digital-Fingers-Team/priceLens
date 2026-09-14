@@ -10,6 +10,19 @@ export interface EvaluationResult {
   notified: number;
 }
 
+/** Alert types whose evaluation needs historical aggregates. */
+const HISTORY_BACKED_TYPES: ReadonlySet<AlertType> = new Set([
+  AlertType.LOWEST_EVER,
+  AlertType.MAJOR_DISCOUNT,
+]);
+
+/** Alert types measured against the price when the alert was created. */
+const BASELINE_BACKED_TYPES: ReadonlySet<AlertType> = new Set([
+  AlertType.PRICE_DROP_ABSOLUTE,
+  AlertType.PRICE_DROP_PERCENT,
+  AlertType.PRICE_INCREASE,
+]);
+
 /** Per-product market snapshot used to evaluate every alert on that product. */
 interface MarketSnapshot {
   bestPrice: number;
@@ -85,20 +98,14 @@ export class PriceAlertService {
     // Three batched lookups for the whole sweep, rather than per-alert
     // queries. At batchSize=500 the old shape issued well over a thousand
     // round trips per run.
-    const needsHistory = alerts.some((alert) =>
-      [AlertType.LOWEST_EVER, AlertType.MAJOR_DISCOUNT].includes(alert.alertType),
-    );
+    const needsHistory = alerts.some((alert) => HISTORY_BACKED_TYPES.has(alert.alertType));
 
     const [markets, histories, baselines] = await Promise.all([
       this.getMarketSnapshots(productIds),
       needsHistory ? this.getHistoryAggregates(productIds) : Promise.resolve(new Map<string, HistoryAggregate>()),
       this.getBaselines(
         alerts
-          .filter((alert) =>
-            [AlertType.PRICE_DROP_ABSOLUTE, AlertType.PRICE_DROP_PERCENT, AlertType.PRICE_INCREASE].includes(
-              alert.alertType,
-            ),
-          )
+          .filter((alert) => BASELINE_BACKED_TYPES.has(alert.alertType))
           .map((alert) => ({
             alertId: alert.id,
             productId: alert.canonicalProductId,
