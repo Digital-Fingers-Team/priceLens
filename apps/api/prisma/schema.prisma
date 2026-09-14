@@ -28,15 +28,50 @@ enum MatchStatus {
 }
 
 enum AlertType {
-  PRICE_DROP_ABSOLUTE // e.g. drop by $10
-  PRICE_DROP_PERCENT // e.g. drop by 10%
-  PRICE_TARGET // e.g. below $299
+  PRICE_DROP_ABSOLUTE // drop by N currency units vs the price when the alert was set
+  PRICE_DROP_PERCENT // drop by N% vs the price when the alert was set
+  PRICE_TARGET // "tell me when this reaches 12,000 EGP"
+  LOWEST_EVER // current best price ties or beats the lowest ever recorded
+  PRICE_INCREASE // rose by N% vs the price when the alert was set
+  RESTOCK // out-of-stock -> available again
+  MAJOR_DISCOUNT // current price is N% below its own trailing median
 }
 
 enum AlertStatus {
   ACTIVE
   TRIGGERED
   DISABLED
+}
+
+// ─── Billing & Entitlements ─────────────────────────────────────────────────
+
+enum PlanTier {
+  FREE
+  PLUS // B2C premium
+  SELLER // B2B retailer
+  ENTERPRISE // manufacturer / brand
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+  EXPIRED
+}
+
+enum NotificationChannelType {
+  IN_APP
+  EMAIL
+  TELEGRAM
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
 }
 
 enum ScrapingJobStatus {
@@ -78,11 +113,14 @@ model User {
   lastLoginAt   DateTime? @map("last_login_at")
   deletedAt     DateTime? @map("deleted_at") // soft delete
 
-  sessions        Session[]
-  watchlistItems  WatchlistItem[]
-  priceAlerts     PriceAlert[]
-  reviewDecisions ReviewDecision[]
-  affiliateClicks AffiliateClick[]
+  sessions             Session[]
+  watchlistItems       WatchlistItem[]
+  priceAlerts          PriceAlert[]
+  reviewDecisions      ReviewDecision[]
+  affiliateClicks      AffiliateClick[]
+  subscriptions        Subscription[]
+  notificationChannels NotificationChannel[]
+  notifications        Notification[]
 
   @@index([email])
   @@index([username])
@@ -423,11 +461,27 @@ model PriceAlert {
   createdAt          DateTime    @default(now()) @map("created_at")
   updatedAt          DateTime    @updatedAt @map("updated_at")
 
+  // A repeating alert re-arms itself after firing instead of parking in
+  // TRIGGERED forever -- which is what a user actually wants from "tell me
+  // whenever this drops below X". cooldownHours stops a price oscillating
+  // around the threshold from spamming them.
+  repeatable     Boolean   @default(false)
+  cooldownHours  Int       @default(24) @map("cooldown_hours")
+  lastNotifiedAt DateTime? @map("last_notified_at")
+
+  // RESTOCK has to know the stock state we last observed -- without it the
+  // very first evaluation of an in-stock product would fire immediately.
+  lastSeenInStock Boolean? @map("last_seen_in_stock")
+
   user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   canonicalProduct CanonicalProduct @relation(fields: [canonicalProductId], references: [id])
+  notifications    Notification[]
 
   @@index([userId])
   @@index([canonicalProductId, status])
+  // The sweep selects ACTIVE alerts ordered by lastCheckedAt; without this it
+  // is a full scan + sort of the whole table every 30 minutes.
+  @@index([status, lastCheckedAt])
   @@map("price_alerts")
 }
 
@@ -514,4 +568,192 @@ model AffiliateConversion {
   @@index([status])
   @@index([occurredAt])
   @@map("affiliate_conversions")
+}
+
+// ─── Billing ─────────────────────────────────────────────────────────────────
+
+// A sellable plan. Prices and limits live in the DB rather than in code so
+// pricing can be changed without a deploy (the spec's EGP figures are
+// starting points, not constants). `limits` is the single source of truth for
+// entitlements -- see EntitlementsService / PLAN_LIMIT_KEYS. A null/absent
+// limit means "unlimited"; see DEFAULT_PLAN_BLUEPRINTS for the seeded shape.
+model Plan {
+  id          String   @id @default(uuid())
+  key         String   @unique @db.VarChar(64) // stable code identifier, e.g. "plus_monthly"
+  tier        PlanTier
+  name        String   @db.VarChar(128)
+  description String?  @db.Text
+
+  // Stored in the *minor* unit (piastres) to avoid float money. 0 = free.
+  priceMinor   Int    @default(0) @map("price_minor")
+  currency     String @default("EGP") @db.VarChar(3)
+  intervalDays Int    @default(30) @map("interval_days")
+
+  // Stripe Price id for this plan. Nullable: free plans and hand-sold
+  // enterprise contracts never go through Checkout.
+  stripePriceId String? @unique @map("stripe_price_id")
+
+  limits      Json    @default("{}") // see PlanLimits
+  isActive    Boolean @default(true) @map("is_active")
+  isPublic    Boolean @default(true) @map("is_public") // shown on the pricing page
+  sortOrder   Int     @default(0) @map("sort_order")
+  trialDays   Int     @default(0) @map("trial_days")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  subscriptions Subscription[]
+
+  @@index([tier, isActive])
+  @@map("plans")
+}
+
+// A user's entitlement grant. At most one non-terminal subscription per user
+// is enforced by a partial unique index (see the migration) so a user cannot
+// stack two paid plans and confuse limit resolution.
+model Subscription {
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  planId String @map("plan_id")
+
+  status SubscriptionStatus @default(ACTIVE)
+
+  // "stripe" for self-serve, "manual" for admin/enterprise grants.
+  provider               String  @default("manual") @db.VarChar(32)
+  providerCustomerId     String? @map("provider_customer_id")
+  providerSubscriptionId String? @unique @map("provider_subscription_id")
+
+  currentPeriodStart DateTime  @default(now()) @map("current_period_start")
+  currentPeriodEnd   DateTime? @map("current_period_end")
+  cancelAtPeriodEnd  Boolean   @default(false) @map("cancel_at_period_end")
+  canceledAt         DateTime? @map("canceled_at")
+  trialEndsAt        DateTime? @map("trial_ends_at")
+
+  // Per-subscription limit overrides, merged over the plan's limits. This is
+  // how an enterprise deal gets a custom product cap without inventing a Plan
+  // row per customer.
+  limitOverrides Json @default("{}") @map("limit_overrides")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan Plan @relation(fields: [planId], references: [id])
+
+  @@index([userId, status])
+  @@index([status, currentPeriodEnd])
+  @@index([providerCustomerId])
+  @@map("subscriptions")
+}
+
+// Append-only audit of every entitlement change, including the raw provider
+// event. Billing disputes are unanswerable without this.
+model SubscriptionEvent {
+  id             String   @id @default(uuid())
+  subscriptionId String?  @map("subscription_id")
+  userId         String?  @map("user_id")
+  type           String   @db.VarChar(64) // created | renewed | canceled | payment_failed | plan_changed | manual_grant
+  fromPlanKey    String?  @map("from_plan_key") @db.VarChar(64)
+  toPlanKey      String?  @map("to_plan_key") @db.VarChar(64)
+  provider       String   @default("manual") @db.VarChar(32)
+  providerEventId String? @map("provider_event_id")
+  payload        Json     @default("{}")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  // Provider webhooks are at-least-once. This makes replay a no-op instead of
+  // a double grant.
+  @@unique([provider, providerEventId])
+  @@index([subscriptionId])
+  @@index([userId, createdAt])
+  @@map("subscription_events")
+}
+
+// ─── Notifications ───────────────────────────────────────────────────────────
+
+// One row per (user, channel) destination. IN_APP is implicit and always
+// present; EMAIL defaults to the account address; TELEGRAM needs an explicit
+// verified chat id.
+model NotificationChannel {
+  id     String                  @id @default(uuid())
+  userId String                  @map("user_id")
+  type   NotificationChannelType
+
+  // Email address or Telegram chat id. Null for IN_APP.
+  destination String? @db.VarChar(255)
+
+  isActive   Boolean   @default(true) @map("is_active")
+  verified   Boolean   @default(false)
+  // Short-lived code the user pastes to the Telegram bot / clicks in email.
+  verifyToken String?  @map("verify_token") @db.VarChar(64)
+  verifyExpiresAt DateTime? @map("verify_expires_at")
+  verifiedAt DateTime? @map("verified_at")
+
+  lastUsedAt   DateTime? @map("last_used_at")
+  failureCount Int       @default(0) @map("failure_count")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user          User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries    NotificationDelivery[]
+
+  @@unique([userId, type])
+  @@index([userId])
+  @@index([verifyToken])
+  @@map("notification_channels")
+}
+
+// The user-visible notification. Also backs the in-app inbox, so it is
+// written even when every external channel fails.
+model Notification {
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+
+  type  String  @db.VarChar(64) // price_alert.triggered | restock | deal | system | seller.competitor_change
+  title String  @db.VarChar(255)
+  body  String  @db.Text
+  // Deep link into the app, e.g. /products/<slug>.
+  url   String?
+
+  // Structured payload (productId, price, threshold, ...) so the frontend can
+  // render a rich card without re-parsing the body text.
+  data Json @default("{}")
+
+  priceAlertId String? @map("price_alert_id")
+
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user       User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  priceAlert PriceAlert?            @relation(fields: [priceAlertId], references: [id], onDelete: SetNull)
+  deliveries NotificationDelivery[]
+
+  // The inbox query is "unread first, newest first, for this user".
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+// Per-channel send attempt. Separate from Notification so one alert that goes
+// to email + Telegram records two independent outcomes and a retry of one
+// does not resend the other.
+model NotificationDelivery {
+  id             String                  @id @default(uuid())
+  notificationId String                  @map("notification_id")
+  channelId      String?                 @map("channel_id")
+  channelType    NotificationChannelType @map("channel_type")
+
+  status       NotificationStatus @default(PENDING)
+  attempts     Int                @default(0)
+  error        String?            @db.Text
+  sentAt       DateTime?          @map("sent_at")
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+
+  notification Notification         @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  channel      NotificationChannel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
+
+  @@unique([notificationId, channelType])
+  @@index([status, createdAt])
+  @@map("notification_deliveries")
 }
