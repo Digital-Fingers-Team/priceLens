@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { OrgRole, OrgType, Organization, Prisma } from '@prisma/client';
+import { OrgRole, OrgType, Organization } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { EntitlementsService } from '../billing/entitlements.service';
 import { UpgradeRequiredException } from '../billing/billing.errors';

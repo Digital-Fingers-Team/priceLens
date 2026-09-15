@@ -5,7 +5,6 @@ import { PrismaService } from '../database/prisma.service';
 import { EntitlementsService } from '../billing/entitlements.service';
 import { PlanLimitExceededException } from '../billing/billing.errors';
 import { isWithinLimit } from '../billing/plan-limits';
-import { PriceIntelligenceService } from '../intelligence/price-intelligence.service';
 import { filterPriceOutliers } from '../intelligence/price-statistics';
 import { OrganizationsService } from './organizations.service';
 import {
@@ -45,7 +44,6 @@ export class SellerProductsService {
     private readonly prisma: PrismaService,
     private readonly organizations: OrganizationsService,
     private readonly entitlements: EntitlementsService,
-    private readonly intelligence: PriceIntelligenceService,
     config: ConfigService,
   ) {
     this.currency = config.get<string>('pricing.fxBaseCurrency', 'EGP');

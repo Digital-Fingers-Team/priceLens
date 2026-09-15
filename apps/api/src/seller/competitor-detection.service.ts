@@ -4,7 +4,6 @@ import {
   CompetitorEventType,
   EventSeverity,
   MatchStatus,
-  OrgRole,
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
