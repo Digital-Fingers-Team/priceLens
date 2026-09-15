@@ -39,12 +39,6 @@ interface HistoryAggregate {
   dayCount: number;
 }
 
-/** Per-alert baseline: what the product cost when the alert was created. */
-interface AlertBaseline {
-  alertId: string;
-  baseline: number | null;
-}
-
 interface TriggerOutcome {
   triggered: boolean;
   /** Filled in only when triggered; drives the notification copy. */
@@ -447,5 +441,3 @@ export class PriceAlertService {
     return map;
   }
 }
-
-export type { AlertBaseline };
