@@ -3,7 +3,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { Heart, User, LogOut, Shield, Menu, X, TrendingUp, Sparkles } from 'lucide-react';
+import { Heart, User, LogOut, Shield, Menu, X, TrendingUp, Sparkles, Building2 } from 'lucide-react';
 import { NotificationBell } from '@/components/notifications/notification-bell';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { useLogout } from '@/lib/hooks/use-auth';
@@ -81,6 +81,12 @@ export function Navbar() {
                 <Link href="/collections">
                   <Button variant="ghost" size="sm">
                     Collections
+                  </Button>
+                </Link>
+
+                <Link href="/seller">
+                  <Button variant="ghost" size="sm" leftIcon={<Building2 className="w-4 h-4" />}>
+                    Seller
                   </Button>
                 </Link>
 
