@@ -10,12 +10,15 @@
 #
 # Two things about this setup are not obvious and both have caused outages:
 #
-#  1. nginx.prod.conf is bind-mounted into the proxy as a single FILE. Anything
-#     that replaces it by rename -- sed -i, mv, most editors -- gives the host
-#     path a new inode while the container keeps the old one, so the edit is
-#     invisible to nginx and the reload silently re-reads the old config. Every
-#     write here truncates in place instead, and the result is read back from
-#     inside the container before anything is reloaded.
+#  1. The live address is written to docker/nginx-upstreams/web.conf, which is
+#     UNTRACKED and lives in a bind-mounted DIRECTORY. It used to be a literal
+#     address inside the tracked nginx.prod.conf, which is bind-mounted as a
+#     single FILE -- and that combination failed twice: a git operation on the
+#     checkout reverted the address to a dead container, and replacing the file
+#     by rename gave the host path a new inode while the container kept the old
+#     one, so reloads silently re-read the old config. A directory mount has
+#     neither problem. Writes still truncate in place, and the result is still
+#     read back from inside the container before anything is reloaded.
 #
 #  2. nginx resolves an upstream hostname once, when the config is loaded, and
 #     on this host it has answered pricelens-web-* with 127.0.53.53 even while
@@ -33,8 +36,8 @@ cd "$ROOT"
 
 NETWORK="pricelens_external"
 PROXY="pricelens-proxy"
-CONF="$ROOT/docker/nginx.prod.conf"
-CONF_IN_PROXY="/etc/nginx/conf.d/default.conf"
+CONF="$ROOT/docker/nginx-upstreams/web.conf"
+CONF_IN_PROXY="/etc/nginx/conf.d/upstreams/web.conf"
 IMAGE="localhost/pricelens_web:latest"
 BOOT_TIMEOUT=180   # seconds to let Next.js come up before giving up
 
@@ -57,7 +60,8 @@ env_value() {
 # The IP is what nginx uses; this name is what tells the next deploy which
 # container is live and therefore which colour to build into.
 current_target() {
-  sed -n 's|.*# web -> \(pricelens-web-[a-z]*\).*|\1|p' "$CONF" | head -1
+  [[ -f "$CONF" ]] || return 0
+  sed -n 's|.*# \(pricelens-web-[a-z]*\).*|\1|p' "$CONF" | head -1
 }
 
 container_ip() {
@@ -67,7 +71,26 @@ container_ip() {
 # Truncate-in-place, never rename -- see note 1 at the top.
 write_conf() {
   local src="$1"
+  mkdir -p "$(dirname "$CONF")"
   cat "$src" > "$CONF"
+}
+
+# The upstream file is untracked, so a fresh clone or a wiped checkout will not
+# have it and nginx would refuse to start on an unknown upstream name. Create a
+# placeholder pointing at whatever is currently running.
+ensure_conf() {
+  [[ -f "$CONF" ]] && return 0
+  warn "$CONF is missing; recreating it"
+  local existing ip
+  for existing in pricelens-web-green pricelens-web-blue pricelens-web; do
+    ip="$(container_ip "$existing" || true)"
+    if [[ -n "$ip" ]]; then
+      mkdir -p "$(dirname "$CONF")"
+      printf 'upstream pricelens_web { server %s:3000; } # %s\n' "$ip" "$existing" > "$CONF"
+      return 0
+    fi
+  done
+  die "no web container is running and $CONF is missing -- nothing to point nginx at"
 }
 
 API_URL="$(env_value NEXT_PUBLIC_API_URL)"
@@ -75,6 +98,8 @@ SITE_URL="$(env_value NEXT_PUBLIC_SITE_URL)"
 [[ -n "$API_URL" && -n "$SITE_URL" ]] || die "NEXT_PUBLIC_API_URL and NEXT_PUBLIC_SITE_URL must be set in .env"
 
 podman container exists "$PROXY" || die "$PROXY is not running; start the stack first"
+
+ensure_conf
 
 if [[ "${1:-}" != "--no-build" ]]; then
   log "building image"
@@ -136,20 +161,15 @@ log "pointing nginx at $idle_ip"
 tmp="$(mktemp)"; trap 'rm -f "$tmp"' EXIT
 cp "$CONF" "$tmp.prev"
 
-# Replace whatever the web upstream currently is -- a name from the original
-# compose config, or an address from a previous deploy -- and stamp the colour.
-# "@" as the delimiter, not "|": the pattern needs "|" for the alternation.
-sed -E "s@proxy_pass http://(web|pricelens-web-[a-z]+|[0-9.]+):3000;.*@proxy_pass http://$idle_ip:3000; # web -> $idle@" \
-  "$CONF" > "$tmp"
-
-grep -q "# web -> $idle" "$tmp" || { rm -f "$tmp.prev"; podman rm -f "$idle" >/dev/null 2>&1 || true; die "could not find the web upstream in $CONF"; }
+# The whole file is one upstream block, so it is rewritten rather than patched.
+printf 'upstream pricelens_web { server %s:3000; } # %s\n' "$idle_ip" "$idle" > "$tmp"
 
 write_conf "$tmp"
 
 # Read it back from inside the container: if the bind mount has come adrift
 # (note 1), nginx is about to reload a config nobody edited, and the deploy
 # would report success while serving the old container -- or nothing at all.
-if ! docker exec "$PROXY" grep -q "# web -> $idle" "$CONF_IN_PROXY" 2>/dev/null; then
+if ! docker exec "$PROXY" grep -q "# $idle" "$CONF_IN_PROXY" 2>/dev/null; then
   write_conf "$tmp.prev"; rm -f "$tmp.prev"
   podman rm -f "$idle" >/dev/null 2>&1 || true
   die "the proxy cannot see edits to $CONF (stale bind mount).

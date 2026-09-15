@@ -61,3 +61,8 @@ build-all.sh
 # TLS material: private keys and the ACME challenge webroot. Certificates are
 # issued on the host, never carried in the repo.
 docker/certbot/
+
+# The live web upstream address, written by scripts/deploy-web.sh on every
+# deploy. Deliberately untracked: it is machine state, not source, and having
+# git able to rewrite it is what took the site down.
+docker/nginx-upstreams/*.conf
