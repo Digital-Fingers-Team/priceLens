@@ -18,7 +18,6 @@ import { PricesModule } from './prices/prices.module';
 import { WorkersModule } from './workers/workers.module';
 import { AffiliateModule } from './affiliate/affiliate.module';
 import { BillingModule } from './billing/billing.module';
-import { FeatureGuard } from './billing/feature.guard';
 import { NotificationsModule } from './notifications/notifications.module';
 import { IntelligenceModule } from './intelligence/intelligence.module';
 import { DealHunterModule } from './deal-hunter/deal-hunter.module';
@@ -124,10 +123,9 @@ import notificationsConfig from './config/notifications.config';
     // registered, every @Throttle decorator in the app is inert and endpoints
     // like login and the scrape-triggering search are unthrottled.
     { provide: APP_GUARD, useClass: ThrottlerGuard },
-    // Enforces @RequiresFeature globally, so a paid feature is gated by a
-    // decorator next to the route rather than by remembering to wire a guard
-    // into each module.
-    { provide: APP_GUARD, useClass: FeatureGuard },
+    // FeatureGuard (@RequiresFeature) is registered in AuthModule, directly
+    // after JwtAuthGuard -- it needs request.user, so it must not run before
+    // authentication has populated it.
   ],
 })
 export class AppModule {}

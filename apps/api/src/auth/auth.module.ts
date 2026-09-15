@@ -12,6 +12,7 @@ import { LocalStrategy } from './strategies/local.strategy';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { FeatureGuard } from '../billing/feature.guard';
 
 @Module({
   imports: [
@@ -30,9 +31,17 @@ import { RolesGuard } from '../common/guards/roles.guard';
     JwtStrategy,
     LocalStrategy,
     JwtRefreshStrategy,
-    // Apply JWT auth globally — use @Public() to opt out
+    // Apply JWT auth globally — use @Public() to opt out.
+    //
+    // Order matters and is load-bearing: global guards run in the order they
+    // are registered, and both RolesGuard and FeatureGuard read request.user,
+    // which only exists once JwtAuthGuard has run. Registering FeatureGuard in
+    // AppModule instead put it AHEAD of this one, so a signed-in user on a
+    // feature-gated route was rejected with 401 "sign in" instead of being
+    // offered an upgrade -- which broke every paywall's upgrade path.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_GUARD, useClass: FeatureGuard },
   ],
   exports: [AuthService, JwtModule],
 })
