@@ -19,9 +19,14 @@ import { MarketQueryDto } from './dto/public-api.dto';
  * Responses use snake_case, unlike the rest of the app: this is a published
  * contract that integrators pin against, and it should look like the REST API
  * it is rather than leaking our internal casing.
+ *
+ * Mounted at /api/v1/partner rather than /api/v1: the app already applies a
+ * global api/v1 prefix, so a 'v1' controller path would publish
+ * /api/v1/v1/..., and mounting at the root would put key-authenticated routes
+ * on the same prefix as the session-authenticated ones.
  */
 @ApiExcludeController()
-@Controller('v1')
+@Controller('partner')
 @Public()
 @SkipThrottle()
 @UseGuards(ApiKeyGuard)
@@ -31,7 +36,7 @@ export class PublicApiController {
     private readonly prisma: PrismaService,
   ) {}
 
-  /** GET /api/v1/v1/products/{sku}/market */
+  /** GET /api/v1/partner/products/{sku}/market */
   @Get('products/:sku/market')
   @RequiresApiScope('market:read')
   getProductMarket(@Param('sku') sku: string, @Query() query: MarketQueryDto) {

@@ -63,8 +63,13 @@ export class SellerController {
     return this.organizations.listMembers(orgId);
   }
 
+  /**
+   * Not gated on a feature flag: the seat *count* is the limit, and
+   * OrganizationsService.addMember already refuses when they are used up.
+   * Requiring FEATURES.TEAM_SEATS here locked the Seller plan out of the
+   * three seats it pays for, because that flag only exists on Enterprise.
+   */
   @Post('workspaces/:orgId/members')
-  @RequiresFeature(FEATURES.TEAM_SEATS)
   addMember(
     @CurrentUser() user: User,
     @Param('orgId', ParseUUIDPipe) orgId: string,
