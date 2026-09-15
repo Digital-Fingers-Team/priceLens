@@ -25,6 +25,26 @@ fi
 # Give Xvfb a moment before Chrome ever tries to attach to it.
 sleep 1
 
+# ─── Database migrations ─────────────────────────────────────────────────────
+# Nothing in the deploy path ran migrations before this, so every schema change
+# had to be remembered and applied by hand -- and a forgotten one surfaces as
+# runtime errors against columns that do not exist.
+#
+# `migrate deploy` is idempotent (it only applies what _prisma_migrations says
+# is outstanding) and never generates or resets anything, so it is safe to run
+# on every boot. It is fatal on failure on purpose: serving traffic against a
+# schema the code does not expect is worse than not starting.
+#
+# Set RUN_MIGRATIONS_ON_START=false when running more than one API replica, and
+# apply migrations as a separate step instead.
+if [ "${RUN_MIGRATIONS_ON_START:-true}" = "true" ]; then
+  echo "Applying database migrations..."
+  if ! node /repo/node_modules/.pnpm/prisma@5.22.0/node_modules/prisma/build/index.js migrate deploy; then
+    echo "Database migration failed — refusing to start." >&2
+    exit 1
+  fi
+fi
+
 cleanup() {
   kill "$XVFB_PID" 2>/dev/null || true
 }
