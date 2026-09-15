@@ -2,7 +2,7 @@
 
 import { CheckCircle2, CircleDashed, Clock, HelpCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { formatPrice } from '@/lib/utils/format';
+import { formatCurrency } from '@/lib/utils/format';
 import { cn } from '@/lib/utils/cn';
 import type { BuyVerdict, CurrentMarket, HistoryStats } from '@/types/intelligence.types';
 
@@ -60,10 +60,10 @@ export function BuyVerdictCard({ verdict, market, history, currency, windowDays 
       {/* The evidence, always. A verdict without its basis is just an opinion. */}
       {history && market.best != null && (
         <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
-          <Stat label="Current" value={formatPrice(market.best, currency)} emphasis />
-          <Stat label={`${windowDays}-day low`} value={formatPrice(history.low, currency)} />
-          <Stat label={`${windowDays}-day average`} value={formatPrice(history.average, currency)} />
-          <Stat label={`${windowDays}-day high`} value={formatPrice(history.high, currency)} />
+          <Stat label="Current" value={formatCurrency(market.best, currency)} emphasis />
+          <Stat label={`${windowDays}-day low`} value={formatCurrency(history.low, currency)} />
+          <Stat label={`${windowDays}-day average`} value={formatCurrency(history.average, currency)} />
+          <Stat label={`${windowDays}-day high`} value={formatCurrency(history.high, currency)} />
         </dl>
       )}
 

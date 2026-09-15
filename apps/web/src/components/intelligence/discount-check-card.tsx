@@ -1,7 +1,7 @@
 'use client';
 
 import { AlertTriangle, BadgeCheck, HelpCircle } from 'lucide-react';
-import { formatPrice } from '@/lib/utils/format';
+import { formatCurrency } from '@/lib/utils/format';
 import type { DiscountCheck } from '@/types/intelligence.types';
 
 /**
@@ -25,13 +25,13 @@ export function DiscountCheckCard({ check, currency }: { check: DiscountCheck; c
               <div>
                 <dt className="text-ink-500">Advertised was</dt>
                 <dd className="mt-0.5 font-semibold tabular-nums text-ink-300 line-through">
-                  {formatPrice(check.advertisedWas ?? 0, currency)}
+                  {formatCurrency(check.advertisedWas ?? 0, currency)}
                 </dd>
               </div>
               <div>
                 <dt className="text-ink-500">Typically sold for</dt>
                 <dd className="mt-0.5 font-semibold tabular-nums text-amber-300">
-                  {formatPrice(check.observedTypicalPrice ?? 0, currency)}
+                  {formatCurrency(check.observedTypicalPrice ?? 0, currency)}
                 </dd>
               </div>
               <div>

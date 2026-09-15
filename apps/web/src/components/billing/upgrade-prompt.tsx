@@ -6,8 +6,11 @@ import { cn } from '@/lib/utils/cn';
 
 interface UpgradePromptProps {
   title: string;
-  /** What they actually get — concrete, not "unlock premium". */
-  description: string;
+  /**
+   * What they actually get — concrete, not "unlock premium". Optional only
+   * for the compact variant, which renders a single line.
+   */
+  description?: string;
   className?: string;
   compact?: boolean;
 }
@@ -51,7 +54,7 @@ export function UpgradePrompt({ title, description, className, compact }: Upgrad
         </div>
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-semibold text-ink-100">{title}</h3>
-          <p className="mt-1 text-sm leading-relaxed text-ink-400">{description}</p>
+          {description && <p className="mt-1 text-sm leading-relaxed text-ink-400">{description}</p>}
           <Link
             href="/pricing"
             className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-200 transition-colors hover:bg-amber-500/25"
