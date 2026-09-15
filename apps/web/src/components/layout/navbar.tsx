@@ -73,6 +73,11 @@ export function Navbar() {
                     Watchlist
                   </Button>
                 </Link>
+                <Link href="/deal-hunter">
+                  <Button variant="ghost" size="sm" leftIcon={<Sparkles className="w-4 h-4" />}>
+                    Deal Hunter
+                  </Button>
+                </Link>
                 <Link href="/collections">
                   <Button variant="ghost" size="sm">
                     Collections
