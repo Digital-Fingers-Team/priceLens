@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { CompetitorEventType, Prisma } from '@prisma/client';
+import { CompetitorEventType, OrgRole, Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { OrganizationsService } from './organizations.service';
 
@@ -122,36 +122,40 @@ export class CompetitorEventsService {
       cooldownHours?: number;
     },
   ) {
-    await this.organizations.requireMembership(userId, orgId, 'ADMIN' as never);
+    await this.organizations.requireMembership(userId, orgId, OrgRole.ADMIN);
 
-    const rule = await this.prisma.competitorAlertRule.upsert({
-      where: {
-        orgId_type_sellerProductId: {
-          orgId,
-          type: input.type,
-          sellerProductId: input.sellerProductId ?? null,
-        },
-      },
-      create: {
-        orgId,
-        type: input.type,
-        thresholdPct: input.thresholdPct ?? 5,
-        sellerProductId: input.sellerProductId ?? null,
-        isActive: input.isActive ?? true,
-        cooldownHours: input.cooldownHours ?? 12,
-      },
-      update: {
-        ...(input.thresholdPct != null ? { thresholdPct: input.thresholdPct } : {}),
-        ...(input.isActive != null ? { isActive: input.isActive } : {}),
-        ...(input.cooldownHours != null ? { cooldownHours: input.cooldownHours } : {}),
-      },
+    // find-then-write rather than upsert: sellerProductId is nullable, and
+    // Prisma's compound-unique `where` type will not accept null for it, so a
+    // catalogue-wide rule (the common case) cannot be addressed by upsert.
+    const existing = await this.prisma.competitorAlertRule.findFirst({
+      where: { orgId, type: input.type, sellerProductId: input.sellerProductId ?? null },
     });
+
+    const rule = existing
+      ? await this.prisma.competitorAlertRule.update({
+          where: { id: existing.id },
+          data: {
+            ...(input.thresholdPct != null ? { thresholdPct: input.thresholdPct } : {}),
+            ...(input.isActive != null ? { isActive: input.isActive } : {}),
+            ...(input.cooldownHours != null ? { cooldownHours: input.cooldownHours } : {}),
+          },
+        })
+      : await this.prisma.competitorAlertRule.create({
+          data: {
+            orgId,
+            type: input.type,
+            thresholdPct: input.thresholdPct ?? 5,
+            sellerProductId: input.sellerProductId ?? null,
+            isActive: input.isActive ?? true,
+            cooldownHours: input.cooldownHours ?? 12,
+          },
+        });
 
     return { id: rule.id, type: rule.type, isActive: rule.isActive };
   }
 
   async deleteRule(userId: string, orgId: string, ruleId: string) {
-    await this.organizations.requireMembership(userId, orgId, 'ADMIN' as never);
+    await this.organizations.requireMembership(userId, orgId, OrgRole.ADMIN);
     const result = await this.prisma.competitorAlertRule.deleteMany({ where: { id: ruleId, orgId } });
     if (result.count === 0) throw new NotFoundException('Rule not found');
   }
