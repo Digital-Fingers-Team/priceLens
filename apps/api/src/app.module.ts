@@ -21,6 +21,7 @@ import { BillingModule } from './billing/billing.module';
 import { FeatureGuard } from './billing/feature.guard';
 import { NotificationsModule } from './notifications/notifications.module';
 import { IntelligenceModule } from './intelligence/intelligence.module';
+import { DealHunterModule } from './deal-hunter/deal-hunter.module';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
 import redisConfig from './config/redis.config';
@@ -116,6 +117,7 @@ import notificationsConfig from './config/notifications.config';
     BillingModule,
     NotificationsModule,
     IntelligenceModule,
+    DealHunterModule,
   ],
   providers: [
     // ThrottlerModule only supplies configuration — without the guard actually
