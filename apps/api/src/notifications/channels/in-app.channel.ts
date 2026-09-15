@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { NotificationChannelType } from '@prisma/client';
-import { DeliveryResult, NotificationChannelDriver, OutboundNotification } from './notification-channel.interface';
+import { DeliveryResult, NotificationChannelDriver } from './notification-channel.interface';
 
 /**
  * The in-app inbox.
@@ -18,7 +18,9 @@ export class InAppChannel implements NotificationChannelDriver {
     return true;
   }
 
-  async send(_destination: string, _notification: OutboundNotification): Promise<DeliveryResult> {
+  // Takes no arguments on purpose: there is nothing to deliver to. A function
+  // of fewer parameters still satisfies the driver interface.
+  async send(): Promise<DeliveryResult> {
     return { ok: true };
   }
 }
