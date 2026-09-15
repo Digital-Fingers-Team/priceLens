@@ -99,6 +99,8 @@ function mapProductNode(
 
   const offer = resolvePrimaryOffer(node.offers);
   const availability = asString(offer?.availability);
+  const price = asNumber(offer?.price ?? offer?.lowPrice ?? offer?.highPrice);
+  const advertisedPrice = extractListPrice(offer, price);
   const aggregateRating = asObject(node.aggregateRating);
   const brand = extractBrand(node.brand);
 
@@ -106,7 +108,8 @@ function mapProductNode(
     externalId,
     externalUrl: url,
     title,
-    priceUsd: asNumber(offer?.price ?? offer?.lowPrice ?? offer?.highPrice),
+    priceUsd: price,
+    advertisedPrice,
     currency: asString(offer?.priceCurrency) ?? defaultCurrency,
     brand,
     model: asString(node.model),
@@ -125,6 +128,46 @@ function mapProductNode(
     },
     raw: node,
   };
+}
+
+/**
+ * The advertised "was" price, when the markup states one explicitly.
+ *
+ * Only an explicit ListPrice/StrikethroughPrice priceSpecification counts.
+ * An AggregateOffer's `highPrice` is deliberately NOT used: it means "the
+ * dearest seller in this aggregate", not "what this product used to cost", and
+ * treating it as a previous price would manufacture discounts that were never
+ * claimed -- the exact failure mode fake-sale detection exists to catch.
+ *
+ * Returns null unless a higher list price is genuinely published.
+ */
+function extractListPrice(offer: Record<string, unknown> | null, price: number | null): number | null {
+  if (!offer || price == null) return null;
+
+  const specs = Array.isArray(offer.priceSpecification)
+    ? offer.priceSpecification
+    : offer.priceSpecification
+      ? [offer.priceSpecification]
+      : [];
+
+  for (const entry of specs) {
+    const spec = asObject(entry);
+    if (!spec) continue;
+
+    const type = asString(spec['@type'])?.toLowerCase() ?? '';
+    const isListPrice =
+      type.includes('listprice') ||
+      type.includes('strikethrough') ||
+      asString(spec.priceType)?.toLowerCase().includes('list') === true;
+    if (!isListPrice) continue;
+
+    const value = asNumber(spec.price);
+    // A "was" price at or below the live price is not a discount; ignore it
+    // rather than reporting a zero or negative saving.
+    if (value != null && value > price) return value;
+  }
+
+  return null;
 }
 
 function resolvePrimaryOffer(offers: unknown): Record<string, unknown> | null {

@@ -263,6 +263,17 @@ model SourceListing {
   extractedModel      String?  @map("extracted_model")
   extractedAttributes Json     @default("{}") @map("extracted_attributes")
   priceUsd            Decimal? @map("price_usd") @db.Decimal(12, 2)
+
+  // The struck-through "was" price the store advertises next to the live one,
+  // normalised to the same base currency as priceUsd.
+  //
+  // Deliberately NOT PriceHistory.originalPrice: despite the name, that column
+  // holds the store's raw pre-FX price, which is the same price in another
+  // currency rather than a previous one. Fake-discount detection needs a real
+  // advertised RRP, and null (no discount claimed) is the honest default --
+  // only connectors that can actually read one populate this.
+  advertisedPrice     Decimal? @map("advertised_price") @db.Decimal(12, 2)
+
   inStock             Boolean? @map("in_stock")
   rating              Float?
   reviewCount         Int?     @map("review_count")

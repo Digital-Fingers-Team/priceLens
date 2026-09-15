@@ -10,6 +10,15 @@ export interface RetailerListing {
   externalUrl: string;
   title: string;
   priceUsd: number | null;
+  /**
+   * The store's advertised "was" price, in the same currency as priceUsd.
+   *
+   * Only set when the store genuinely publishes a higher struck-through
+   * price. Leaving it null means "no discount claimed", which is what
+   * fake-discount detection needs in order to stay honest -- do not default
+   * it to the live price.
+   */
+  advertisedPrice?: number | null;
   currency: string;
   brand: string | null;
   model: string | null;

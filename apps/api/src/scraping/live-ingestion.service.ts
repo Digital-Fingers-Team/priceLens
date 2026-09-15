@@ -889,6 +889,16 @@ export class LiveIngestionService {
     const normalizedPrice =
       listing.priceUsd != null ? await this.fxRates.convert(listing.priceUsd, listing.currency) : null;
 
+    // The advertised "was" price, normalised the same way so it is comparable
+    // with priceUsd. Only kept when it is genuinely above the live price --
+    // anything else is not a discount claim and must not be stored as one.
+    const advertisedPrice =
+      listing.advertisedPrice != null && normalizedPrice != null
+        ? await this.fxRates
+            .convert(listing.advertisedPrice, listing.currency)
+            .then((value) => (value != null && value > normalizedPrice ? value : null))
+        : null;
+
     const canonicalMatch = await this.findCanonicalMatch(category.id, normalized, extracted, listing);
     const matchedExistingCanonicalProduct = !!canonicalMatch;
 
@@ -924,6 +934,7 @@ export class LiveIngestionService {
         extractedModel: extracted.model ?? listing.model,
         extractedAttributes: this.toJson(extracted),
         priceUsd: this.toDbDecimal(normalizedPrice),
+        advertisedPrice: this.toDbDecimal(advertisedPrice),
         inStock: listing.inStock,
         rating: listing.rating,
         reviewCount: listing.reviewCount,
@@ -952,6 +963,7 @@ export class LiveIngestionService {
         extractedModel: extracted.model ?? listing.model,
         extractedAttributes: this.toJson(extracted),
         priceUsd: this.toDbDecimal(normalizedPrice),
+        advertisedPrice: this.toDbDecimal(advertisedPrice),
         inStock: listing.inStock,
         rating: listing.rating,
         reviewCount: listing.reviewCount,

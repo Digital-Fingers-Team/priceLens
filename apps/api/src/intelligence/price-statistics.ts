@@ -38,6 +38,105 @@ export interface HistoryStats {
   lastDate: string;
 }
 
+/** One recorded price change, as stored. */
+export interface PriceChangePoint {
+  sourceListingId: string;
+  /** Start of the day the price was recorded, as YYYY-MM-DD. */
+  date: string;
+  price: number;
+  inStock: boolean;
+}
+
+/**
+ * Expands change-only price history into a real daily series.
+ *
+ * PriceHistory only gets a row when a listing's price actually *changes*
+ * (see LiveIngestionService.appendPriceHistory) — a sensible storage choice,
+ * but it makes the raw rows useless as a statistical sample: a product that
+ * sat at 20,000 for sixty days has a single row, so counting rows would call
+ * that "one day of history" and weight it the same as a price that bounced
+ * daily. Percentiles computed over change events answer "how do the changes
+ * rank", when the question is "how did the price rank over time".
+ *
+ * So each listing's last known price is carried forward day by day, and the
+ * daily figure is the cheapest across listings — the price a shopper would
+ * actually have paid that day. Nothing is invented: the fill never starts
+ * before the first price we recorded for a listing, and a listing that did
+ * not exist yet simply does not contribute to that day.
+ */
+export function forwardFillDailySeries(
+  changes: PriceChangePoint[],
+  options: { from: string; to: string },
+): DailyPricePoint[] {
+  if (changes.length === 0) return [];
+
+  const byListing = new Map<string, PriceChangePoint[]>();
+  for (const change of changes) {
+    const bucket = byListing.get(change.sourceListingId);
+    if (bucket) bucket.push(change);
+    else byListing.set(change.sourceListingId, [change]);
+  }
+  for (const bucket of byListing.values()) {
+    bucket.sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  const startMs = Date.parse(`${options.from}T00:00:00Z`);
+  const endMs = Date.parse(`${options.to}T00:00:00Z`);
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) return [];
+
+  // A guard against an absurd range producing an unbounded loop.
+  const MAX_DAYS = 2000;
+  const series: DailyPricePoint[] = [];
+
+  // Cursor per listing, so the whole expansion is a single linear pass rather
+  // than a scan of every change on every day.
+  const cursors = new Map<string, { index: number; price: number | null; inStock: boolean }>();
+  for (const listingId of byListing.keys()) {
+    cursors.set(listingId, { index: 0, price: null, inStock: true });
+  }
+
+  for (let dayMs = startMs, guard = 0; dayMs <= endMs && guard < MAX_DAYS; dayMs += 86_400_000, guard += 1) {
+    const date = new Date(dayMs).toISOString().slice(0, 10);
+    const prices: number[] = [];
+    let anyInStock = false;
+    let sawStockSignal = false;
+
+    for (const [listingId, bucket] of byListing) {
+      const cursor = cursors.get(listingId)!;
+
+      // Advance through every change recorded on or before this day.
+      while (cursor.index < bucket.length && bucket[cursor.index].date <= date) {
+        cursor.price = bucket[cursor.index].price;
+        cursor.inStock = bucket[cursor.index].inStock;
+        cursor.index += 1;
+      }
+
+      // Null means this listing had not been seen yet on this day; it must
+      // not contribute, rather than contributing a guessed price.
+      if (cursor.price == null) continue;
+
+      prices.push(cursor.price);
+      sawStockSignal = true;
+      if (cursor.inStock) anyInStock = true;
+    }
+
+    if (prices.length === 0) continue;
+
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    series.push({
+      date,
+      min,
+      max,
+      avg: prices.reduce((sum, value) => sum + value, 0) / prices.length,
+      count: prices.length,
+      inStock: sawStockSignal ? anyInStock : true,
+    });
+  }
+
+  return series;
+}
+
 export function median(values: number[]): number | null {
   if (values.length === 0) return null;
   const sorted = [...values].sort((a, b) => a - b);

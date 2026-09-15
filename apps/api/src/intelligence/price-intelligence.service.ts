@@ -8,9 +8,11 @@ import {
   DailyPricePoint,
   DiscountCheck,
   HistoryStats,
+  PriceChangePoint,
   computeBuyVerdict,
   computeHistoryStats,
   detectMisleadingDiscount,
+  forwardFillDailySeries,
 } from './price-statistics';
 import { DealScoreResult, computeDealScore } from './deal-score';
 
@@ -110,38 +112,77 @@ export class PriceIntelligenceService {
   }
 
   /**
-   * One row per day: the cheapest price seen that day and whether anything
-   * was in stock. Bounded by the window, so at most ~365 rows come back.
+   * The product's daily price series over the window.
+   *
+   * PriceHistory is *change-only* — a row is written only when a listing's
+   * price actually moves — so the stored rows are not a daily sample and
+   * cannot be grouped by day directly: a price that held steady for two
+   * months would read as a single day of history. The rows are change events;
+   * forwardFillDailySeries turns them into the daily series the statistics
+   * actually need.
+   *
+   * The query deliberately reaches one row further back than the window per
+   * listing, so a listing whose last change predates the window still has a
+   * known price on the window's first day instead of appearing mid-series.
    */
   async getDailySeries(productId: string, days: number): Promise<DailyPricePoint[]> {
-    const since = new Date(Date.now() - Math.max(days, 1) * 86_400_000);
+    const windowDays = Math.max(days, 1);
+    const since = new Date(Date.now() - windowDays * 86_400_000);
 
     const rows = await this.prisma.$queryRaw<
-      Array<{ day: Date; min: Prisma.Decimal; max: Prisma.Decimal; avg: Prisma.Decimal; count: bigint; in_stock: boolean }>
+      Array<{ source_listing_id: string; day: Date; price: Prisma.Decimal; in_stock: boolean }>
     >`
-      SELECT
-        date_trunc('day', ph.recorded_at)::date AS day,
-        MIN(ph.price_usd)                        AS min,
-        MAX(ph.price_usd)                        AS max,
-        AVG(ph.price_usd)                        AS avg,
-        COUNT(*)                                 AS count,
-        BOOL_OR(ph.in_stock)                     AS in_stock
-      FROM price_history ph
-      WHERE ph.canonical_product_id = ${productId}
-        AND ph.recorded_at >= ${since}
-        AND ph.price_usd > 0
-      GROUP BY 1
-      ORDER BY 1 ASC
+      WITH listings AS (
+        SELECT DISTINCT source_listing_id
+        FROM price_history
+        WHERE canonical_product_id = ${productId}::text
+      ),
+      -- The last price each listing was known to have *before* the window,
+      -- so day one of the chart is not artificially empty.
+      carried AS (
+        SELECT ph.source_listing_id, ph.recorded_at, ph.price_usd, ph.in_stock
+        FROM listings l
+        CROSS JOIN LATERAL (
+          SELECT ph.source_listing_id, ph.recorded_at, ph.price_usd, ph.in_stock
+          FROM price_history ph
+          WHERE ph.source_listing_id = l.source_listing_id
+            AND ph.recorded_at < ${since}
+            AND ph.price_usd > 0
+          ORDER BY ph.recorded_at DESC
+          LIMIT 1
+        ) ph
+      ),
+      within AS (
+        SELECT ph.source_listing_id, ph.recorded_at, ph.price_usd, ph.in_stock
+        FROM price_history ph
+        WHERE ph.canonical_product_id = ${productId}::text
+          AND ph.recorded_at >= ${since}
+          AND ph.price_usd > 0
+      )
+      SELECT source_listing_id,
+             date_trunc('day', recorded_at)::date AS day,
+             price_usd                            AS price,
+             in_stock
+      FROM (SELECT * FROM carried UNION ALL SELECT * FROM within) combined
+      ORDER BY recorded_at ASC
     `;
 
-    return rows.map((row) => ({
+    if (rows.length === 0) return [];
+
+    const changes: PriceChangePoint[] = rows.map((row) => ({
+      sourceListingId: row.source_listing_id,
       date: row.day.toISOString().slice(0, 10),
-      min: Number(row.min),
-      max: Number(row.max),
-      avg: Number(row.avg),
-      count: Number(row.count),
+      price: Number(row.price),
       inStock: row.in_stock,
     }));
+
+    // Never start the series before the window, even if a carried-forward row
+    // is older; and never project past today.
+    const windowStart = since.toISOString().slice(0, 10);
+    const firstObserved = changes[0].date;
+    const from = firstObserved > windowStart ? firstObserved : windowStart;
+
+    return forwardFillDailySeries(changes, { from, to: new Date().toISOString().slice(0, 10) });
   }
 
   /** Live prices across every store carrying the product. */
@@ -223,24 +264,36 @@ export class PriceIntelligenceService {
   }
 
   /**
-   * The struck-through "was" price the cheapest listing advertises.
+   * The struck-through "was" price a store is currently advertising.
    *
-   * Taken from PriceHistory.originalPrice, which ingestion records alongside
-   * the live price. Null when no store is claiming a discount at all.
+   * IMPORTANT: this is *not* PriceHistory.originalPrice. Despite the name,
+   * that column holds the store's raw, pre-FX-conversion price (see
+   * LiveIngestionService.appendPriceHistory) — for an EGP store it equals the
+   * live price, and for a foreign-currency store it is the same price in a
+   * different currency. Reading it as a recommended retail price would either
+   * find a discount that was never claimed or compare two currencies as if
+   * they were one.
+   *
+   * The real advertised price comes from SourceListing.advertisedPrice, which
+   * connectors populate only where the store actually publishes one. Null —
+   * meaning "no discount is being claimed" — is the correct and common answer,
+   * and is strictly better than a fabricated one.
    */
   private async getAdvertisedPreviousPrice(productId: string): Promise<number | null> {
-    const recent = await this.prisma.priceHistory.findFirst({
+    const listing = await this.prisma.sourceListing.findFirst({
       where: {
         canonicalProductId: productId,
-        originalPrice: { not: null },
-        // Stale "was" prices are not evidence of a current sale.
-        recordedAt: { gte: new Date(Date.now() - 7 * 86_400_000) },
+        advertisedPrice: { not: null },
+        priceUsd: { not: null },
+        matchStatus: { in: ACCEPTED_MATCHES },
+        // A stale "was" price is not evidence of a current sale.
+        lastSeenAt: { gte: new Date(Date.now() - 7 * 86_400_000) },
       },
-      orderBy: { recordedAt: 'desc' },
-      select: { originalPrice: true },
+      orderBy: { priceUsd: 'asc' },
+      select: { advertisedPrice: true },
     });
 
-    const value = recent?.originalPrice ? Number(recent.originalPrice) : null;
+    const value = listing?.advertisedPrice ? Number(listing.advertisedPrice) : null;
     return value && value > 0 ? value : null;
   }
 }
