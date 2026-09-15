@@ -41,7 +41,11 @@ describe('market position', () => {
 
   it('matches the brief’s worked example', () => {
     // Your price 14,999; market median 14,300 -> +4.9%.
-    const position = computeMarketPosition(14_999, competitors(13_900, 14_300, 14_800));
+    //
+    // Five competitors, not three: with only 13,900/14,300/14,800 the seller
+    // is also the most expensive, which is a different (and correct) label.
+    // The brief describes being above the median while still not the dearest.
+    const position = computeMarketPosition(14_999, competitors(13_500, 13_900, 14_300, 14_800, 15_500));
     expect(position.marketMedian).toBe(14_300);
     expect(position.vsMedianPct).toBeCloseTo(4.89, 1);
     expect(position.label).toBe('ABOVE_MARKET');
@@ -70,7 +74,7 @@ describe('market position', () => {
 });
 
 describe('margin-aware pricing', () => {
-  const market = computeMarketPosition(14_999, competitors(13_900, 14_300, 14_800));
+  const market = computeMarketPosition(14_999, competitors(13_500, 13_900, 14_300, 14_800, 15_500));
 
   it('will not recommend without a cost', () => {
     const rec = recommendPrice({
