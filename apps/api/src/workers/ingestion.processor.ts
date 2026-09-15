@@ -6,6 +6,7 @@ import { ReconciliationOptions, ReconciliationService } from '../matching/reconc
 import { PriceAlertService } from '../watchlist/price-alert.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SubscriptionsService } from '../billing/subscriptions.service';
+import { CompetitorDetectionService } from '../seller/competitor-detection.service';
 
 export const INGESTION_QUEUE = 'ingestion';
 export const RUN_LIVE_INGESTION_JOB = 'run-live-ingestion';
@@ -16,6 +17,7 @@ export const RUN_STORE_COVERAGE_SWEEP_JOB = 'run-store-coverage-sweep';
 export const RUN_PRICE_ALERTS_JOB = 'run-price-alerts';
 export const RUN_NOTIFICATION_RETRY_JOB = 'run-notification-retry';
 export const RUN_SUBSCRIPTION_MAINTENANCE_JOB = 'run-subscription-maintenance';
+export const RUN_COMPETITOR_DETECTION_JOB = 'run-competitor-detection';
 
 interface RunQueryIngestionData extends LiveIngestionOptions {
   query: string;
@@ -36,7 +38,25 @@ export class IngestionProcessor {
     private readonly priceAlertService: PriceAlertService,
     private readonly notificationsService: NotificationsService,
     private readonly subscriptionsService: SubscriptionsService,
+    private readonly competitorDetectionService: CompetitorDetectionService,
   ) {}
+
+  /**
+   * Detects competitor price and stock changes for every monitored seller
+   * product. Idempotent: every event carries a deterministic dedupe key, so
+   * an overlapping or re-run sweep records nothing twice.
+   */
+  @Process(RUN_COMPETITOR_DETECTION_JOB)
+  async handleCompetitorDetection() {
+    const result = await this.competitorDetectionService.detectForAllOrganizations();
+    if (result.eventsRecorded > 0) {
+      this.logger.log(
+        `Competitor detection: ${result.productsScanned} product(s), ` +
+          `${result.eventsRecorded} event(s), ${result.notificationsSent} notification(s)`,
+      );
+    }
+    return result;
+  }
 
   /**
    * Retries notification deliveries that failed transiently (SMTP timeout,

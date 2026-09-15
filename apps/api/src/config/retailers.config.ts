@@ -46,6 +46,9 @@ export default registerAs('retailers', () => ({
   notificationRetryCron: process.env.NOTIFICATION_RETRY_CRON ?? '*/15 * * * *',
   // Expires subscriptions whose period elapsed without a renewal webhook.
   subscriptionMaintenanceCron: process.env.SUBSCRIPTION_MAINTENANCE_CRON ?? '17 * * * *',
+  // Competitor detection, offset from the ingestion cron so it reads prices
+  // that have just been refreshed rather than racing the scraper.
+  competitorDetectionCron: process.env.COMPETITOR_DETECTION_CRON ?? '45 */3 * * *',
   storeCoverageSweepBatchSize: parseInt(process.env.STORE_COVERAGE_SWEEP_BATCH_SIZE ?? '100', 10),
   // How long to leave a product alone after the sweep has tried to expand it.
   // Without this, any product that cannot reach the target -- because no other

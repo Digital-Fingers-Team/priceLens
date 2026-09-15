@@ -10,6 +10,7 @@ import {
   RUN_PRICE_ALERTS_JOB,
   RUN_NOTIFICATION_RETRY_JOB,
   RUN_SUBSCRIPTION_MAINTENANCE_JOB,
+  RUN_COMPETITOR_DETECTION_JOB,
 } from './ingestion.processor';
 
 const REPEATABLE_JOB_ID = 'scheduled-live-ingestion';
@@ -18,6 +19,7 @@ const STORE_COVERAGE_SWEEP_JOB_ID = 'scheduled-store-coverage-sweep';
 const PRICE_ALERTS_JOB_ID = 'scheduled-price-alerts';
 const NOTIFICATION_RETRY_JOB_ID = 'scheduled-notification-retry';
 const SUBSCRIPTION_MAINTENANCE_JOB_ID = 'scheduled-subscription-maintenance';
+const COMPETITOR_DETECTION_JOB_ID = 'scheduled-competitor-detection';
 
 @Injectable()
 export class IngestionScheduler implements OnModuleInit {
@@ -79,7 +81,19 @@ export class IngestionScheduler implements OnModuleInit {
       { jobId: SUBSCRIPTION_MAINTENANCE_JOB_ID, repeat: { cron: maintenanceCron } },
     );
 
-    this.logger.log(`Scheduled notification retry (${retryCron}) and subscription maintenance (${maintenanceCron})`);
+    // Runs on the half hour, between ingestion runs, so it reads prices that
+    // have just been refreshed rather than racing the scraper.
+    const detectionCron = this.configService.get<string>('retailers.competitorDetectionCron', '45 */3 * * *');
+    await this.queue.add(
+      RUN_COMPETITOR_DETECTION_JOB,
+      {},
+      { jobId: COMPETITOR_DETECTION_JOB_ID, repeat: { cron: detectionCron } },
+    );
+
+    this.logger.log(
+      `Scheduled notification retry (${retryCron}), subscription maintenance (${maintenanceCron}) ` +
+        `and competitor detection (${detectionCron})`,
+    );
   }
 
   /**
