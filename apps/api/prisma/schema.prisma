@@ -814,6 +814,7 @@ model Organization {
   brandWatches BrandWatch[]
   discoveries ProductDiscovery[]
   reports     MarketReport[]
+  apiKeys     ApiKey[]
 
   @@index([platformId])
   @@map("organizations")
@@ -1068,4 +1069,75 @@ model MarketReport {
   @@unique([orgId, period, periodStart])
   @@index([orgId, periodEnd])
   @@map("market_reports")
+}
+
+// ─── Enterprise API ──────────────────────────────────────────────────────────
+
+// An API credential belonging to a workspace.
+//
+// Only a hash of the secret is stored, exactly as for a password: a leaked
+// database must not hand over working credentials. The plaintext key is
+// returned once, at creation, and never again.
+model ApiKey {
+  id    String @id @default(uuid())
+  orgId String @map("org_id")
+
+  name String @db.VarChar(128)
+
+  /// The public half, shown in the UI so a key can be identified and revoked
+  /// without ever displaying the secret (e.g. "pl_live_7f3a").
+  keyPrefix String @unique @map("key_prefix") @db.VarChar(32)
+
+  /// SHA-256 of the full key. Not bcrypt: this is verified on every API
+  /// request, and a deliberately slow hash would become the rate limit.
+  /// The key is 256 bits of CSPRNG output, so it is not brute-forceable the
+  /// way a human-chosen password is.
+  keyHash String @unique @map("key_hash") @db.VarChar(64)
+
+  /// Coarse permissions, e.g. ["market:read", "events:read"].
+  scopes String[] @default([])
+
+  isActive   Boolean   @default(true) @map("is_active")
+  lastUsedAt DateTime? @map("last_used_at")
+  expiresAt  DateTime? @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  usage        ApiUsage[]
+
+  @@index([orgId, isActive])
+  @@map("api_keys")
+}
+
+// Per-key, per-day, per-endpoint call counts.
+//
+// Aggregated rather than one row per request: an enterprise key at 50k
+// calls/day would otherwise write 50k rows a day purely to answer "how many
+// calls have you made". The daily rollup is what both the rate limit and the
+// usage report actually read.
+model ApiUsage {
+  id       String @id @default(uuid())
+  apiKeyId String @map("api_key_id")
+  orgId    String @map("org_id")
+
+  /// Midnight UTC of the day being counted.
+  day      DateTime @db.Date
+  endpoint String   @db.VarChar(128)
+
+  count        Int @default(0)
+  /// Responses that were not 2xx, so a customer debugging an integration can
+  /// see their own error rate.
+  errorCount   Int @default(0) @map("error_count")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  apiKey ApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@unique([apiKeyId, day, endpoint])
+  @@index([orgId, day])
+  @@map("api_usage")
 }
