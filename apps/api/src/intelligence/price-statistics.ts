@@ -475,3 +475,75 @@ export function detectMisleadingDiscount(
       'which is consistent with the advertised previous price.',
   };
 }
+
+// ─── Outlier filtering ──────────────────────────────────────────────────────
+
+/**
+ * How far from the median a price may sit before it is treated as a mismatch
+ * rather than a bargain.
+ *
+ * Matching is imperfect, and its characteristic failure is pulling an
+ * accessory (a case, a cable, a replacement part) onto a product's page. The
+ * result is a "competitor" at a fraction of the real price, which poisons the
+ * cheapest-price claim, the deal score, and — worst — a seller's pricing
+ * recommendation. 2.5x is wide enough to keep genuine clearance pricing and
+ * genuine premium bundles.
+ */
+export const OUTLIER_RATIO = 2.5;
+
+/** Below this many prices there is no reliable median to judge against. */
+export const MIN_PRICES_FOR_OUTLIER_CHECK = 3;
+
+export interface OutlierFilterResult<T> {
+  kept: T[];
+  /** Excluded entries, so the UI can say what was dropped and why. */
+  excluded: T[];
+  /** The median the decision was made against. */
+  median: number | null;
+}
+
+/**
+ * Drops prices far enough from the median to be almost certainly the wrong
+ * product.
+ *
+ * Uses the median rather than the mean precisely because the mean is what an
+ * outlier destroys. Returns what it removed rather than silently discarding
+ * it: a seller who is told "the cheapest competitor is 4,123" when that is an
+ * accessory loses trust in everything else on the page, and one who is shown
+ * nothing at all cannot tell that we filtered.
+ *
+ * With fewer than MIN_PRICES_FOR_OUTLIER_CHECK entries nothing is excluded --
+ * with two prices there is no way to tell which one is wrong.
+ */
+export function filterPriceOutliers<T>(
+  items: T[],
+  getPrice: (item: T) => number,
+  ratio = OUTLIER_RATIO,
+): OutlierFilterResult<T> {
+  const prices = items.map(getPrice).filter((price) => Number.isFinite(price) && price > 0);
+
+  if (items.length < MIN_PRICES_FOR_OUTLIER_CHECK || prices.length < MIN_PRICES_FOR_OUTLIER_CHECK) {
+    return { kept: items, excluded: [], median: median(prices) };
+  }
+
+  const mid = median(prices);
+  if (mid == null || mid <= 0) return { kept: items, excluded: [], median: null };
+
+  const lower = mid / ratio;
+  const upper = mid * ratio;
+
+  const kept: T[] = [];
+  const excluded: T[] = [];
+
+  for (const item of items) {
+    const price = getPrice(item);
+    if (!Number.isFinite(price) || price <= 0 || price < lower || price > upper) excluded.push(item);
+    else kept.push(item);
+  }
+
+  // Never filter away everything: if the rule would empty the set, the median
+  // itself was untrustworthy and the honest answer is to keep the data as-is.
+  if (kept.length === 0) return { kept: items, excluded: [], median: mid };
+
+  return { kept, excluded, median: mid };
+}

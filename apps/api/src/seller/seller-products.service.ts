@@ -6,7 +6,7 @@ import { EntitlementsService } from '../billing/entitlements.service';
 import { PlanLimitExceededException } from '../billing/billing.errors';
 import { isWithinLimit } from '../billing/plan-limits';
 import { PriceIntelligenceService } from '../intelligence/price-intelligence.service';
-import { computeHistoryStats } from '../intelligence/price-statistics';
+import { filterPriceOutliers } from '../intelligence/price-statistics';
 import { OrganizationsService } from './organizations.service';
 import {
   CompetitorPrice,
@@ -297,6 +297,21 @@ export class SellerProductsService {
         url: listing.externalUrl,
       });
       map.set(listing.canonicalProductId, bucket);
+    }
+
+    // Matching occasionally pulls an accessory onto a product, which shows up
+    // as a "competitor" at a fraction of the real price. Left in, it becomes
+    // the cheapest competitor and drives the pricing recommendation -- the
+    // fastest way to lose a seller's trust. Excluded entries are kept so the
+    // UI can show what was filtered rather than quietly dropping it.
+    for (const [productId, bucket] of map) {
+      const { kept, excluded } = filterPriceOutliers(bucket, (entry) => entry.price);
+      if (excluded.length > 0) {
+        this.logger.debug(
+          `Excluded ${excluded.length} outlier listing(s) from the market for product ${productId}`,
+        );
+      }
+      map.set(productId, kept);
     }
 
     return map;

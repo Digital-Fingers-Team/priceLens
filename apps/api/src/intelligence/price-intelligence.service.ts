@@ -12,6 +12,7 @@ import {
   computeBuyVerdict,
   computeHistoryStats,
   detectMisleadingDiscount,
+  filterPriceOutliers,
   forwardFillDailySeries,
 } from './price-statistics';
 import { DealScoreResult, computeDealScore } from './deal-score';
@@ -283,9 +284,13 @@ export class PriceIntelligenceService {
       _min: { priceUsd: true },
     });
 
-    return rows
+    const prices = rows
       .map((row) => Number(row._min.priceUsd))
       .filter((value) => Number.isFinite(value) && value > 0);
+
+    // A mis-matched accessory would otherwise become the "cheapest store" and
+    // inflate the deal score for a product nobody is actually selling cheaply.
+    return filterPriceOutliers(prices, (price) => price).kept;
   }
 
   /**
