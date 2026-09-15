@@ -200,12 +200,30 @@ for _ in $(seq 1 10); do
 done
 
 if [[ "$served" != 1 ]]; then
-  warn "site did not answer 200 through $idle; rolling back"
-  write_conf "$tmp.prev"
-  docker exec "$PROXY" nginx -s reload || true
+  # Only roll back if there is something alive to roll back TO. Restoring a
+  # config that names a removed container points nginx at nothing and turns a
+  # failed deploy into an outage -- which is precisely what happened once.
+  prev_ip="$(sed -n 's|.*server \([0-9.]*\):3000.*|\1|p' "$tmp.prev" | head -1)"
+  prev_alive=0
+  if [[ -n "$prev_ip" ]] && docker exec "$PROXY" wget -q -T 3 -O /dev/null "http://$prev_ip:3000/" 2>/dev/null; then
+    prev_alive=1
+  fi
+
+  if [[ "$prev_alive" == 1 ]]; then
+    warn "site did not answer 200 through $idle; rolling back"
+    write_conf "$tmp.prev"
+    docker exec "$PROXY" nginx -s reload || true
+    rm -f "$tmp.prev"
+    podman rm -f "$idle" >/dev/null 2>&1 || true
+    die "rolled back to ${active:-the previous upstream}"
+  fi
+
+  # Nothing alive to fall back to: keep the new container serving and say so.
+  # A half-working site beats a config pointing at a container that is gone.
   rm -f "$tmp.prev"
-  podman rm -f "$idle" >/dev/null 2>&1 || true
-  die "rolled back to ${active:-the previous upstream}"
+  die "site did not answer 200 through $idle, and the previous upstream is no
+     longer running -- so the config was NOT rolled back. $idle is still
+     serving on $idle_ip. Check: podman logs --tail 50 $idle"
 fi
 rm -f "$tmp.prev"
 
