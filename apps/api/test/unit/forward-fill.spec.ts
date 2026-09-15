@@ -1,4 +1,5 @@
 import {
+  FILL_GRACE_DAYS,
   PriceChangePoint,
   computeBuyVerdict,
   computeHistoryStats,
@@ -80,6 +81,65 @@ describe('forwardFillDailySeries', () => {
       { from: '2026-01-01', to: '2026-01-02' },
     );
     expect(series.every((point) => point.inStock)).toBe(true);
+  });
+
+  describe('delisted listings', () => {
+    it('stops carrying a listing forward once it is no longer observed', () => {
+      // The failure this guards against: a listing delisted on the 5th would
+      // otherwise keep contributing its price for the rest of the range,
+      // inventing a cheaper market than the one that exists.
+      const series = forwardFillDailySeries(
+        [change('gone', '2026-01-01', 15_000), change('live', '2026-01-01', 20_000)],
+        {
+          from: '2026-01-01',
+          to: '2026-01-20',
+          lastSeenByListing: new Map([
+            ['gone', '2026-01-05'],
+            ['live', '2026-01-20'],
+          ]),
+        },
+      );
+
+      // While it was alive, the cheap listing sets the price.
+      expect(series.find((p) => p.date === '2026-01-03')!.min).toBe(15_000);
+      // After its last observation plus the grace period, it is gone and the
+      // surviving listing sets the price.
+      expect(series.find((p) => p.date === '2026-01-15')!.min).toBe(20_000);
+      expect(series.find((p) => p.date === '2026-01-15')!.count).toBe(1);
+    });
+
+    it('allows a grace period so one failed scrape does not truncate the chart', () => {
+      const series = forwardFillDailySeries([change('a', '2026-01-01', 20_000)], {
+        from: '2026-01-01',
+        to: '2026-01-20',
+        lastSeenByListing: new Map([['a', '2026-01-10']]),
+      });
+
+      const lastDay = series[series.length - 1].date;
+      const expected = new Date(Date.parse('2026-01-10T00:00:00Z') + FILL_GRACE_DAYS * 86_400_000)
+        .toISOString()
+        .slice(0, 10);
+      expect(lastDay).toBe(expected);
+    });
+
+    it('fills to the end of the range when no last-seen data is supplied', () => {
+      // Backwards compatible: a caller without last-seen data behaves as before
+      // rather than silently producing an empty series.
+      const series = forwardFillDailySeries([change('a', '2026-01-01', 20_000)], {
+        from: '2026-01-01',
+        to: '2026-01-10',
+      });
+      expect(series).toHaveLength(10);
+    });
+
+    it('produces no series at all when every listing is long gone', () => {
+      const series = forwardFillDailySeries([change('a', '2026-01-01', 20_000)], {
+        from: '2026-02-01',
+        to: '2026-02-10',
+        lastSeenByListing: new Map([['a', '2026-01-02']]),
+      });
+      expect(series).toEqual([]);
+    });
   });
 
   it('refuses an inverted range instead of looping', () => {

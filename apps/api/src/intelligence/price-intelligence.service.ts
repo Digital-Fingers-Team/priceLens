@@ -130,12 +130,26 @@ export class PriceIntelligenceService {
     const since = new Date(Date.now() - windowDays * 86_400_000);
 
     const rows = await this.prisma.$queryRaw<
-      Array<{ source_listing_id: string; day: Date; price: Prisma.Decimal; in_stock: boolean }>
+      Array<{
+        source_listing_id: string;
+        day: Date;
+        price: Prisma.Decimal;
+        in_stock: boolean;
+        last_seen_at: Date;
+      }>
     >`
       WITH listings AS (
         SELECT DISTINCT source_listing_id
         FROM price_history
         WHERE canonical_product_id = ${productId}::text
+      ),
+      -- How recently each listing was actually observed. A listing that has
+      -- stopped being scraped must stop contributing to the daily price, or
+      -- its final price would be carried forward as if still on sale.
+      seen AS (
+        SELECT sl.id AS source_listing_id, sl.last_seen_at
+        FROM source_listings sl
+        JOIN listings l ON l.source_listing_id = sl.id
       ),
       -- The last price each listing was known to have *before* the window,
       -- so day one of the chart is not artificially empty.
@@ -159,12 +173,14 @@ export class PriceIntelligenceService {
           AND ph.recorded_at >= ${since}
           AND ph.price_usd > 0
       )
-      SELECT source_listing_id,
-             date_trunc('day', recorded_at)::date AS day,
-             price_usd                            AS price,
-             in_stock
-      FROM (SELECT * FROM carried UNION ALL SELECT * FROM within) combined
-      ORDER BY recorded_at ASC
+      SELECT c.source_listing_id,
+             date_trunc('day', c.recorded_at)::date AS day,
+             c.price_usd                            AS price,
+             c.in_stock,
+             s.last_seen_at
+      FROM (SELECT * FROM carried UNION ALL SELECT * FROM within) c
+      JOIN seen s ON s.source_listing_id = c.source_listing_id
+      ORDER BY c.recorded_at ASC
     `;
 
     if (rows.length === 0) return [];
@@ -176,13 +192,22 @@ export class PriceIntelligenceService {
       inStock: row.in_stock,
     }));
 
+    const lastSeenByListing = new Map<string, string>();
+    for (const row of rows) {
+      lastSeenByListing.set(row.source_listing_id, row.last_seen_at.toISOString().slice(0, 10));
+    }
+
     // Never start the series before the window, even if a carried-forward row
     // is older; and never project past today.
     const windowStart = since.toISOString().slice(0, 10);
     const firstObserved = changes[0].date;
     const from = firstObserved > windowStart ? firstObserved : windowStart;
 
-    return forwardFillDailySeries(changes, { from, to: new Date().toISOString().slice(0, 10) });
+    return forwardFillDailySeries(changes, {
+      from,
+      to: new Date().toISOString().slice(0, 10),
+      lastSeenByListing,
+    });
   }
 
   /** Live prices across every store carrying the product. */

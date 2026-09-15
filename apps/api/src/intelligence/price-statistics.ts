@@ -48,6 +48,34 @@ export interface PriceChangePoint {
 }
 
 /**
+ * Grace, in days, between a listing's last successful scrape and the point we
+ * stop carrying its price forward.
+ *
+ * A live listing has lastSeenAt updated on every scrape, so in normal
+ * operation this is never reached. It exists to absorb a transient scrape
+ * failure -- one failed run should not punch a hole in the chart -- while
+ * still ensuring a genuinely delisted product stops contributing within days
+ * rather than indefinitely.
+ */
+export const FILL_GRACE_DAYS = 2;
+
+export interface ForwardFillOptions {
+  from: string;
+  to: string;
+  /**
+   * Last date each listing was actually observed (YYYY-MM-DD).
+   *
+   * Without this, forward fill cannot tell "the price did not change" from
+   * "this listing no longer exists" -- both look like an absence of rows -- and
+   * a delisted listing's final price would be carried forward forever,
+   * understating the real market price and poisoning every verdict built on
+   * it. A listing missing from the map is filled to the end of the range,
+   * which is the correct behaviour when the caller has no last-seen data.
+   */
+  lastSeenByListing?: Map<string, string>;
+}
+
+/**
  * Expands change-only price history into a real daily series.
  *
  * PriceHistory only gets a row when a listing's price actually *changes*
@@ -66,7 +94,7 @@ export interface PriceChangePoint {
  */
 export function forwardFillDailySeries(
   changes: PriceChangePoint[],
-  options: { from: string; to: string },
+  options: ForwardFillOptions,
 ): DailyPricePoint[] {
   if (changes.length === 0) return [];
 
@@ -91,8 +119,18 @@ export function forwardFillDailySeries(
   // Cursor per listing, so the whole expansion is a single linear pass rather
   // than a scan of every change on every day.
   const cursors = new Map<string, { index: number; price: number | null; inStock: boolean }>();
+  // The last day each listing may contribute to, after the grace period.
+  const fillUntil = new Map<string, string>();
   for (const listingId of byListing.keys()) {
     cursors.set(listingId, { index: 0, price: null, inStock: true });
+
+    const lastSeen = options.lastSeenByListing?.get(listingId);
+    if (lastSeen) {
+      const cutoffMs = Date.parse(`${lastSeen}T00:00:00Z`) + FILL_GRACE_DAYS * 86_400_000;
+      if (Number.isFinite(cutoffMs)) {
+        fillUntil.set(listingId, new Date(cutoffMs).toISOString().slice(0, 10));
+      }
+    }
   }
 
   for (let dayMs = startMs, guard = 0; dayMs <= endMs && guard < MAX_DAYS; dayMs += 86_400_000, guard += 1) {
@@ -114,6 +152,12 @@ export function forwardFillDailySeries(
       // Null means this listing had not been seen yet on this day; it must
       // not contribute, rather than contributing a guessed price.
       if (cursor.price == null) continue;
+
+      // Past its last observation (plus grace) the listing is treated as gone.
+      // Carrying a delisted price forward would invent a cheaper market than
+      // the one that actually exists.
+      const cutoff = fillUntil.get(listingId);
+      if (cutoff && date > cutoff) continue;
 
       prices.push(cursor.price);
       sawStockSignal = true;

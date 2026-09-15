@@ -9,6 +9,10 @@ interface RawAmazonCard {
   title: string | null;
   priceLabel: string | null;
   imageUrl: string | null;
+  /** The struck-through "List:" price, when the card shows one. */
+  listPriceLabel: string | null;
+  /** Text Amazon uses to mark a card unavailable, when present. */
+  unavailableLabel: string | null;
 }
 
 /**
@@ -60,11 +64,30 @@ export class AmazonConnector implements RetailerConnector {
           const img = item.querySelector('img.s-image');
           const h2 = item.querySelector('h2');
           const title = img?.getAttribute('alt')?.trim() || h2?.textContent?.trim() || null;
-          const priceEl = item.querySelector('.a-price .a-offscreen');
+          // The live price and the struck-through one are both .a-price, and
+          // are told apart by a-text-price, which Amazon puts only on the
+          // "List:" price. Selecting .a-price blindly would pick whichever
+          // came first in the DOM and could report the was-price as the price.
+          const priceEl = item.querySelector('.a-price:not(.a-text-price) .a-offscreen');
+          const listPriceEl = item.querySelector('.a-price.a-text-price .a-offscreen');
+
+          // Amazon marks unavailable results in the card body rather than with
+          // a stable class, so match the wording. Kept narrow on purpose: a
+          // phrase we do not recognise leaves stock unknown rather than
+          // guessing "available".
+          const bodyText = item.textContent?.toLowerCase() ?? '';
+          const unavailablePhrase = [
+            'currently unavailable',
+            'temporarily out of stock',
+            'out of stock',
+          ].find((phrase) => bodyText.includes(phrase));
+
           return {
             asin: item.getAttribute('data-asin'),
             title,
             priceLabel: priceEl?.textContent?.trim() ?? null,
+            listPriceLabel: listPriceEl?.textContent?.trim() ?? null,
+            unavailableLabel: unavailablePhrase ?? null,
             imageUrl: img?.getAttribute('src') ?? null,
           };
         });
@@ -92,16 +115,25 @@ export class AmazonConnector implements RetailerConnector {
 
     if (!card.asin || !card.title) return null;
 
+    const listPrice = this.parsePriceLabel(card.listPriceLabel).amount;
+
     return {
       externalId: card.asin,
       externalUrl: `${baseUrl.replace(/\/$/, '')}/dp/${card.asin}`,
       title: card.title,
       priceUsd: amount,
+      // Only a genuinely higher struck-through price is a discount claim.
+      advertisedPrice: listPrice != null && amount != null && listPrice > amount ? listPrice : null,
       currency: currency ?? 'EGP',
       brand: null,
       model: null,
       imageUrl: card.imageUrl,
-      inStock: null,
+      // Stock inferred from the search card, which is the only signal a search
+      // scrape has: an explicit unavailability phrase means out of stock; a
+      // buyable price with no such phrase means in stock. Anything else stays
+      // null -- unknown, not "available" -- so downstream restock alerts and
+      // the deal score's availability signal are never fed a guess.
+      inStock: card.unavailableLabel ? false : amount != null ? true : null,
       rating: null,
       reviewCount: null,
       identifiers: { gtin: null, upc: null, ean: null, mpn: null },

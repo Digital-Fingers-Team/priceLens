@@ -7,6 +7,10 @@ import { RetailerListing } from '../interfaces/retailer-listing.interface';
 interface RawNoonCard {
   href: string;
   price: string | null;
+  /** The struck-through was-price, when the card shows one. */
+  wasPrice: string | null;
+  /** Whether the card carries an explicit sold-out badge. */
+  soldOut: boolean;
   title: string | null;
   imageUrl: string | null;
 }
@@ -77,9 +81,21 @@ export class NoonConnector implements RetailerConnector {
 
           const priceEl = anchor.querySelector('[class*="sellingPrice"]');
           const img = anchor.querySelector('img');
+          // Noon renders the struck-through was-price in its own element,
+          // separate from sellingPrice.
+          const wasPriceEl = anchor.querySelector('[class*="preReductionPrice"], [class*="oldPrice"], del');
+
+          // Noon marks sold-out cards with an overlay badge. As with Amazon,
+          // only explicit wording counts -- an unrecognised state leaves stock
+          // unknown rather than assuming it is buyable.
+          const bodyText = anchor.textContent?.toLowerCase() ?? '';
+          const soldOut = bodyText.includes('out of stock') || bodyText.includes('sold out');
+
           out.push({
             href,
             price: priceEl ? priceEl.textContent?.trim() ?? null : null,
+            wasPrice: wasPriceEl ? wasPriceEl.textContent?.trim() ?? null : null,
+            soldOut,
             title: img?.getAttribute('alt') ?? null,
             imageUrl: img?.getAttribute('src') ?? null,
           });
@@ -114,16 +130,22 @@ export class NoonConnector implements RetailerConnector {
     // storing "placeholder" as a fake product title.
     if (!externalId || !title || title.toLowerCase() === 'placeholder') return null;
 
+    const wasPrice = this.parsePrice(card.wasPrice);
+
     return {
       externalId,
       externalUrl: card.href,
       title,
       priceUsd: price,
+      // Only a genuinely higher was-price is a discount claim.
+      advertisedPrice: wasPrice != null && price != null && wasPrice > price ? wasPrice : null,
       currency: 'EGP',
       brand: null,
       model: null,
       imageUrl: card.imageUrl,
-      inStock: null,
+      // See the AmazonConnector note: an explicit sold-out badge means out of
+      // stock, a buyable price means in stock, anything else stays unknown.
+      inStock: card.soldOut ? false : price != null ? true : null,
       rating: null,
       reviewCount: null,
       identifiers: { gtin: null, upc: null, ean: null, mpn: null },
