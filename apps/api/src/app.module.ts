@@ -22,6 +22,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { IntelligenceModule } from './intelligence/intelligence.module';
 import { DealHunterModule } from './deal-hunter/deal-hunter.module';
 import { SellerModule } from './seller/seller.module';
+import { BrandModule } from './brand/brand.module';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
 import redisConfig from './config/redis.config';
@@ -119,6 +120,7 @@ import notificationsConfig from './config/notifications.config';
     IntelligenceModule,
     DealHunterModule,
     SellerModule,
+    BrandModule,
   ],
   providers: [
     // ThrottlerModule only supplies configuration — without the guard actually

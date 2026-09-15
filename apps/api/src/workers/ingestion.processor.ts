@@ -7,6 +7,9 @@ import { PriceAlertService } from '../watchlist/price-alert.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SubscriptionsService } from '../billing/subscriptions.service';
 import { CompetitorDetectionService } from '../seller/competitor-detection.service';
+import { MapMonitoringService } from '../brand/map-monitoring.service';
+import { LaunchDetectionService } from '../brand/launch-detection.service';
+import { MarketReportsService } from '../brand/market-reports.service';
 
 export const INGESTION_QUEUE = 'ingestion';
 export const RUN_LIVE_INGESTION_JOB = 'run-live-ingestion';
@@ -18,6 +21,9 @@ export const RUN_PRICE_ALERTS_JOB = 'run-price-alerts';
 export const RUN_NOTIFICATION_RETRY_JOB = 'run-notification-retry';
 export const RUN_SUBSCRIPTION_MAINTENANCE_JOB = 'run-subscription-maintenance';
 export const RUN_COMPETITOR_DETECTION_JOB = 'run-competitor-detection';
+export const RUN_MAP_SWEEP_JOB = 'run-map-sweep';
+export const RUN_LAUNCH_DETECTION_JOB = 'run-launch-detection';
+export const RUN_WEEKLY_REPORTS_JOB = 'run-weekly-reports';
 
 interface RunQueryIngestionData extends LiveIngestionOptions {
   query: string;
@@ -39,7 +45,38 @@ export class IngestionProcessor {
     private readonly notificationsService: NotificationsService,
     private readonly subscriptionsService: SubscriptionsService,
     private readonly competitorDetectionService: CompetitorDetectionService,
+    private readonly mapMonitoringService: MapMonitoringService,
+    private readonly launchDetectionService: LaunchDetectionService,
+    private readonly marketReportsService: MarketReportsService,
   ) {}
+
+  /** MAP violations. Idempotent: one violation per product/retailer/day. */
+  @Process(RUN_MAP_SWEEP_JOB)
+  async handleMapSweep() {
+    const result = await this.mapMonitoringService.runSweep();
+    if (result.violationsFound > 0) {
+      this.logger.log(
+        `MAP sweep: ${result.violationsFound} violation(s) across ${result.productsChecked} product(s)`,
+      );
+    }
+    return result;
+  }
+
+  /** Products appearing for the first time in a watched brand or category. */
+  @Process(RUN_LAUNCH_DETECTION_JOB)
+  async handleLaunchDetection() {
+    const result = await this.launchDetectionService.runSweep();
+    if (result.productsDiscovered > 0) {
+      this.logger.log(`Launch detection: ${result.productsDiscovered} product(s) discovered`);
+    }
+    return result;
+  }
+
+  /** Weekly market reports, generated from recorded data only. */
+  @Process(RUN_WEEKLY_REPORTS_JOB)
+  async handleWeeklyReports() {
+    return this.marketReportsService.generateForAllWorkspaces();
+  }
 
   /**
    * Detects competitor price and stock changes for every monitored seller

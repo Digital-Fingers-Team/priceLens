@@ -11,6 +11,9 @@ import {
   RUN_NOTIFICATION_RETRY_JOB,
   RUN_SUBSCRIPTION_MAINTENANCE_JOB,
   RUN_COMPETITOR_DETECTION_JOB,
+  RUN_MAP_SWEEP_JOB,
+  RUN_LAUNCH_DETECTION_JOB,
+  RUN_WEEKLY_REPORTS_JOB,
 } from './ingestion.processor';
 
 const REPEATABLE_JOB_ID = 'scheduled-live-ingestion';
@@ -20,6 +23,9 @@ const PRICE_ALERTS_JOB_ID = 'scheduled-price-alerts';
 const NOTIFICATION_RETRY_JOB_ID = 'scheduled-notification-retry';
 const SUBSCRIPTION_MAINTENANCE_JOB_ID = 'scheduled-subscription-maintenance';
 const COMPETITOR_DETECTION_JOB_ID = 'scheduled-competitor-detection';
+const MAP_SWEEP_JOB_ID = 'scheduled-map-sweep';
+const LAUNCH_DETECTION_JOB_ID = 'scheduled-launch-detection';
+const WEEKLY_REPORTS_JOB_ID = 'scheduled-weekly-reports';
 
 @Injectable()
 export class IngestionScheduler implements OnModuleInit {
@@ -90,9 +96,30 @@ export class IngestionScheduler implements OnModuleInit {
       { jobId: COMPETITOR_DETECTION_JOB_ID, repeat: { cron: detectionCron } },
     );
 
+    // Brand-side sweeps. All three are idempotent and cheap when no brand
+    // workspace exists, so they are not behind a feature flag.
+    const mapCron = this.configService.get<string>('retailers.mapSweepCron', '50 */3 * * *');
+    await this.queue.add(RUN_MAP_SWEEP_JOB, {}, { jobId: MAP_SWEEP_JOB_ID, repeat: { cron: mapCron } });
+
+    const launchCron = this.configService.get<string>('retailers.launchDetectionCron', '20 */6 * * *');
+    await this.queue.add(
+      RUN_LAUNCH_DETECTION_JOB,
+      {},
+      { jobId: LAUNCH_DETECTION_JOB_ID, repeat: { cron: launchCron } },
+    );
+
+    // Monday morning, covering the week that just ended.
+    const reportsCron = this.configService.get<string>('retailers.weeklyReportsCron', '0 6 * * 1');
+    await this.queue.add(
+      RUN_WEEKLY_REPORTS_JOB,
+      {},
+      { jobId: WEEKLY_REPORTS_JOB_ID, repeat: { cron: reportsCron } },
+    );
+
     this.logger.log(
-      `Scheduled notification retry (${retryCron}), subscription maintenance (${maintenanceCron}) ` +
-        `and competitor detection (${detectionCron})`,
+      `Scheduled notification retry (${retryCron}), subscription maintenance (${maintenanceCron}), ` +
+        `competitor detection (${detectionCron}), MAP sweep (${mapCron}), ` +
+        `launch detection (${launchCron}) and weekly reports (${reportsCron})`,
     );
   }
 

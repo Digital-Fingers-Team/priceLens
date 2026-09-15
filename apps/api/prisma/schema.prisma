@@ -156,6 +156,7 @@ model Category {
   searchTerms String[] @map("search_terms")
   createdAt   DateTime @default(now()) @map("created_at")
 
+  brandWatches BrandWatch[]
   parent   Category?          @relation("CategoryTree", fields: [parentId], references: [id])
   children Category[]         @relation("CategoryTree")
   products CanonicalProduct[]
@@ -233,6 +234,7 @@ model CanonicalProduct {
   affiliateClicks  AffiliateClick[]
   sellerProducts   SellerProduct[]
   competitorEvents CompetitorEvent[]
+  discoveries      ProductDiscovery[]
 
   @@index([categoryId])
   @@index([brand, model])
@@ -805,10 +807,13 @@ model Organization {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   platform  Platform?            @relation(fields: [platformId], references: [id], onDelete: SetNull)
-  members   OrganizationMember[]
-  products  SellerProduct[]
-  events    CompetitorEvent[]
-  alertRules CompetitorAlertRule[]
+  members     OrganizationMember[]
+  products    SellerProduct[]
+  events      CompetitorEvent[]
+  alertRules  CompetitorAlertRule[]
+  brandWatches BrandWatch[]
+  discoveries ProductDiscovery[]
+  reports     MarketReport[]
 
   @@index([platformId])
   @@map("organizations")
@@ -877,6 +882,7 @@ enum CompetitorEventType {
   OUT_OF_STOCK
   BACK_IN_STOCK
   NEW_ENTRANT // a store started carrying this product
+  NEW_PRODUCT // a product we had never seen appeared in a watched brand
   UNUSUAL_MOVEMENT // a move far outside this product's normal volatility
   MAP_VIOLATION // advertised below the brand's minimum (stage 4)
 }
@@ -969,4 +975,97 @@ model CompetitorAlertRule {
   @@unique([orgId, type, sellerProductId])
   @@index([orgId, isActive])
   @@map("competitor_alert_rules")
+}
+
+// ─── Brand / manufacturer monitoring ─────────────────────────────────────────
+
+// What a brand workspace watches: its own brand, and the competing brands it
+// wants tracked alongside. Scoped to a category when a brand only cares about
+// part of its range.
+model BrandWatch {
+  id    String @id @default(uuid())
+  orgId String @map("org_id")
+
+  /// Brand name as it appears on canonical products. Matched
+  /// case-insensitively, because scraped brand strings are inconsistent.
+  brand String @db.VarChar(128)
+
+  /// Narrow the watch to one category. Null watches the brand everywhere.
+  categoryId String? @map("category_id")
+
+  /// Ours vs theirs. Distribution and MAP reporting only apply to our own
+  /// brand; competitor brands feed the comparison and launch detection.
+  isOwnBrand Boolean @default(false) @map("is_own_brand")
+
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  category     Category?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@unique([orgId, brand, categoryId])
+  @@index([orgId, isActive])
+  @@map("brand_watches")
+}
+
+// A product we observed for the first time inside a watched brand/category.
+//
+// Separate from CanonicalProduct.createdAt because "new" is per-workspace:
+// a product that predates a brand's subscription is not news to them, and
+// each org needs its own notified state.
+model ProductDiscovery {
+  id    String @id @default(uuid())
+  orgId String @map("org_id")
+
+  canonicalProductId String @map("canonical_product_id")
+
+  /// Denormalised so a report can be rendered without rejoining, and stays
+  /// truthful even if the product is later re-categorised or re-branded.
+  brand        String?  @db.VarChar(128)
+  categoryName String?  @map("category_name") @db.VarChar(128)
+  firstPrice   Decimal? @map("first_price") @db.Decimal(12, 2)
+  firstStore   String?  @map("first_store") @db.VarChar(128)
+
+  /// When PriceLens first saw it, which is the only "new" we can honestly
+  /// claim -- it is not necessarily when the product launched.
+  firstDetectedAt DateTime  @default(now()) @map("first_detected_at")
+  notifiedAt      DateTime? @map("notified_at")
+
+  organization     Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  canonicalProduct CanonicalProduct @relation(fields: [canonicalProductId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, canonicalProductId])
+  @@index([orgId, firstDetectedAt])
+  @@map("product_discoveries")
+}
+
+enum ReportPeriod {
+  WEEKLY
+  MONTHLY
+}
+
+// A generated market report.
+//
+// The rendered figures are stored rather than recomputed on open: a report
+// dated last Tuesday must keep saying what was true last Tuesday, even after
+// prices move. Regenerating it later would quietly rewrite history.
+model MarketReport {
+  id    String @id @default(uuid())
+  orgId String @map("org_id")
+
+  period      ReportPeriod
+  periodStart DateTime     @map("period_start")
+  periodEnd   DateTime     @map("period_end")
+
+  /// The full rendered report -- see MarketReportPayload in the service.
+  payload Json @default("{}")
+
+  generatedAt DateTime @default(now()) @map("generated_at")
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  // One report per org per period, so a re-run replaces nothing silently.
+  @@unique([orgId, period, periodStart])
+  @@index([orgId, periodEnd])
+  @@map("market_reports")
 }

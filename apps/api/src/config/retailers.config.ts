@@ -49,6 +49,11 @@ export default registerAs('retailers', () => ({
   // Competitor detection, offset from the ingestion cron so it reads prices
   // that have just been refreshed rather than racing the scraper.
   competitorDetectionCron: process.env.COMPETITOR_DETECTION_CRON ?? '45 */3 * * *',
+  // Brand-side sweeps, staggered after competitor detection.
+  mapSweepCron: process.env.MAP_SWEEP_CRON ?? '50 */3 * * *',
+  launchDetectionCron: process.env.LAUNCH_DETECTION_CRON ?? '20 */6 * * *',
+  // Monday morning, covering the week that just ended.
+  weeklyReportsCron: process.env.WEEKLY_REPORTS_CRON ?? '0 6 * * 1',
   storeCoverageSweepBatchSize: parseInt(process.env.STORE_COVERAGE_SWEEP_BATCH_SIZE ?? '100', 10),
   // How long to leave a product alone after the sweep has tried to expand it.
   // Without this, any product that cannot reach the target -- because no other
