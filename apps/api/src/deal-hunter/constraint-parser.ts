@@ -208,7 +208,11 @@ function extractSpecs(text: string): { specs: SpecConstraint[]; consumed: string
   }
 
   // Screen size: 15.6", 15.6 inch, 55-inch.
-  for (const match of text.matchAll(/\b(\d{2}(?:\.\d)?)\s*(?:"|''|inch|inches|-inch)\b/gi)) {
+  //
+  // The word forms carry their own trailing \b; the quote forms must not,
+  // because a quote is not a word character and \b would then require a word
+  // character after it -- so `15.6"` (followed by a space) never matched.
+  for (const match of text.matchAll(/\b(\d{2}(?:\.\d)?)\s*(?:''|"|-?\s?inch(?:es)?\b)/gi)) {
     add('displaySize', `${match[1]} inch`, match[0]);
   }
 
