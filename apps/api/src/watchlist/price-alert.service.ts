@@ -337,7 +337,7 @@ export class PriceAlertService {
         BOOL_OR(sl.in_stock)              AS in_stock,
         COUNT(DISTINCT sl.platform_id)    AS store_count
       FROM source_listings sl
-      WHERE sl.canonical_product_id = ANY(${productIds}::uuid[])
+      WHERE sl.canonical_product_id = ANY(${productIds}::text[])
         AND sl.price_usd IS NOT NULL
         AND sl.price_usd > 0
         AND sl.match_status IN (${MatchStatus.ACCEPTED}::"MatchStatus", ${MatchStatus.MANUAL_ACCEPT}::"MatchStatus")
@@ -368,7 +368,7 @@ export class PriceAlertService {
           date_trunc('day', ph.recorded_at)::date  AS day,
           MIN(ph.price_usd)                        AS day_min
         FROM price_history ph
-        WHERE ph.canonical_product_id = ANY(${productIds}::uuid[])
+        WHERE ph.canonical_product_id = ANY(${productIds}::text[])
           AND ph.price_usd > 0
           AND ph.recorded_at >= NOW() - INTERVAL '90 days'
         GROUP BY 1, 2
@@ -412,8 +412,8 @@ export class PriceAlertService {
     const rows = await this.prisma.$queryRaw<Array<{ alert_id: string; baseline: Prisma.Decimal | null }>>`
       WITH wanted AS (
         SELECT * FROM UNNEST(
-          ${alertIds}::uuid[],
-          ${productIds}::uuid[],
+          ${alertIds}::text[],
+          ${productIds}::text[],
           ${createdAts}::timestamp[]
         ) AS t(alert_id, product_id, created_at)
       )

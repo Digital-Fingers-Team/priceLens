@@ -127,7 +127,7 @@ export class PriceIntelligenceService {
         COUNT(*)                                 AS count,
         BOOL_OR(ph.in_stock)                     AS in_stock
       FROM price_history ph
-      WHERE ph.canonical_product_id = ${productId}::uuid
+      WHERE ph.canonical_product_id = ${productId}
         AND ph.recorded_at >= ${since}
         AND ph.price_usd > 0
       GROUP BY 1
