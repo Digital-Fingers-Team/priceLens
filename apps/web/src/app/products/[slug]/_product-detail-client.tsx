@@ -6,6 +6,7 @@ import { ProductHeaderSkeleton } from '@/components/product/product-header-skele
 import { ListingTable } from '@/components/product/listing-table';
 import { ListingTableSkeleton } from '@/components/product/listing-table-skeleton';
 import { PriceChart } from '@/components/charts/price-chart';
+import { IntelligencePanel } from '@/components/intelligence/intelligence-panel';
 import { PriceChartSkeleton } from '@/components/charts/price-chart-skeleton';
 import { PriceStatsBar } from '@/components/product/price-stats-bar';
 import { Button } from '@/components/ui/button';
@@ -111,6 +112,10 @@ export function ProductDetailClient({ slug, initialProduct }: ProductDetailClien
           week52High={week52?.high ?? null}
           currency={product.priceStats.currency}
         />
+
+        {/* Placed above the chart: the decision ("buy or wait") is what the
+            visitor came for; the chart is the supporting evidence. */}
+        <IntelligencePanel productId={product.id} />
 
         <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
           <div className="xl:col-span-3">

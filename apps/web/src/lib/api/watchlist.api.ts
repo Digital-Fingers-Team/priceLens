@@ -1,5 +1,13 @@
 import { apiClient } from './client';
-import type { WatchlistItem, PriceAlert, AlertType } from '@/types/product.types';
+import type { WatchlistItem, PriceAlert } from '@/types/product.types';
+import type { AlertType } from '@/types/billing.types';
+
+export interface CreateAlertPayload {
+  alertType: AlertType;
+  thresholdValue: number;
+  repeatable?: boolean;
+  cooldownHours?: number;
+}
 import type { ApiResponse } from '@/types/api.types';
 
 export const watchlistApi = {
@@ -25,14 +33,19 @@ export const watchlistApi = {
     return res.data.data;
   },
 
-  createAlert: async (
-    productId: string,
-    alertType: AlertType,
-    thresholdValue: number,
-  ): Promise<PriceAlert> => {
+  createAlert: async (productId: string, payload: CreateAlertPayload): Promise<PriceAlert> => {
     const res = await apiClient.post<ApiResponse<PriceAlert>>(
       `/watchlist/${productId}/alerts`,
-      { alertType, thresholdValue },
+      payload,
+    );
+    return res.data.data;
+  },
+
+  /** Re-arm an alert that has already fired. */
+  reactivateAlert: async (alertId: string): Promise<{ id: string; status: string }> => {
+    const res = await apiClient.post<ApiResponse<{ id: string; status: string }>>(
+      `/watchlist/alerts/${alertId}/reactivate`,
+      {},
     );
     return res.data.data;
   },

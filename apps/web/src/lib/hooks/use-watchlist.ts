@@ -4,7 +4,8 @@ import { QUERY_KEYS } from '@/config/constants';
 import { useUiStore } from '@/lib/store/ui.store';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { getStoredTokens } from '@/lib/api/client';
-import type { AlertType } from '@/types/product.types';
+import { getApiErrorMessage } from '@/lib/utils/api-error';
+import type { CreateAlertPayload } from '@/lib/api/watchlist.api';
 import { isGuestWatched, toggleGuestWatchlist } from '@/lib/utils/guest-watchlist';
 
 export function useWatchlist() {
@@ -107,22 +108,20 @@ export function useCreateAlert() {
   const addToast = useUiStore((s) => s.addToast);
 
   return useMutation({
-    mutationFn: ({
-      productId,
-      alertType,
-      thresholdValue,
-    }: {
-      productId: string;
-      alertType: AlertType;
-      thresholdValue: number;
-    }) => watchlistApi.createAlert(productId, alertType, thresholdValue),
+    mutationFn: ({ productId, ...payload }: { productId: string } & CreateAlertPayload) =>
+      watchlistApi.createAlert(productId, payload),
 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.alerts() });
-      addToast('Price alert created', 'success');
+      // The plan's usage counters move when an alert is created.
+      queryClient.invalidateQueries({ queryKey: ['billing', 'me'] });
+      addToast('Alert set. We will tell you when it fires.', 'success');
     },
 
-    onError: () => addToast('Failed to create alert', 'error'),
+    // Surface the server's message rather than a generic failure: a plan-limit
+    // or upgrade-required response carries the only text that tells the user
+    // what to actually do about it.
+    onError: (err) => addToast(getApiErrorMessage(err, 'Failed to create alert'), 'error'),
   });
 }
 

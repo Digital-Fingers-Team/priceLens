@@ -3,7 +3,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { Heart, User, LogOut, Shield, Menu, X, TrendingUp } from 'lucide-react';
+import { Heart, User, LogOut, Shield, Menu, X, TrendingUp, Sparkles } from 'lucide-react';
+import { NotificationBell } from '@/components/notifications/notification-bell';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { useLogout } from '@/lib/hooks/use-auth';
 import { Button } from '@/components/ui/button';
@@ -78,6 +79,8 @@ export function Navbar() {
                   </Button>
                 </Link>
 
+                <NotificationBell />
+
                 {isAdmin && (
                   <Link href="/admin">
                     <Button variant="ghost" size="sm" leftIcon={<Shield className="w-4 h-4" />}>
@@ -88,9 +91,9 @@ export function Navbar() {
 
                 <div className="w-px h-6 bg-ink-700 mx-1" />
 
-                <span className="text-sm text-ink-400 px-2">
+                <Link href="/account/billing" className="px-2 text-sm text-ink-400 transition-colors hover:text-ink-100">
                   {user?.displayName ?? user?.username}
-                </span>
+                </Link>
 
                 <Button
                   variant="ghost"
@@ -104,6 +107,11 @@ export function Navbar() {
               </>
             ) : (
               <>
+                <Link href="/pricing">
+                  <Button variant="ghost" size="sm" leftIcon={<Sparkles className="w-4 h-4" />}>
+                    Pricing
+                  </Button>
+                </Link>
                 <Link href="/login">
                   <Button variant="ghost" size="sm">Sign in</Button>
                 </Link>
