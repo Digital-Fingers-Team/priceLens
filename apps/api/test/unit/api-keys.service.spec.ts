@@ -10,7 +10,18 @@ function build(options: { features?: string[]; apiCallsPerDay?: number } = {}) {
   const prisma = {
     apiKey: {
       create: jest.fn(async ({ data }: { data: Record<string, unknown> }) => {
-        const row = { id: 'key-1', createdAt: new Date(), ...data };
+        // Prisma applies column defaults on insert; the mock has to as well,
+        // or resolve() sees isActive === undefined and rejects a key the real
+        // database would have accepted.
+        const row = {
+          id: `key-${stored.length + 1}`,
+          createdAt: new Date(),
+          isActive: true,
+          revokedAt: null,
+          expiresAt: null,
+          lastUsedAt: null,
+          ...data,
+        };
         stored.push(row);
         return row;
       }),
