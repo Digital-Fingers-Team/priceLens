@@ -1,3 +1,5 @@
+import type { PlatformRef } from '@pricelens/contracts';
+
 export type ProductTier = 'BUDGET' | 'MID_RANGE' | 'PREMIUM' | 'ULTRA_PREMIUM';
 export type MatchStatus =
   | 'ACCEPTED'
@@ -14,13 +16,8 @@ export interface Category {
   level: number;
 }
 
-export interface Platform {
-  id: string;
-  slug: string;
-  name: string;
-  logoUrl: string | null;
-  baseUrl: string;
-}
+/** A store, as embedded in product responses (shared with the API). */
+export type Platform = PlatformRef;
 
 export interface CanonicalProduct {
   id: string;
@@ -80,55 +77,12 @@ export interface SourceListing {
   lastScrapedAt: string | null;
 }
 
-export interface PriceHistoryPoint {
-  date: string;
-  min: number | null;
-  max: number | null;
-  avg: number | null;
-  count: number;
-}
-
-export interface PriceHistory {
-  productId: string;
-  productTitle: string;
-  days: number;
-  granularity: 'day' | 'week' | 'month';
-  chart: PriceHistoryPoint[];
-  summary: {
-    allTimeMin: number | null;
-    allTimeMax: number | null;
-    periodMin: number | null;
-    periodMax: number | null;
-    avgPrice: number | null;
-    dataPoints: number;
-  };
-  platformBreakdown: Array<{
-    platformId: string;
-    name: string;
-    minPrice: number;
-    maxPrice: number;
-    avgPrice: number;
-  }>;
-}
-
-export interface CurrentPrices {
-  productId: string;
-  listings: Array<{
-    id: string;
-    platform: Platform;
-    price: number;
-    currency: string;
-    url: string;
-    inStock: boolean | null;
-    rating: number | null;
-    reviewCount: number | null;
-    lastSeenAt: string;
-  }>;
-  bestPrice: number | null;
-  worstPrice: number | null;
-  avgPrice: number | null;
-  currency: string;
-}
+// Price responses are defined once, in @pricelens/contracts, and shared with the API.
+export type {
+  PriceHistoryPoint,
+  PriceHistoryResponse as PriceHistory,
+  CurrentPricesResponse as CurrentPrices,
+} from '@pricelens/contracts';
 
 export interface WatchlistItem {
   id: string;

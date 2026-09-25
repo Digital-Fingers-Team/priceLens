@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
+    "@pricelens/contracts": "workspace:*",
     "@tanstack/react-query": "^5.80.0",
     "@tanstack/react-query-devtools": "^5.80.0",
     "axios": "^1.7.0",

@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MatchStatus, Prisma, ProductTier } from '@prisma/client';
 import type { CanonicalProduct, SourceListing } from '@prisma/client';
+import type { CurrentPricesResponse, PriceHistoryResponse } from '@pricelens/contracts';
 import { PrismaService } from '../database/prisma.service';
 import { filterMarketOutliers } from '../intelligence/price-statistics';
 import { IngestionQueue } from '../workers/ingestion-queue.service';
@@ -53,60 +54,6 @@ interface ProductStats {
 interface ProductWithListings {
   sourceListings: Array<{
     priceUsd: unknown;
-  }>;
-}
-
-export interface CurrentPricesResponse {
-  productId: string;
-  listings: Array<{
-    id: string;
-    platform: {
-      id: string;
-      slug: string;
-      name: string;
-      logoUrl: string | null;
-      baseUrl: string;
-    };
-    price: number;
-    currency: string;
-    url: string;
-    inStock: boolean | null;
-    rating: number | null;
-    reviewCount: number | null;
-    lastSeenAt: string;
-  }>;
-  bestPrice: number | null;
-  worstPrice: number | null;
-  avgPrice: number | null;
-  currency: string;
-}
-
-export interface PriceHistoryResponse {
-  productId: string;
-  productTitle: string;
-  days: number;
-  granularity: 'day' | 'week' | 'month';
-  chart: Array<{
-    date: string;
-    min: number | null;
-    max: number | null;
-    avg: number | null;
-    count: number;
-  }>;
-  summary: {
-    allTimeMin: number | null;
-    allTimeMax: number | null;
-    periodMin: number | null;
-    periodMax: number | null;
-    avgPrice: number | null;
-    dataPoints: number;
-  };
-  platformBreakdown: Array<{
-    platformId: string;
-    name: string;
-    minPrice: number;
-    maxPrice: number;
-    avgPrice: number;
   }>;
 }
 

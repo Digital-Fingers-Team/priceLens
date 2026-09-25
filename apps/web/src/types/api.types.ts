@@ -1,27 +1,13 @@
-export interface ApiResponse<T> {
-  success: true;
-  data: T;
-  meta?: Record<string, unknown>;
-}
+// The response envelope is defined once, in @pricelens/contracts, and shared
+// with the API.
+import type { ApiResponse, PaginatedData } from '@pricelens/contracts';
 
-export interface ApiError {
-  success: false;
-  error: {
-    code: string;
-    message: string;
-    details?: unknown;
-    requestId: string;
-    timestamp: string;
-    path: string;
-  };
-}
-
-export interface PaginatedData<T> {
-  items: T[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
+export type {
+  ApiResponse,
+  ApiErrorResponse as ApiError,
+  ApiErrorBody,
+  ApiErrorCode,
+  PaginatedData,
+} from '@pricelens/contracts';
 
 export type PaginatedResponse<T> = ApiResponse<PaginatedData<T>>;

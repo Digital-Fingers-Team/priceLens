@@ -21,6 +21,9 @@ WORKDIR /repo
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
+# Shared type declarations (@pricelens/contracts). Types only, a few KB: the
+# whole package is copied so the filtered install can link it.
+COPY packages/contracts packages/contracts
 
 RUN pnpm config set fetch-timeout 600000 && pnpm config set fetch-retries 5
 
@@ -89,6 +92,9 @@ WORKDIR /repo
 
 COPY --from=build /repo/node_modules /repo/node_modules
 COPY --from=build /repo/apps/api /repo/apps/api
+# Not needed to run the API (type imports are erased), but the unit tests run
+# in this image by deploy-api.sh type-check against it.
+COPY --from=build /repo/packages/contracts /repo/packages/contracts
 
 WORKDIR /repo/apps/api
 

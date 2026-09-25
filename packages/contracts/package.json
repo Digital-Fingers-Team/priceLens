@@ -1,0 +1,16 @@
+{
+  "name": "@pricelens/contracts",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Types shared by the API and the web app: the response envelope, error codes and response shapes. Types only: nothing here exists at runtime.",
+  "types": "index.d.ts",
+  "files": [
+    "*.d.ts"
+  ],
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0"
+  }
+}

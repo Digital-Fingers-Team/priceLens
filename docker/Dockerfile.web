@@ -19,6 +19,8 @@ WORKDIR /repo
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
+# Shared type declarations (@pricelens/contracts), linked by the install.
+COPY packages/contracts packages/contracts
 
 RUN pnpm config set fetch-timeout 600000 && pnpm config set fetch-retries 5
 
@@ -45,6 +47,8 @@ COPY --from=deps /repo/pnpm-workspace.yaml /repo/package.json /repo/pnpm-lock.ya
 
 COPY apps/web/package.json apps/web/package.json
 COPY apps/web apps/web
+# next build type-checks against the shared contracts.
+COPY packages/contracts packages/contracts
 
 # NEXT_PUBLIC_* values are compiled into the Next.js client bundle.
 # Defaults to a same-origin relative path, NOT a localhost URL. A localhost

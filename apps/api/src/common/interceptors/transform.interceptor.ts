@@ -7,12 +7,7 @@ import {
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
-
-export interface ApiResponse<T> {
-  success: true;
-  data: T;
-  meta?: Record<string, unknown>;
-}
+import type { ApiResponse } from '@pricelens/contracts';
 
 @Injectable()
 export class TransformInterceptor<T>
