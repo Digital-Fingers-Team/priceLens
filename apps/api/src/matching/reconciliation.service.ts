@@ -6,6 +6,7 @@ import { PrismaService } from '../database/prisma.service';
 import { FuzzyMatcherService } from './fuzzy-matcher.service';
 import { NormalizerService } from './normalizer.service';
 import { SemanticService } from './semantic.service';
+import { identifiersConflict } from './pipeline';
 
 interface CandidatePair {
   a_id: string;
@@ -39,11 +40,14 @@ export interface ReconciliationReport {
 /**
  * Background pass that re-checks EXISTING canonical products against each other
  * for duplicates and merges them. New listings are deduped at ingestion time
- * (see LiveIngestionService.findMatchViaLocalAi), but products stored before
- * semantic matching existed — or split incorrectly — are never re-examined,
- * which is what leaves so many products showing only "1 store". This job closes
- * that gap by re-running the same embedding + conflict-guard + LLM judgement over
- * the stored catalog and collapsing confirmed duplicates onto one canonical.
+ * (the matching pipeline, src/matching/pipeline), but products stored before
+ * a matcher fix -- or split incorrectly -- are never re-examined, which is what
+ * leaves so many products showing only "1 store". This job closes that gap by
+ * re-running conflict guards + model agreement + LLM judgement over the stored
+ * catalog and collapsing confirmed duplicates onto one canonical.
+ *
+ * Its guards are NOT the pipeline's (step 8): it treats color as a conflict
+ * and skips the product-type and chip guards. See audit 01, A-12.
  */
 @Injectable()
 export class ReconciliationService {
@@ -271,7 +275,7 @@ export class ReconciliationService {
 
     if (this.fuzzyMatcher.detectDisjointModelConflict(a.title, b.title)) return true;
 
-    if (this.hasIdentifierConflict(a, b)) return true;
+    if (identifiersConflict(a, b)) return true;
 
     if (this.fuzzyMatcher.detectConditionConflict(a.title, b.title)) return true;
 
@@ -334,18 +338,6 @@ export class ReconciliationService {
       color: read('color'),
       displaySize: read('displaySize') ?? read('display_size') ?? read('screenSize'),
     };
-  }
-
-  private hasIdentifierConflict(a: CanonicalRow, b: CanonicalRow): boolean {
-    const pairs: Array<[string | null, string | null]> = [
-      [a.gtin, b.gtin],
-      [a.upc, b.upc],
-      [a.ean, b.ean],
-      [a.mpn, b.mpn],
-    ];
-    return pairs.some(
-      ([x, y]) => !!x && !!y && x.trim().toLowerCase() !== y.trim().toLowerCase(),
-    );
   }
 
   /**

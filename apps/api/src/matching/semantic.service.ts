@@ -9,7 +9,6 @@ export class SemanticService {
   private readonly openRouterApiKey: string;
   private readonly openRouterBaseUrl: string;
   private readonly openRouterMatchModel: string;
-  private readonly openRouterEmbedModel: string;
   private readonly openRouterFallbackEnabled: boolean;
 
   constructor(
@@ -19,52 +18,7 @@ export class SemanticService {
     this.openRouterApiKey = this.config.get<string>('search.openRouterApiKey', '');
     this.openRouterBaseUrl = this.config.get<string>('search.openRouterBaseUrl', 'https://openrouter.ai/api/v1');
     this.openRouterMatchModel = this.config.get<string>('search.openRouterMatchModel', 'google/gemini-2.5-flash');
-    this.openRouterEmbedModel = this.config.get<string>('search.openRouterEmbedModel', 'openai/text-embedding-3-small');
     this.openRouterFallbackEnabled = this.config.get<boolean>('search.openRouterFallbackEnabled', true);
-  }
-
-  /**
-   * Generate a text embedding via OpenRouter. This app always needs internet
-   * access anyway (it scrapes live retailer sites), and a local Ollama model
-   * was found to be both slower (competing for RAM/CPU with everything else
-   * running on this machine) and no more useful — matching ranks candidates
-   * by pg_trgm title similarity now, not embeddings, so this is only used to
-   * store a reference embedding on new canonical products.
-   */
-  async embed(text: string): Promise<number[] | null> {
-    if (!this.openRouterFallbackEnabled || !this.openRouterApiKey) {
-      this.logger.warn('Embedding skipped: OpenRouter not configured (OPENROUTER_API_KEY unset or fallback disabled)');
-      return null;
-    }
-
-    try {
-      const response = await fetch(`${this.openRouterBaseUrl}/embeddings`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.openRouterApiKey}`,
-        },
-        body: JSON.stringify({
-          model: this.openRouterEmbedModel,
-          input: text.slice(0, 8000),
-          // Requests 768 dims via the OpenAI `dimensions` param so the vector
-          // fits the existing vector(768) column.
-          dimensions: 768,
-        }),
-        signal: AbortSignal.timeout(30_000),
-      });
-
-      if (!response.ok) {
-        throw new Error(`OpenRouter embeddings HTTP ${response.status}`);
-      }
-
-      const data = (await response.json()) as { data?: Array<{ embedding?: number[] }> };
-      const embedding = data.data?.[0]?.embedding;
-      return Array.isArray(embedding) ? embedding : null;
-    } catch (err) {
-      this.logger.warn(`OpenRouter embedding call failed: ${(err as Error).message}`);
-      return null;
-    }
   }
 
   /**
