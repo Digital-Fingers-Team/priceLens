@@ -84,6 +84,7 @@ export class ApiKeyGuard implements CanActivate {
         {
           statusCode: HttpStatus.TOO_MANY_REQUESTS,
           error: 'QuotaExceeded',
+          code: 'QUOTA_EXCEEDED',
           message: `Daily quota of ${quota.limit} calls exceeded. It resets at 00:00 UTC.`,
           used: quota.used,
           limit: quota.limit,

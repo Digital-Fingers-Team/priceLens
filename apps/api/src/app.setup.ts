@@ -4,10 +4,10 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe, ClassSerializerInterceptor } from '@nestjs/common';
 import helmet from 'helmet';
 import * as compression from 'compression';
-import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
-import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
+import { ApiExceptionFilter } from './common/filters/api-exception.filter';
+import { AppException } from './common/errors/app.exception';
 
 /**
  * Everything that shapes request handling -- routes outside the prefix,
@@ -84,7 +84,7 @@ export function configureApp(app: NestExpressApplication): void {
         callback(null, true);
         return;
       }
-      callback(new Error(`Origin "${origin}" is not allowed by CORS`));
+      callback(new AppException(403, 'CORS_ORIGIN_NOT_ALLOWED', `Origin "${origin}" is not allowed by CORS`));
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -117,8 +117,6 @@ export function configureApp(app: NestExpressApplication): void {
   );
 
   // ─── Global Filters ───────────────────────────────────────────────────────
-  app.useGlobalFilters(
-    new HttpExceptionFilter(),
-    new PrismaExceptionFilter(),
-  );
+  // One filter for every error, so every failure has the same envelope.
+  app.useGlobalFilters(new ApiExceptionFilter());
 }

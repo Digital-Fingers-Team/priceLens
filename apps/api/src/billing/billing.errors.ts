@@ -1,4 +1,5 @@
 import { ForbiddenException, HttpStatus } from '@nestjs/common';
+import type { ApiErrorCode } from '../common/errors/api-error';
 import { FeatureKey } from './plan-limits';
 
 /**
@@ -22,7 +23,7 @@ export class UpgradeRequiredException extends ForbiddenException {
     super({
       statusCode: HttpStatus.FORBIDDEN,
       error: 'UpgradeRequired',
-      code: 'UPGRADE_REQUIRED',
+      code: 'UPGRADE_REQUIRED' satisfies ApiErrorCode,
       message: reason,
       ...details,
     });

@@ -110,6 +110,22 @@ describe('Smoke (e2e)', () => {
     });
   });
 
+  it('errors use one envelope: unknown route, validation, rejected CORS origin', async () => {
+    const http = request(app.getHttpServer());
+    const missing = await http.get('/api/v1/no-such-route').expect(404);
+    expect(missing.body).toMatchObject({ success: false, error: { code: 'NOT_FOUND', path: '/api/v1/no-such-route' } });
+
+    const invalid = await request(app.getHttpServer()).post('/api/v1/auth/register').send({ email: 'not-an-email' }).expect(400);
+    expect(invalid.body.error.code).toBe('BAD_REQUEST');
+    expect(invalid.body.error.details).toEqual(expect.arrayContaining(['email must be an email']));
+
+    const cors = await request(app.getHttpServer())
+      .get('/api/v1/billing/plans')
+      .set('Origin', 'https://evil.example')
+      .expect(403);
+    expect(cors.body).toMatchObject({ success: false, error: { code: 'CORS_ORIGIN_NOT_ALLOWED' } });
+  });
+
   it('search returns the ingested product', async () => {
     const res = await request(app.getHttpServer()).get('/api/v1/search').query({ q: 'iphone 15' }).expect(200);
     const titles: string[] = res.body.data.hits.map((hit: { title: string }) => hit.title);
