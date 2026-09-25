@@ -4,6 +4,7 @@ import type { PrismaClient } from '@prisma/client';
 import { AppModule } from '../../src/app.module';
 import { PrismaService } from '../../src/database/prisma.service';
 import { LiveIngestionService } from '../../src/scraping/live-ingestion.service';
+import { StoreCoverageService } from '../../src/scraping/store-coverage.service';
 import { AmazonConnector } from '../../src/scraping/connectors/amazon.connector';
 import { NoonConnector } from '../../src/scraping/connectors/noon.connector';
 import { JumiaConnector } from '../../src/scraping/connectors/jumia.connector';
@@ -276,14 +277,15 @@ describe('Matching pipeline characterization (e2e)', () => {
     current.overrides = null;
 
     const nokia = await prisma.sourceListing.findFirstOrThrow({ where: { externalId: 'a7' } });
-    await ingestion.expandProductStores(nokia.canonicalProductId!, 3, 5);
+    const coverage = app.get(StoreCoverageService);
+    await coverage.expandProductStores(nokia.canonicalProductId!, 3, 5);
 
     // The catalogue as the pipeline left it. Captured before the coverage
     // sweep: the sweep visits products in an order the database does not fix
     // (ties on store count), so only its totals are pinned down.
     state = await captureState(prisma);
 
-    const sweep = await ingestion.runStoreCoverageSweep(100);
+    const sweep = await coverage.runStoreCoverageSweep(100);
     const stamped = await prisma.canonicalProduct.count({ where: { lastCoverageAttemptAt: { not: null } } });
     reports.coverageSweep = { ...sweep, stamped };
   });

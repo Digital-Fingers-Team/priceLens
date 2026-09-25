@@ -149,7 +149,7 @@ export class IngestionScheduler implements OnModuleInit {
   /**
    * Catches products that fall under minStoresPerProduct without anyone browsing
    * to them -- the reactive triggers (product detail view, search hit) only reach
-   * products someone actually looks at. See LiveIngestionService.runStoreCoverageSweep.
+   * products someone actually looks at. See StoreCoverageService.runStoreCoverageSweep.
    */
   private async scheduleStoreCoverageSweep() {
     if (!this.configService.get<boolean>('retailers.storeCoverageSweepEnabled', true)) {

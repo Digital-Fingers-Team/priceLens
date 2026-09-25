@@ -2,6 +2,7 @@ import { Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bull';
 import { LiveIngestionService, LiveIngestionOptions } from '../scraping/live-ingestion.service';
+import { StoreCoverageService } from '../scraping/store-coverage.service';
 import { ReconciliationOptions, ReconciliationService } from '../matching/reconciliation.service';
 import { PriceAlertService } from '../watchlist/price-alert.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -40,6 +41,7 @@ export class IngestionProcessor {
 
   constructor(
     private readonly liveIngestionService: LiveIngestionService,
+    private readonly storeCoverageService: StoreCoverageService,
     private readonly reconciliationService: ReconciliationService,
     private readonly priceAlertService: PriceAlertService,
     private readonly notificationsService: NotificationsService,
@@ -157,14 +159,14 @@ export class IngestionProcessor {
   async handleRunStoreExpansion(job: Job<RunStoreExpansionData>) {
     const { productId, targetStores } = job.data;
     this.logger.log(`Starting store expansion for product ${productId} (job ${job.id})`);
-    await this.liveIngestionService.expandProductStores(productId, targetStores);
+    await this.storeCoverageService.expandProductStores(productId, targetStores);
     this.logger.log(`Finished store expansion for product ${productId} (job ${job.id})`);
   }
 
   @Process(RUN_STORE_COVERAGE_SWEEP_JOB)
   async handleRunStoreCoverageSweep(job: Job<{ maxProducts?: number }>) {
     this.logger.log(`Starting store coverage sweep (job ${job.id})`);
-    const { scanned, expanded } = await this.liveIngestionService.runStoreCoverageSweep(
+    const { scanned, expanded } = await this.storeCoverageService.runStoreCoverageSweep(
       job.data?.maxProducts,
     );
     this.logger.log(

@@ -2,40 +2,36 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module';
 import { MatchingModule } from '../matching/matching.module';
 import { BrowserSessionService } from './browser/browser-session.service';
-import { AmazonConnector } from './connectors/amazon.connector';
-import { AlibabaConnector } from './connectors/alibaba.connector';
-import { AliExpressConnector } from './connectors/aliexpress.connector';
-import { NoonConnector } from './connectors/noon.connector';
-import { JumiaConnector } from './connectors/jumia.connector';
-import { CarrefourConnector } from './connectors/carrefour.connector';
-import { TwoBConnector } from './connectors/twob.connector';
-import { ElarabyConnector } from './connectors/elaraby.connector';
+import {
+  CONNECTOR_CLASSES,
+  ConnectorRegistry,
+  retailerConnectorsProvider,
+} from './connectors/connector.registry';
+import { IngestionRepository } from './ingestion/ingestion.repository';
+import { ListingProcessor } from './ingestion/listing-processor.service';
 import { LiveIngestionService } from './live-ingestion.service';
+import { StoreCoverageService } from './store-coverage.service';
 
+/**
+ * Store adapters and the ingestion flow built on them.
+ *
+ *   connectors/          one RetailerConnector per store, ConnectorRegistry
+ *   ingestion/           ListingProcessor (pipeline + persistence), repository
+ *   live-ingestion       scheduled sweep, on-demand query run, backfill
+ *   store-coverage       per-product expansion, coverage sweep
+ */
 @Module({
   imports: [DatabaseModule, MatchingModule],
   providers: [
     BrowserSessionService,
-    AmazonConnector,
-    AlibabaConnector,
-    AliExpressConnector,
-    NoonConnector,
-    JumiaConnector,
-    CarrefourConnector,
-    TwoBConnector,
-    ElarabyConnector,
+    ...CONNECTOR_CLASSES,
+    retailerConnectorsProvider,
+    ConnectorRegistry,
+    IngestionRepository,
+    ListingProcessor,
     LiveIngestionService,
+    StoreCoverageService,
   ],
-  exports: [
-    AmazonConnector,
-    AlibabaConnector,
-    AliExpressConnector,
-    NoonConnector,
-    JumiaConnector,
-    CarrefourConnector,
-    TwoBConnector,
-    ElarabyConnector,
-    LiveIngestionService,
-  ],
+  exports: [LiveIngestionService, StoreCoverageService],
 })
 export class ScrapingModule {}

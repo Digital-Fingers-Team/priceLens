@@ -12,26 +12,8 @@ import { Test } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
 import retailersConfig from '../../src/config/retailers.config';
 import { BrowserSessionService } from '../../src/scraping/browser/browser-session.service';
-import { AmazonConnector } from '../../src/scraping/connectors/amazon.connector';
-import { AlibabaConnector } from '../../src/scraping/connectors/alibaba.connector';
-import { AliExpressConnector } from '../../src/scraping/connectors/aliexpress.connector';
-import { NoonConnector } from '../../src/scraping/connectors/noon.connector';
-import { JumiaConnector } from '../../src/scraping/connectors/jumia.connector';
-import { CarrefourConnector } from '../../src/scraping/connectors/carrefour.connector';
-import { TwoBConnector } from '../../src/scraping/connectors/twob.connector';
-import { ElarabyConnector } from '../../src/scraping/connectors/elaraby.connector';
+import { CONNECTOR_CLASSES as CONNECTORS } from '../../src/scraping/connectors/connector.registry';
 import { RetailerConnector } from '../../src/scraping/interfaces/retailer-connector.interface';
-
-const CONNECTORS = [
-  AmazonConnector,
-  AlibabaConnector,
-  AliExpressConnector,
-  NoonConnector,
-  JumiaConnector,
-  CarrefourConnector,
-  TwoBConnector,
-  ElarabyConnector,
-];
 
 async function main() {
   const [storeArg, ...queryArgs] = process.argv.slice(2);
