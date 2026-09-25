@@ -4,8 +4,9 @@ Price comparison for Egyptian stores. PriceLens collects listings from Amazon, N
 
 - `apps/api`: NestJS API plus background workers (Prisma/PostgreSQL + pgvector, Redis, Bull)
 - `apps/web`: Next.js 14 App Router frontend
+- `packages/contracts`: types shared by both (response envelope, error codes, price responses)
 
-See [PROJECT_MAP.md](PROJECT_MAP.md) for the full map (modules, jobs, ports, environment) and `audit/` for the current state of each overhaul phase.
+[ARCHITECTURE.md](ARCHITECTURE.md) explains how it fits together (system, data flow, the matching pipeline, queues), with decisions recorded in [docs/adr](docs/adr/). [PROJECT_MAP.md](PROJECT_MAP.md) is the file-level map (modules, jobs, ports, environment), and `audit/` holds the state of each overhaul phase.
 
 ## Prerequisites
 
@@ -38,9 +39,11 @@ It uses the committed `.env.development`: local values, with **every store conne
 |---|---|---|
 | `pnpm --filter @pricelens/api test:unit` | API unit tests | nothing |
 | `pnpm --filter @pricelens/api test:integration` | Raw SQL and auth against a real database | dev stack |
-| `pnpm --filter @pricelens/api test:e2e` | Smoke: health, a real matching-pipeline run, search, product, auth | dev stack |
+| `pnpm --filter @pricelens/api test:e2e` | Smoke (health, search, product, auth, error envelope) and the matching characterization suite (snapshot of where ~60 listings land) | dev stack |
 | `pnpm --filter @pricelens/web test` | Component tests (Vitest) | nothing |
 | `pnpm --filter @pricelens/web test:e2e` | Browser smoke tests (Playwright), desktop + mobile | `pnpm dev:up` running |
+
+The characterization suite fails on any change to matching outcomes. When a change is deliberate (phase 02 fixes, threshold tuning), update it with `pnpm --filter @pricelens/api test:e2e -u` and review the snapshot diff like code.
 
 API tests load the committed `.env.test`. They **refuse to run** unless the database is local and its name ends in `_test`, so they can never touch a real database. Run `pnpm test:db:migrate` after adding migrations.
 
