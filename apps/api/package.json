@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "postinstall": "[ ! -f prisma/schema.prisma ] || prisma generate",
     "build": "dotenv -e ../../.env -- prisma generate && nest build",
     "dev": "nest start --watch",
     "start": "node dist/src/main",
