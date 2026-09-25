@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MatchStatus, ProductTier, Prisma, ScrapingJobStatus, Platform, Category } from '@prisma/client';
+import type { CanonicalProduct } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { NormalizerService } from '../matching/normalizer.service';
 import { FuzzyMatcherService } from '../matching/fuzzy-matcher.service';
@@ -16,75 +17,25 @@ import { TwoBConnector } from './connectors/twob.connector';
 import { ElarabyConnector } from './connectors/elaraby.connector';
 import { RetailerConnector } from './interfaces/retailer-connector.interface';
 import { RetailerListing } from './interfaces/retailer-listing.interface';
-import { filterMarketOutliers } from '../intelligence/price-statistics';
-
-/**
- * Minimum combined fuzzy score (token overlap + Jaccard + edit similarity) for
- * merging a scraped listing into an existing canonical product from another store.
- * High on purpose: a wrong merge (two different products shown as one) is worse
- * than a missed merge (same product shown twice).
- */
-const FUZZY_MATCH_THRESHOLD = 0.85;
-
-/**
- * Score assigned to a survivor whose extracted model number exactly matches
- * the listing's (see the `modelsAgree` boost below). Kept as a named constant
- * so the auto-accept fast path and the boost that produces this score can't
- * drift apart.
- */
-const MODEL_AGREEMENT_SCORE = 0.95;
-
-/**
- * Listings that are never a real single-unit offer for the product they name:
- * sponsored result cards (Amazon pairs the ad title with some other item's
- * price), and wholesale "bulk order" / MOQ offers, whose title lists several
- * models and whose price is the lowest tier of a range. One of these created
- * an "RTX 5090" product at a fourteenth of the real price and was then shown
- * as its best deal.
- */
-const JUNK_LISTING_PATTERNS: Array<[RegExp, string]> = [
-  [/^\s*sponsored\b/i, 'sponsored result'],
-  [/\bbulk\s+(?:order|buy|purchase|price)\b/i, 'bulk/wholesale offer'],
-  [/\bmoq\b/i, 'bulk/wholesale offer'],
-];
+import {
+  CANDIDATE_POOL_SIZE,
+  CATEGORY_MEDIAN_TTL_MS,
+  CandidateSource,
+  MATCHED_CONFIDENCE,
+  MIN_LISTINGS_FOR_CATEGORY_FLOOR,
+  MatchingTools,
+  NEW_PRODUCT_CONFIDENCE,
+  checkCategorySanity,
+  checkMarketOutlier,
+  detectJunkListing,
+  findCanonicalMatch,
+  hasUsablePrice,
+  identifierLookupClauses,
+  normalizeListing,
+  toBasePrices,
+} from '../matching/pipeline';
 
 const ACCEPTED_STATUSES: MatchStatus[] = [MatchStatus.ACCEPTED, MatchStatus.MANUAL_ACCEPT];
-
-/**
- * A listing priced under this fraction of its category's median is not that
- * kind of product. Most products have a single store, so there is often no
- * other listing to compare a price against -- the category is the only
- * reference. It is a safety net for junk whose title gives nothing away (a
- * replacement screen listed as just "OPPO A35 HD" at 298 EGP); cases and
- * parts that say what they are are caught by the accessory rule first.
- *
- * Kept low because the median it is measured against moves: with the junk
- * cleaned out, the Smartphones median is ~16,900 EGP, so 2.5% (~420) still
- * admits the cheapest real phones (Nokia 105, ~510) with margin, and the
- * Graphics Cards floor (~1,030) the cheapest real cards (~1,600).
- */
-const CATEGORY_PRICE_FLOOR_RATIO = 0.025;
-/** Below this many priced listings a category median is not trusted. */
-const MIN_LISTINGS_FOR_CATEGORY_FLOOR = 50;
-const CATEGORY_MEDIAN_TTL_MS = 60 * 60 * 1000;
-
-/**
- * Categories whose products are devices, where a case, cable or screen is
- * never the product -- store searches for "smartphone" return cases too, and
- * each became a "smartphone" of its own. Left out on purpose: Headphones
- * ("with charging case"), Smart Watches ("aluminium case") and Home
- * Appliances ("stand mixer"), where the accessory words describe the product.
- */
-const DEVICE_CATEGORIES = new Set(['smartphones', 'tablets', 'laptops', 'tvs', 'monitors', 'cpus', 'graphics cards']);
-/**
- * Accessory wording alone is not enough: a real phone "with Free cover" says
- * "cover" too. Accessories are also cheap next to the devices around them, so
- * both must hold -- measured: 15% of the phone median (~2,500 EGP) is above
- * nearly every case and below nearly every phone.
- */
-const DEVICE_ACCESSORY_PRICE_RATIO = 0.15;
-/** Wording only the device itself uses; a cheap feature phone "with charger" is still a phone. */
-const DESCRIBES_DEVICE = /\b(dual[\s-]?sim|keypad|feature\s+phone|\d+\s?gb\s+ram)\b/i;
 
 export interface LiveIngestionOptions {
   platformSlugs?: string[];
@@ -114,6 +65,7 @@ export interface IngestionReport {
 export class LiveIngestionService {
   private readonly logger = new Logger(LiveIngestionService.name);
   private readonly connectorsBySlug: Map<string, RetailerConnector>;
+  private readonly tools: MatchingTools;
 
   /** Guards against two scheduled coverage sweeps overlapping. */
   private coverageSweepInFlight = false;
@@ -154,6 +106,7 @@ export class LiveIngestionService {
       this.elarabyConnector,
     ];
     this.connectorsBySlug = new Map(connectors.map((connector) => [connector.slug, connector]));
+    this.tools = { normalizer: this.normalizer, fuzzy: this.fuzzyMatcher };
   }
 
   async runLiveIngestion(options: LiveIngestionOptions = {}): Promise<IngestionReport> {
@@ -396,7 +349,8 @@ export class LiveIngestionService {
             }
             seenExternalIds.add(listing.externalId);
 
-            if (listing.priceUsd == null || !Number.isFinite(listing.priceUsd) || listing.priceUsd <= 0) {
+            // Step 1: price gate.
+            if (!hasUsablePrice(listing.priceUsd)) {
               this.logger.warn(
                 `Skipping listing "${listing.title}" from ${connector.slug} — no usable price (likely a scrape error, not a real product)`,
               );
@@ -531,7 +485,7 @@ export class LiveIngestionService {
           const summary = summaryBySlug.get(platform.slug);
 
           for (const listing of listings) {
-            if (listing.priceUsd == null || !Number.isFinite(listing.priceUsd) || listing.priceUsd <= 0) {
+            if (!hasUsablePrice(listing.priceUsd)) {
               continue;
             }
 
@@ -654,7 +608,7 @@ export class LiveIngestionService {
         let coveredByThisStore = false;
 
         for (const listing of listings) {
-          if (listing.priceUsd == null || !Number.isFinite(listing.priceUsd) || listing.priceUsd <= 0) {
+          if (!hasUsablePrice(listing.priceUsd)) {
             continue;
           }
 
@@ -928,73 +882,46 @@ export class LiveIngestionService {
     priceHistoryCreated: boolean;
     canonicalProductId: string;
   } | null> {
-    const junk = JUNK_LISTING_PATTERNS.find(([pattern]) => pattern.test(listing.title));
+    // Step 2: junk filter.
+    const junk = detectJunkListing(listing.title);
     if (junk) {
-      await this.rejectListing(platform, listing, junk[1]);
+      await this.rejectListing(platform, listing, junk);
       return null;
     }
 
-    const normalized = this.normalizer.normalizeTitle(listing.title);
-    const extracted = this.normalizer.extractAttributes(listing.title, {
-      brand: listing.brand ?? undefined,
-      model: listing.model ?? undefined,
-      gtin: listing.identifiers.gtin ?? undefined,
-      upc: listing.identifiers.upc ?? undefined,
-      ean: listing.identifiers.ean ?? undefined,
-      mpn: listing.identifiers.mpn ?? undefined,
-    });
+    // Step 3: normalize and extract.
+    const input = normalizeListing(listing, this.tools);
+    const { normalized, extracted } = input;
 
-    // `listing.priceUsd`/`listing.currency` are the raw scraped amount in the
-    // store's own currency (the field name is a historical misnomer — see
-    // RetailerListing). Converted once here to the base currency (EGP) so the
-    // `priceUsd` DB column — used for every cross-store comparison, sort, and
-    // merge decision — is genuinely comparable between e.g. a Carrefour AED
-    // listing and a 2B EGP listing. `rawPrice`/`rawCurrency` below stay
-    // untouched so the store's real, uncoverted price is still shown per-listing.
-    const normalizedPrice =
-      listing.priceUsd != null ? await this.fxRates.convert(listing.priceUsd, listing.currency) : null;
+    // Step 4: currency. `rawPrice`/`rawCurrency` below keep the store's own amount.
+    const { price: normalizedPrice, advertisedPrice } = await toBasePrices(listing, (amount, currency) =>
+      this.fxRates.convert(amount, currency),
+    );
 
-    // The advertised "was" price, normalised the same way so it is comparable
-    // with priceUsd. Only kept when it is genuinely above the live price --
-    // anything else is not a discount claim and must not be stored as one.
-    const advertisedPrice =
-      listing.advertisedPrice != null && normalizedPrice != null
-        ? await this.fxRates
-            .convert(listing.advertisedPrice, listing.currency)
-            .then((value) => (value != null && value > normalizedPrice ? value : null))
-        : null;
-
+    // Step 5: category sanity.
     if (normalizedPrice != null) {
       const categoryMedian = await this.categoryMedianPrice(category.id);
-      if (
-        categoryMedian != null &&
-        DEVICE_CATEGORIES.has(category.name.trim().toLowerCase()) &&
-        normalizedPrice < categoryMedian * DEVICE_ACCESSORY_PRICE_RATIO &&
-        this.normalizer.isAccessory(listing.title) &&
-        !DESCRIBES_DEVICE.test(listing.title)
-      ) {
-        await this.rejectListing(platform, listing, `accessory in the ${category.name} category`);
-        return null;
-      }
-      if (categoryMedian != null && normalizedPrice < categoryMedian * CATEGORY_PRICE_FLOOR_RATIO) {
-        await this.rejectListing(
-          platform,
-          listing,
-          `price ${normalizedPrice} is under ${CATEGORY_PRICE_FLOOR_RATIO * 100}% of the ${category.name} median ${Math.round(categoryMedian)}`,
-        );
+      const insane = checkCategorySanity(
+        { title: listing.title, price: normalizedPrice, categoryName: category.name, categoryMedian },
+        this.tools,
+      );
+      if (insane) {
+        await this.rejectListing(platform, listing, insane);
         return null;
       }
     }
 
-    const canonicalMatch = await this.findCanonicalMatch(category.id, normalized, extracted, listing);
+    // Steps 6-9: find the product it belongs to.
+    const canonicalMatch = await findCanonicalMatch(
+      input,
+      category.id,
+      { candidates: this.candidateSource, judge: this.semantic },
+      this.tools,
+    );
 
-    // Title matching can agree on brand and model number and still be wrong --
-    // a spare part, a fake, or a different tier of a wholesale range all name
-    // the product they are not. A price far outside what every other store
-    // charges for it is the one signal those cannot fake, so such a listing is
-    // not attached to the product. It is not turned into a product of its own
-    // either: its title says it is this product, so a new canonical would just
-    // be a duplicate of it carrying the bad price.
+    // Step 10: market outlier. Such a listing is not attached to the product,
+    // and not turned into a product of its own either: its title says it is
+    // this product, so a new canonical would just duplicate it with a bad price.
     if (canonicalMatch && normalizedPrice != null) {
       const others = await this.prisma.sourceListing.findMany({
         where: {
@@ -1005,16 +932,11 @@ export class LiveIngestionService {
         },
         select: { priceUsd: true, platformId: true },
       });
-      const prices = [
-        ...others.map((other) => ({ price: Number(other.priceUsd), store: other.platformId, self: false })),
-        { price: normalizedPrice, store: platform.id, self: true },
-      ];
-      const { excluded, median } = filterMarketOutliers(
-        prices,
-        (entry) => entry.price,
-        (entry) => entry.store,
+      const { outlier, median } = checkMarketOutlier(
+        { price: normalizedPrice, store: platform.id },
+        others.map((other) => ({ price: Number(other.priceUsd), store: other.platformId })),
       );
-      if (excluded.some((entry) => entry.self)) {
+      if (outlier) {
         await this.rejectListing(
           platform,
           listing,
@@ -1025,6 +947,7 @@ export class LiveIngestionService {
     }
 
     const matchedExistingCanonicalProduct = !!canonicalMatch;
+    const confidence = matchedExistingCanonicalProduct ? MATCHED_CONFIDENCE : NEW_PRODUCT_CONFIDENCE;
 
     const canonicalProduct =
       canonicalMatch ??
@@ -1063,7 +986,7 @@ export class LiveIngestionService {
         rating: listing.rating,
         reviewCount: listing.reviewCount,
         matchStatus: MatchStatus.ACCEPTED,
-        matchConfidence: matchedExistingCanonicalProduct ? 1 : 0.98,
+        matchConfidence: confidence,
         matchedAt: new Date(),
         lastSeenAt: new Date(),
         lastScrapedAt: new Date(),
@@ -1092,7 +1015,7 @@ export class LiveIngestionService {
         rating: listing.rating,
         reviewCount: listing.reviewCount,
         matchStatus: MatchStatus.ACCEPTED,
-        matchConfidence: matchedExistingCanonicalProduct ? 1 : 0.98,
+        matchConfidence: confidence,
         matchedAt: new Date(),
         lastSeenAt: new Date(),
         lastScrapedAt: new Date(),
@@ -1112,7 +1035,7 @@ export class LiveIngestionService {
         sourceListingId: sourceListing.id,
         candidateId: canonicalProduct.id,
         status: MatchStatus.ACCEPTED,
-        confidence: matchedExistingCanonicalProduct ? 1 : 0.98,
+        confidence,
         engineVersion: `live-ingestion-${sourceSlug}-v1`,
         scores: this.toJson({
           strategy: matchedExistingCanonicalProduct ? 'exact-match' : 'new-canonical-product',
@@ -1176,246 +1099,18 @@ export class LiveIngestionService {
     );
   }
 
-  private async findCanonicalMatch(
-    categoryId: string,
-    normalized: ReturnType<NormalizerService['normalizeTitle']>,
-    extracted: ReturnType<NormalizerService['extractAttributes']>,
-    listing: RetailerListing,
-  ) {
-    const identifierMatch = await this.findByIdentifier(listing.identifiers);
-    if (identifierMatch) {
-      return identifierMatch;
-    }
-
-    const candidates = await this.prisma.canonicalProduct.findMany({
-      where: {
-        categoryId,
-      },
-      take: 200,
-    });
-
-    const listingBrand = listing.brand?.trim().toLowerCase() ?? extracted.brand?.trim().toLowerCase() ?? null;
-    const listingModel = listing.model?.trim().toLowerCase() ?? extracted.model?.trim().toLowerCase() ?? null;
-    const listingIsAccessory = this.normalizer.isAccessory(listing.title);
-
-    for (const candidate of candidates) {
-      const candidateNormalized = candidate.normalizedTitle.trim().toLowerCase();
-      if (candidateNormalized !== normalized.normalized) {
-        continue;
+  /** Step 6-9 candidate lookup, over Prisma. */
+  private readonly candidateSource: CandidateSource<CanonicalProduct> = {
+    findByIdentifier: async (identifiers) => {
+      const clauses = identifierLookupClauses(identifiers);
+      if (clauses.length === 0) {
+        return null;
       }
-
-      const candidateBrand = candidate.brand?.trim().toLowerCase() ?? null;
-      if (candidateBrand && listingBrand && candidateBrand !== listingBrand) {
-        continue;
-      }
-
-      const candidateModel = candidate.model?.trim().toLowerCase() ?? null;
-      if (candidateModel && listingModel && candidateModel !== listingModel) {
-        continue;
-      }
-
-      if (this.hasIdentifierConflict(listing, candidate)) {
-        continue;
-      }
-
-      if (this.fuzzyMatcher.detectConditionConflict(listing.title, candidate.title)) {
-        continue;
-      }
-
-      if (this.fuzzyMatcher.detectProductTypeConflict(listing.title, candidate.title)) {
-        continue;
-      }
-
-      return candidate;
-    }
-
-    // Rank same-category candidates that survive the hard-conflict guards
-    // (brand, accessory-vs-product, variant, identifier, storage/RAM/color) by
-    // fuzzy text similarity, then ask the local LLM to confirm the closest few,
-    // strongest match first.
-    //
-    // This used to rank candidates by title-embedding similarity instead of
-    // fuzzy score. That turned out to actively mislead: nomic-embed-text scored
-    // the SAME phone worded differently by two stores at ~0.54 similarity —
-    // *lower* than two completely different phone models (~0.53) — while a
-    // wrong-color variant of the exact same listing scored a near-perfect ~1.0.
-    // Embeddings were essentially blind to the attributes that actually decide
-    // a match here and were quietly starving the LLM step of the right
-    // candidates. Fuzzy text score (edit distance + token overlap) orders these
-    // sanely, and the conflict guards below still do the real precision work.
-    const survivors: Array<{ candidate: (typeof candidates)[number]; score: number }> = [];
-
-    for (const candidate of candidates) {
-      const candidateBrand = candidate.brand?.trim().toLowerCase() ?? null;
-      if (candidateBrand && listingBrand && candidateBrand !== listingBrand) {
-        continue;
-      }
-
-      // An accessory's title routinely *names* the product it's compatible with
-      // ("Case for Samsung Galaxy S26 Ultra") — that would otherwise satisfy the
-      // brand/model/title checks below and merge a phone case into the phone.
-      if (listingIsAccessory !== this.normalizer.isAccessory(candidate.title)) {
-        continue;
-      }
-
-      // A laptop titled "... RTX 5050" and an "RTX 5050" card agree on model
-      // number, which alone clears the auto-accept below. Different kinds of
-      // product are never the same product, whatever they share.
-      if (this.fuzzyMatcher.detectProductTypeConflict(listing.title, candidate.title)) {
-        continue;
-      }
-
-      // "MacBook Air M4" vs "MacBook Air M5": same brand and model name, and the
-      // chip is too short for the model-code guards below to notice.
-      if (this.fuzzyMatcher.detectChipConflict(listing.title, candidate.title)) {
-        continue;
-      }
-
-      if (this.fuzzyMatcher.detectVariantConflict(listing.title, candidate.title)) {
-        continue;
-      }
-
-      if (this.fuzzyMatcher.detectModelCodeSuffixConflict(listing.title, candidate.title)) {
-        continue;
-      }
-
-      if (this.fuzzyMatcher.detectDisjointModelConflict(listing.title, candidate.title)) {
-        continue;
-      }
-
-      if (this.hasIdentifierConflict(listing, candidate)) {
-        continue;
-      }
-
-      if (this.fuzzyMatcher.detectConditionConflict(listing.title, candidate.title)) {
-        continue;
-      }
-
-      // Recomputed fresh from the candidate's title rather than trusting its
-      // stored `attributes` column, which can be stale or never populated for
-      // older/previously-merged rows (a real false merge this caused: a
-      // "Cobalt Violet" listing merged with a "Black" canonical because the
-      // stored attributes had no color at all, even though it's extractable
-      // straight from the title).
-      const candidateExtracted = this.normalizer.extractAttributes(candidate.title);
-      if (
-        this.fuzzyMatcher.detectStorageConflict(extracted.storage ?? undefined, candidateExtracted.storage) ||
-        this.fuzzyMatcher.detectRamConflict(extracted.ram ?? undefined, candidateExtracted.ram) ||
-        // Color is deliberately not a conflict: one product covers every color of
-        // a model/storage/RAM, and each store row shows its own color. Stores
-        // name colors differently ("Black" / "Awesome Graphite"), so splitting
-        // by color kept the same phone from ever lining up across stores.
-        this.fuzzyMatcher.detectDisplaySizeConflict(extracted.displaySize ?? undefined, candidateExtracted.displaySize)
-      ) {
-        continue;
-      }
-
-      const candidateTitle = this.normalizer.normalizeTitle(candidate.title);
-      const titleScore = this.fuzzyMatcher.combinedScore(
-        normalized.normalized,
-        normalized.tokens,
-        candidateTitle.normalized,
-        candidateTitle.tokens,
-      );
-
-      // Retailers pad titles wildly differently ("Samsung Galaxy S26 - 256GB - Sky
-      // Blue" vs "Samsung Galaxy S26, Unlocked Android Smartphone... Galaxy AI...
-      // Sky Blue"), which tanks raw title token-overlap even for the exact same SKU.
-      // If brand, model number, storage, RAM and color all agree (and none of the
-      // conflict guards above rejected the pair), that structured agreement is
-      // stronger evidence of a true match than the noisy title text is — boost it
-      // to the front of the LLM confirmation queue without short-circuiting the
-      // LLM check itself.
-      // Falls back to a fresh extraction for the same reason as above: older
-      // canonical rows predate model extraction for several phone brands, so
-      // the stored `model` column is often empty even though it's derivable
-      // from the title right now.
-      const candidateModel = candidate.model?.trim().toLowerCase() ?? candidateExtracted.model?.trim().toLowerCase() ?? null;
-      const modelsAgree = !!candidateModel && !!listingModel && candidateModel === listingModel;
-      const score = modelsAgree ? Math.max(titleScore, MODEL_AGREEMENT_SCORE) : titleScore;
-
-      survivors.push({ candidate, score });
-    }
-
-    survivors.sort((a, b) => b.score - a.score);
-    const topCandidates = survivors.slice(0, 8);
-
-    // A survivor already scoring >= the "models agree" boost has cleared every
-    // hard-conflict guard above (brand, accessory, variant, model-code-suffix,
-    // disjoint-model-code, identifier, storage/RAM/color/display) AND has an
-    // extracted model number that exactly matches the listing's. That's a
-    // stronger, more reliable signal than the small local LLM: testing showed
-    // qwen2.5:1.5b incorrectly rejects real duplicates worded differently by
-    // two stores (e.g. "Oppo A6 - 8GB RAM - 256GB" vs "OPPO A6 Smartphone,
-    // 256 GB, ... 8 GB RAM") even though every structured attribute agrees.
-    // Skip the unreliable judge call entirely for these and accept directly.
-    if (topCandidates.length > 0 && topCandidates[0].score >= MODEL_AGREEMENT_SCORE) {
-      return topCandidates[0].candidate;
-    }
-
-    let llmUnavailable = false;
-    for (const { candidate } of topCandidates) {
-      const verdict = await this.semantic.judgeSameProduct(listing.title, candidate.title);
-      if (verdict === true) {
-        return candidate;
-      }
-      if (verdict === null) {
-        // OpenRouter is unreachable/unconfigured — stop asking (every
-        // remaining call would fail the same way) and fall back below.
-        llmUnavailable = true;
-        break;
-      }
-    }
-
-    // LLM couldn't be reached for any candidate — fall back to the plain fuzzy
-    // score threshold so ingestion doesn't stall or silently stop matching.
-    if (llmUnavailable && survivors.length > 0 && survivors[0].score >= FUZZY_MATCH_THRESHOLD) {
-      return survivors[0].candidate;
-    }
-
-    return null;
-  }
-
-  /**
-   * Same store, near-identical titles, different SKUs (e.g. ELARABY's many
-   * "Remote Control TORNADO LED TV Black" remotes) must never merge: when both
-   * sides carry the same kind of identifier and the values differ, they are
-   * different products no matter how similar the titles look.
-   */
-  private hasIdentifierConflict(
-    listing: RetailerListing,
-    candidate: { gtin: string | null; upc: string | null; ean: string | null; mpn: string | null },
-  ): boolean {
-    const pairs: Array<[string | null | undefined, string | null]> = [
-      [listing.identifiers.gtin, candidate.gtin],
-      [listing.identifiers.upc, candidate.upc],
-      [listing.identifiers.ean, candidate.ean],
-      [listing.identifiers.mpn, candidate.mpn],
-    ];
-
-    return pairs.some(
-      ([listingId, candidateId]) =>
-        !!listingId && !!candidateId && listingId.trim().toLowerCase() !== candidateId.trim().toLowerCase(),
-    );
-  }
-
-  private async findByIdentifier(identifiers: RetailerListing['identifiers']) {
-    const clauses: Array<Record<string, string>> = [];
-    if (identifiers.gtin) clauses.push({ gtin: identifiers.gtin });
-    if (identifiers.upc) clauses.push({ upc: identifiers.upc });
-    if (identifiers.ean) clauses.push({ ean: identifiers.ean });
-    if (identifiers.mpn) clauses.push({ mpn: identifiers.mpn });
-
-    if (clauses.length === 0) {
-      return null;
-    }
-
-    return this.prisma.canonicalProduct.findFirst({
-      where: {
-        OR: clauses,
-      },
-    });
-  }
+      return this.prisma.canonicalProduct.findFirst({ where: { OR: clauses } });
+    },
+    findInCategory: (categoryId) =>
+      this.prisma.canonicalProduct.findMany({ where: { categoryId }, take: CANDIDATE_POOL_SIZE }),
+  };
 
   private async createCanonicalProduct(
     category: Category,
