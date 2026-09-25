@@ -71,10 +71,26 @@ describe('NormalizerService', () => {
       expect(service.isAccessory('Screen Protector for Samsung Galaxy S24')).toBe(true);
     });
 
+    it('flags spare parts that carry the phone model number', () => {
+      // Real listings that were merged into the phone as its cheapest price.
+      expect(service.isAccessory('Original Lcd C71 for Realme C71 Screen 100% Tested')).toBe(true);
+      expect(service.isAccessory('Mobile Phone LCDs Display Pantalla 100% Tested for Itel A100c')).toBe(true);
+      expect(service.isAccessory('GOLDEN MASK For Realme C53/Realme Narzo N53 Camera Lens Protector')).toBe(true);
+      expect(service.isAccessory('Back Glass Housing Replacement Galaxy S24')).toBe(true);
+    });
+
     it('does not flag actual products', () => {
       expect(service.isAccessory('NVIDIA RTX 4090 24GB GDDR6X')).toBe(false);
       expect(service.isAccessory('Apple MacBook Pro 14 M3 Pro')).toBe(false);
       expect(service.isAccessory('Samsung Galaxy S24 Ultra 256GB')).toBe(false);
+      expect(service.isAccessory('Realme C71 Smartphone 4GB RAM 256GB Storage Forest Green')).toBe(false);
+      expect(service.isAccessory('ASUS TUF Gaming Laptop for Gaming and Work RTX 4060')).toBe(false);
+      expect(service.isAccessory('Desktop Graphics Card for Gaming Computer RTX 5090 32GB')).toBe(false);
+      expect(service.isAccessory('Samsung 55 Inch OLED Display 4K Smart TV')).toBe(false);
+      expect(service.isAccessory('LG 24 Inch LCD Monitor Full HD')).toBe(false);
+      expect(service.isAccessory('TORNADO 32 Inch LCD TV HD')).toBe(false);
+      // "for <brand>" is not an accessory signal on its own.
+      expect(service.isAccessory('Apple 2024 MacBook Pro Laptop with M4 Pro: Built for Apple Intelligence')).toBe(false);
     });
   });
 });

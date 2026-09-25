@@ -22,8 +22,19 @@ export class BrowserSessionService implements OnModuleDestroy {
   constructor(private readonly configService: ConfigService) {}
 
   async getPage(storeSlug: string): Promise<Page> {
-    const context = await this.getContext(storeSlug);
-    const page = await context.newPage();
+    let page: Page;
+    try {
+      page = await (await this.getContext(storeSlug)).newPage();
+    } catch (error) {
+      // The cached browser is gone (crashed, killed, or its launch failed).
+      // Drop it and launch a fresh one, once, rather than failing every
+      // search for this store until the process restarts -- which is what
+      // kept five stores at zero listings from 09-16 to 09-25.
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Browser for "${storeSlug}" is unusable (${message.split('\n')[0]}); relaunching.`);
+      this.evict(storeSlug);
+      page = await (await this.getContext(storeSlug)).newPage();
+    }
     // Safe now: `page` keeps the context alive while the pages the profile
     // started with are disposed of. See launchContext for why this cannot
     // happen at launch time.
@@ -73,10 +84,25 @@ export class BrowserSessionService implements OnModuleDestroy {
   private getContext(storeSlug: string): Promise<BrowserContext> {
     let context = this.contexts.get(storeSlug);
     if (!context) {
-      context = this.launchContext(storeSlug);
-      this.contexts.set(storeSlug, context);
+      const launching = this.launchContext(storeSlug);
+      context = launching;
+      this.contexts.set(storeSlug, launching);
+      launching.then(
+        // A browser that dies later must not stay cached as if it were alive.
+        (live) => live.on('close', () => this.evict(storeSlug, launching)),
+        // Nor may a failed launch: the next search should try again.
+        () => this.evict(storeSlug, launching),
+      );
     }
     return context;
+  }
+
+  /** Forgets a store's browser so the next getPage() launches a new one. */
+  private evict(storeSlug: string, only?: Promise<BrowserContext>): void {
+    // `only` guards against a late close event evicting a newer relaunch.
+    if (only && this.contexts.get(storeSlug) !== only) return;
+    this.contexts.delete(storeSlug);
+    this.pendingStrayPages.delete(storeSlug);
   }
 
   /**
@@ -131,6 +157,15 @@ export class BrowserSessionService implements OnModuleDestroy {
     // Chrome's sandbox cannot be used as uid 0, which is how the API container runs.
     const needsNoSandbox = typeof process.getuid === 'function' && process.getuid() === 0;
     const args = needsNoSandbox ? ['--no-sandbox', '--disable-dev-shm-usage'] : [];
+
+    // Profiles live on a volume that outlives the container, and Chromium's
+    // singleton lock names the hostname that held it. Every deploy brings a
+    // new container hostname, and Chromium then refuses the profile as "in
+    // use on another computer". This process is the profile's only user, so a
+    // lock found here is always stale.
+    for (const lock of ['SingletonLock', 'SingletonCookie', 'SingletonSocket']) {
+      fs.rmSync(path.join(profileDir, lock), { force: true });
+    }
 
     this.logger.log(
       `Launching persistent browser profile for "${storeSlug}" at ${profileDir} ` +

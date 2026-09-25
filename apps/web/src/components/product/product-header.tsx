@@ -89,7 +89,7 @@ export function ProductHeader({ product }: ProductHeaderProps) {
         )}
 
         <div className="rounded-xl border border-ink-700 bg-ink-900 p-5 space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
             <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider">
               Price Across {storeCount} Store{storeCount !== 1 ? 's' : ''}
             </p>
@@ -101,15 +101,18 @@ export function ProductHeader({ product }: ProductHeaderProps) {
 
           {priceStats.min != null ? (
             <div className="space-y-1">
-              <div className="flex items-baseline gap-3">
-                <div>
+              {/* Wraps instead of overflowing: on a phone "EGP 20,250.09" plus
+                  "Up to EGP 24,666.00" is wider than the screen and pushed the
+                  whole page sideways. */}
+              <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
+                <div className="min-w-0">
                   <p className="text-[10px] text-ink-500 mb-0.5">Best price</p>
-                  <span className="text-4xl font-black text-signal tracking-tight">
+                  <span className="text-3xl sm:text-4xl font-black text-signal tracking-tight">
                     {formatCurrency(priceStats.min, priceStats.currency)}
                   </span>
                 </div>
                 {hasRange && (
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-[10px] text-ink-500 mb-0.5">Up to</p>
                     <span className="text-xl font-semibold text-ink-400">
                       {formatCurrency(priceStats.max, priceStats.currency)}

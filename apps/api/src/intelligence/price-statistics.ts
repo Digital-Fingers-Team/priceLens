@@ -547,3 +547,61 @@ export function filterPriceOutliers<T>(
 
   return { kept, excluded, median: mid };
 }
+
+/**
+ * Lower bound for a shopper-facing price: under half the market price, a new
+ * product is not on sale, it is a different product (a fake, a spare part, a
+ * lower wholesale tier). Tighter than OUTLIER_RATIO's 1/2.5 below, which let
+ * an Alibaba "Honor X9d" at 8,400 EGP stand as the best deal on a phone that
+ * costs 24,300 at Noon and Amazon.
+ */
+export const MARKET_LOWER_RATIO = 0.5;
+
+/**
+ * filterPriceOutliers, judged against the *market* rather than the pile of
+ * listings: each store contributes one price (its own median), and the market
+ * price is the median of those. Otherwise the store with the most listings
+ * decides what "normal" is -- eight near-identical Alibaba offers outvoted
+ * Noon and Amazon and dragged the median to Alibaba's own level.
+ *
+ * With a single store it falls back to that store's listings, and like
+ * filterPriceOutliers it never filters on too little data or empties the set.
+ */
+export function filterMarketOutliers<T>(
+  items: T[],
+  getPrice: (item: T) => number,
+  getStore: (item: T) => string,
+  lowerRatio = MARKET_LOWER_RATIO,
+  upperRatio = OUTLIER_RATIO,
+): OutlierFilterResult<T> {
+  const priced = items.filter((item) => Number.isFinite(getPrice(item)) && getPrice(item) > 0);
+
+  const byStore = new Map<string, number[]>();
+  for (const item of priced) {
+    const bucket = byStore.get(getStore(item)) ?? [];
+    bucket.push(getPrice(item));
+    byStore.set(getStore(item), bucket);
+  }
+
+  let market: number | null;
+  if (byStore.size >= 2) {
+    market = median([...byStore.values()].map((prices) => median(prices) as number));
+  } else if (priced.length >= MIN_PRICES_FOR_OUTLIER_CHECK) {
+    market = median(priced.map(getPrice));
+  } else {
+    return { kept: items, excluded: [], median: median(priced.map(getPrice)) };
+  }
+  if (market == null || market <= 0) return { kept: items, excluded: [], median: null };
+
+  const lower = market * lowerRatio;
+  const upper = market * upperRatio;
+  const kept: T[] = [];
+  const excluded: T[] = [];
+  for (const item of items) {
+    const price = getPrice(item);
+    if (!Number.isFinite(price) || price <= 0 || price < lower || price > upper) excluded.push(item);
+    else kept.push(item);
+  }
+  if (kept.length === 0) return { kept: items, excluded: [], median: market };
+  return { kept, excluded, median: market };
+}

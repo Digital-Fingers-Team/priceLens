@@ -2,9 +2,10 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bull';
-import { Prisma, ProductTier } from '@prisma/client';
+import { MatchStatus, Prisma, ProductTier } from '@prisma/client';
 import type { CanonicalProduct, SourceListing } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
+import { filterMarketOutliers } from '../intelligence/price-statistics';
 import {
   INGESTION_QUEUE,
   RUN_QUERY_INGESTION_JOB,
@@ -174,7 +175,7 @@ export class ProductsService {
     const whereClause = this.buildSearchWhereSql(normalizedQuery, brand, categoryId, tier);
     const havingClause = this.buildHavingSql(minPrice, maxPrice);
     const relevanceSql = this.buildRelevanceScoreSql(normalizedQuery);
-    const orderBySql = this.buildOrderBySql(sortBy, sortDir, relevanceSql);
+    const orderBySql = this.buildOrderBySql(sortBy, sortDir, relevanceSql, normalizedQuery);
 
     // Sort/filter/paginate at the DB level first — only the current page's
     // products get their full listings fetched, instead of pulling every
@@ -256,7 +257,10 @@ export class ProductsService {
     categoryId?: string,
     tier?: string,
   ): Prisma.Sql {
-    const conditions: Prisma.Sql[] = [Prisma.sql`sl.price_usd IS NOT NULL`];
+    const conditions: Prisma.Sql[] = [
+      Prisma.sql`sl.price_usd IS NOT NULL`,
+      Prisma.sql`sl.match_status NOT IN ('REJECTED', 'MANUAL_REJECT')`,
+    ];
 
     for (const term of normalizedQuery.split(/\s+/).filter(Boolean)) {
       const pattern = `%${term}%`;
@@ -294,7 +298,18 @@ export class ProductsService {
     return parts.length ? Prisma.sql`HAVING ${Prisma.join(parts, ' AND ')}` : Prisma.empty;
   }
 
-  private buildOrderBySql(sortBy: SortBy, sortDir: SortDir, relevanceSql: Prisma.Sql): Prisma.Sql {
+  private buildOrderBySql(
+    sortBy: SortBy,
+    sortDir: SortDir,
+    relevanceSql: Prisma.Sql,
+    normalizedQuery = '',
+  ): Prisma.Sql {
+    if (sortBy === 'relevance' && !normalizedQuery) {
+      // Browsing with no query: relevance is the same for everything, so show
+      // the products compared across the most stores first rather than the
+      // cheapest (which surfaced a page of $2 earphones).
+      return Prisma.sql`COUNT(DISTINCT sl.platform_id) DESC, COUNT(sl.id) DESC, cp.updated_at DESC`;
+    }
     if (sortBy === 'relevance') {
       const direction = sortDir === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
       return Prisma.sql`MAX(${relevanceSql}) ${direction}, MIN(sl.price_usd) ASC NULLS LAST, cp.updated_at DESC`;
@@ -519,11 +534,9 @@ export class ProductsService {
       throw new NotFoundException(`Product with slug "${slug}" not found`);
     }
 
-    // Drop priceless / out-of-stock listings so the detail page only shows stores
-    // that actually have a price for this product right now.
-    product.sourceListings = product.sourceListings.filter((listing) =>
-      this.hasUsablePrice(listing),
-    );
+    // Only stores that actually sell this product right now, at a believable
+    // price (see visibleListings).
+    product.sourceListings = this.visibleListings(product.sourceListings);
 
     // Keep every product comparable across the target number of stores: if it's
     // short, kick off a background spec-based search of the remaining stores.
@@ -539,21 +552,21 @@ export class ProductsService {
     page = clampPageNumber(page);
     // Out-of-stock listings come back with no price; exclude them so callers only
     // see stores the product can actually be bought from.
-    const where: Prisma.SourceListingWhereInput = {
-      canonicalProductId: productId,
-      priceUsd: { not: null },
-      NOT: { inStock: false },
-    };
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.sourceListing.findMany({
-        where,
-        include: { platform: true },
-        orderBy: [{ priceUsd: 'asc' }, { lastSeenAt: 'desc' }],
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      this.prisma.sourceListing.count({ where }),
-    ]);
+    // Filtered in memory rather than paged in SQL: whether a price is an
+    // outlier depends on the product's other listings, which a page does not
+    // contain. A product has tens of listings, not thousands.
+    const all = await this.prisma.sourceListing.findMany({
+      where: {
+        canonicalProductId: productId,
+        priceUsd: { not: null },
+        NOT: { inStock: false },
+      },
+      include: { platform: true },
+      orderBy: [{ priceUsd: 'asc' }, { lastSeenAt: 'desc' }],
+    });
+    const visible = this.visibleListings(all);
+    const total = visible.length;
+    const items = visible.slice((page - 1) * limit, page * limit);
 
     return {
       items: items.map((item) => this.mapListing(item)),
@@ -579,7 +592,7 @@ export class ProductsService {
       throw new NotFoundException(`Product with id "${productId}" not found`);
     }
 
-    const withPrice = product.sourceListings.filter((listing) => listing.priceUsd != null);
+    const withPrice = this.visibleListings(product.sourceListings);
     const listings = withPrice.map((listing) => this.mapCurrentPriceListing(listing));
 
     // best/worst/avg rank listings against each other, so they must use the
@@ -616,7 +629,7 @@ export class ProductsService {
     }
 
     const stats = this.getProductStats(product);
-    const prices = (product.sourceListings ?? [])
+    const prices = this.visibleListings(product.sourceListings ?? [])
       .map((listing) => this.toNumber(listing.priceUsd))
       .filter((value): value is number => value != null);
 
@@ -809,13 +822,52 @@ export class ProductsService {
     return price != null && price > 0 && listing.inStock !== false;
   }
 
+  /**
+   * The listings a shopper should see: priced, in stock, not rejected by
+   * matching, and not a price outlier against the product's other listings.
+   *
+   * The outlier step is what keeps "Best Deal" honest. It is the lowest price
+   * on the page, so a spare part or a fake that slips through matching at a
+   * tenth of the real price becomes the headline number. Rejected listings are
+   * filtered first so they cannot drag the median the outlier check uses, and
+   * the median is the market's (one price per store), so one store with many
+   * listings cannot decide what normal is.
+   */
+  private visibleListings<
+    T extends {
+      priceUsd: unknown;
+      inStock?: boolean | null;
+      matchStatus?: MatchStatus;
+      platformId?: string;
+      rawTitle?: string;
+    },
+  >(listings: T[]): T[] {
+    // The same offer listed several times by one store (Alibaba repeats a
+    // supplier's listing under different ids) is one offer, not several rows.
+    const seen = new Set<string>();
+    const usable = listings.filter((listing) => {
+      if (
+        !this.hasUsablePrice(listing) ||
+        listing.matchStatus === MatchStatus.REJECTED ||
+        listing.matchStatus === MatchStatus.MANUAL_REJECT
+      ) {
+        return false;
+      }
+      const key = `${listing.platformId ?? ''}|${this.toNumber(listing.priceUsd)}|${listing.rawTitle?.trim().toLowerCase() ?? ''}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    return filterMarketOutliers(
+      usable,
+      (listing) => this.toNumber(listing.priceUsd) ?? NaN,
+      (listing) => listing.platformId ?? '?',
+    ).kept;
+  }
+
   /** A product with three listings from one retailer is still sold at one store. */
   private countDistinctStores(product: ProductWithRelations): number {
-    return new Set(
-      product.sourceListings
-        .filter((listing) => this.hasUsablePrice(listing))
-        .map((listing) => listing.platformId),
-    ).size;
+    return new Set(this.visibleListings(product.sourceListings).map((listing) => listing.platformId)).size;
   }
 
   private mapListing(
@@ -826,7 +878,7 @@ export class ProductsService {
     // Carrefour AED price is never shown next to an "EGP" label. `priceUsd` is
     // the FX-normalized (base-currency) value used only for cross-store
     // comparisons (best-deal ranking, sorting), never for display.
-    const rawPrice = this.toNumber(listing.rawPrice);
+    const { price: displayPrice, currency: displayCurrency } = this.displayPrice(listing);
     return {
       id: listing.id,
       platformId: listing.platformId,
@@ -841,12 +893,14 @@ export class ProductsService {
       externalUrl: listing.externalUrl,
       url: listing.externalUrl,
       rawTitle: listing.rawTitle,
-      rawPrice,
-      rawCurrency: listing.rawCurrency,
+      rawPrice: displayPrice,
+      rawCurrency: displayCurrency,
+      originalPrice: this.toNumber(listing.rawPrice),
+      originalCurrency: listing.rawCurrency,
       rawImageUrl: listing.rawImageUrl,
       priceUsd: this.toNumber(listing.priceUsd),
-      price: rawPrice ?? this.toNumber(listing.priceUsd),
-      currency: listing.rawCurrency,
+      price: displayPrice,
+      currency: displayCurrency,
       inStock: listing.inStock,
       rating: listing.rating,
       reviewCount: listing.reviewCount,
@@ -861,9 +915,8 @@ export class ProductsService {
   private mapCurrentPriceListing(
     listing: ProductWithRelations['sourceListings'][number],
   ) {
-    // Same raw-price-first rule as mapListing: this is what the buyer pays at
-    // that specific store, so it must carry that store's own currency.
-    const price = this.toNumber(listing.rawPrice) ?? this.toNumber(listing.priceUsd);
+    // Same display rule as mapListing.
+    const { price, currency } = this.displayPrice(listing);
     if (price == null) {
       throw new Error('Current price listing requires a numeric price');
     }
@@ -878,7 +931,7 @@ export class ProductsService {
         baseUrl: listing.platform.baseUrl,
       },
       price,
-      currency: listing.rawCurrency,
+      currency,
       url: listing.externalUrl,
       inStock: listing.inStock,
       rating: listing.rating,
@@ -887,8 +940,29 @@ export class ProductsService {
     };
   }
 
+  /**
+   * The price and currency a listing is shown in. A store pricing in the base
+   * currency is shown exactly as it charges. A store that priced in another
+   * currency -- Alibaba answering this server in SAR because its IP looks
+   * Saudi -- is shown in the base currency via the FX-normalized priceUsd, so
+   * shoppers compare EGP with EGP instead of reading riyals next to pounds.
+   * The store's own figure stays available as originalPrice/originalCurrency.
+   */
+  private displayPrice(listing: { rawPrice: unknown; rawCurrency: string; priceUsd: unknown }): {
+    price: number | null;
+    currency: string;
+  } {
+    const raw = this.toNumber(listing.rawPrice);
+    const normalized = this.toNumber(listing.priceUsd);
+    if (listing.rawCurrency?.toUpperCase() !== this.baseCurrency.toUpperCase() && normalized != null) {
+      return { price: normalized, currency: this.baseCurrency };
+    }
+    return { price: raw ?? normalized, currency: listing.rawCurrency };
+  }
+
   private getProductStats(product: ProductWithListings): ProductStats & { avgPrice: number | null; medianPrice: number | null } {
-    const prices = product.sourceListings
+    const visible = this.visibleListings(product.sourceListings);
+    const prices = visible
       .map((listing) => this.toNumber(listing.priceUsd))
       .filter((value): value is number => value != null);
 
@@ -896,7 +970,7 @@ export class ProductsService {
       return {
         minPriceUsd: null,
         maxPriceUsd: null,
-        listingCount: product.sourceListings.length,
+        listingCount: visible.length,
         avgPrice: null,
         medianPrice: null,
       };
@@ -912,7 +986,7 @@ export class ProductsService {
     return {
       minPriceUsd: sorted[0],
       maxPriceUsd: sorted[sorted.length - 1],
-      listingCount: product.sourceListings.length,
+      listingCount: visible.length,
       avgPrice: prices.reduce((sum, price) => sum + price, 0) / prices.length,
       medianPrice,
     };

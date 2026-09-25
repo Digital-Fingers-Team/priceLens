@@ -7,7 +7,8 @@ export function useSearch(filters: SearchFilters) {
   return useQuery({
     queryKey: QUERY_KEYS.search(filters),
     queryFn: () => searchApi.search(filters),
-    enabled: filters.q.trim().length > 0,
+    // No enabled guard: an empty query browses the catalog (compared products
+    // first) instead of leaving /search blank.
     placeholderData: (prev) => prev, // keep previous data while fetching new page
     staleTime: 5 * 1000,
     // A zero-result search kicks off a background live-fetch job (see products.service.ts)

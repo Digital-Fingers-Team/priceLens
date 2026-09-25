@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { RetailerConnector } from '../interfaces/retailer-connector.interface';
 import { RetailerListing } from '../interfaces/retailer-listing.interface';
+import { BrowserSessionService } from '../browser/browser-session.service';
+import { isBotWallRefusal, openThroughBotWall } from '../browser/bot-wall';
 
 interface MagentoMoney {
   value?: number;
@@ -71,7 +73,11 @@ export abstract class MagentoGraphqlConnector implements RetailerConnector {
   /** Magento store-view code, used both as the `Store` header and the URL path prefix. */
   protected readonly storeCode: string = 'en';
 
-  constructor(protected readonly configService: ConfigService) {}
+  constructor(
+    protected readonly configService: ConfigService,
+    /** Enables the browser fallback for stores behind a bot wall (see fetchProducts). */
+    protected readonly browserSession?: BrowserSessionService,
+  ) {}
 
   async searchListings(query: string, limit: number): Promise<RetailerListing[]> {
     if (!this.isEnabled) return [];
@@ -94,7 +100,57 @@ export abstract class MagentoGraphqlConnector implements RetailerConnector {
     }
   }
 
+  /**
+   * Plain HTTP first; on a bot-wall refusal (2B sits behind a Cloudflare
+   * challenge that answers every non-browser request with 403), the same
+   * GraphQL call is made from inside a real browser page on the store's own
+   * origin, which has passed the challenge and carries its clearance cookie.
+   */
   private async fetchProducts(search: string, pageSize: number): Promise<MagentoProductItem[]> {
+    try {
+      return await this.fetchProductsOverHttp(search, pageSize);
+    } catch (error) {
+      if (!this.browserSession || !isBotWallRefusal(error)) throw error;
+      return this.fetchProductsInBrowser(search, pageSize);
+    }
+  }
+
+  private async fetchProductsInBrowser(search: string, pageSize: number): Promise<MagentoProductItem[]> {
+    const base = this.baseUrl.replace(/\/$/, '');
+    const page = await this.browserSession!.getPage(this.slug);
+    try {
+      // Any same-origin page works; robots.txt is the lightest one the
+      // challenge will redirect back to once it clears.
+      await openThroughBotWall(page, `${base}/robots.txt`);
+      const result = await page.evaluate(
+        async ({ endpoint, body, store }) => {
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Store: store },
+            body,
+          });
+          return { status: response.status, text: await response.text() };
+        },
+        {
+          endpoint: `${base}/graphql`,
+          body: JSON.stringify({ query: SEARCH_QUERY, variables: { search, pageSize } }),
+          store: this.storeCode,
+        },
+      );
+      if (result.status !== 200) {
+        throw new Error(`GraphQL through the browser returned ${result.status}`);
+      }
+      const data = JSON.parse(result.text) as MagentoSearchResponse;
+      if (data.errors?.length) {
+        throw new Error(data.errors.map((err) => err.message).join('; '));
+      }
+      return data.data?.products?.items ?? [];
+    } finally {
+      await page.close().catch(() => undefined);
+    }
+  }
+
+  private async fetchProductsOverHttp(search: string, pageSize: number): Promise<MagentoProductItem[]> {
     const endpoint = `${this.baseUrl.replace(/\/$/, '')}/graphql`;
     const response = await axios.post<MagentoSearchResponse>(
       endpoint,

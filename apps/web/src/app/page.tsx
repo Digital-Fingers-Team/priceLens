@@ -8,6 +8,10 @@ import { ProductCardSkeleton } from '@/components/product/product-card-skeleton'
 import { Button } from '@/components/ui/button';
 import { absoluteUrl } from '@/lib/seo';
 
+// Trending prices come from the live API; without this the page was rendered
+// once at build time and served with those prices forever.
+export const revalidate = 300;
+
 export const metadata: Metadata = {
   title: 'Find the Best Price',
   description:

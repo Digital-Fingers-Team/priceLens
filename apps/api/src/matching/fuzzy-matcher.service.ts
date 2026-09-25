@@ -183,6 +183,99 @@ export class FuzzyMatcherService {
     return usedA !== usedB ? 'condition_conflict' : null;
   }
 
+  /**
+   * What kind of product a title describes, checked in order — the first hit
+   * wins. The order matters: a laptop title names its GPU ("RTX 5050 GPU")
+   * and a headset names what it pairs with ("for phone"), so the kinds that
+   * mention others come first.
+   */
+  private static readonly PRODUCT_TYPES: Array<[string, RegExp]> = [
+    ['laptop', /\b(laptops?|notebooks?|macbook|chromebook|ultrabook)\b/i],
+    ['tablet', /\b(tablets?|ipad|galaxy\s+tab|matepad|redmi\s+pad|xiaomi\s+pad)\b/i],
+    ['desktop', /\b(desktop\s+(?:pc|computer)|gaming\s+pc|all[-\s]in[-\s]one\s+pc|mini\s+pc)\b/i],
+    ['graphics_card', /\b(graphics?\s+cards?|video\s+cards?|gpu)\b/i],
+    // Before monitor/tv: a smartwatch has a "heart rate monitor", a soundbar is "for TV".
+    ['watch', /\b(smart\s?watch|watch)\b/i],
+    ['audio', /\b(headphones?|headsets?|earbuds?|earphones?|buds\d*|speakers?|soundbar)\b/i],
+    ['monitor', /\bmonitors?\b/i],
+    ['tv', /\b(tv|television)\b/i],
+    ['phone', /\b(smartphones?|mobile\s+phones?|cell\s+phones?|phones?)\b/i],
+  ];
+
+  /** The first product kind a title names, or null when it names none. */
+  productType(title: string): string | null {
+    const hit = FuzzyMatcherService.PRODUCT_TYPES.find(([, pattern]) => pattern.test(title));
+    return hit ? hit[0] : null;
+  }
+
+  /**
+   * Detect two titles that plainly describe different kinds of product — a
+   * laptop and a graphics card, a phone and its earbuds. Every other guard
+   * compares attributes of the *same* kind of thing; none of them notice when
+   * a laptop titled "... RTX 5050" is compared with an "RTX 5050" card, and
+   * the matching model number then auto-accepted the merge. Silent unless both
+   * titles say what they are.
+   */
+  detectProductTypeConflict(titleA: string, titleB: string): string | null {
+    const typeA = this.productType(titleA);
+    const typeB = this.productType(titleB);
+    return typeA && typeB && typeA !== typeB ? 'product_type_conflict' : null;
+  }
+
+  /**
+   * Processor families, each captured to a comparable token. Chip names are
+   * too short for the model-code guards ("M4" has one digit, "i7" one letter),
+   * so without this a MacBook Air M4 and a MacBook Air M5 -- same brand, same
+   * model name -- counted as the same product.
+   */
+  private static readonly CHIP_PATTERNS: Array<[string, RegExp]> = [
+    // Only on Apple titles: elsewhere "M2" is an SSD form factor.
+    ['apple', /\bm([1-9])(?:\s*(pro|max|ultra))?\b/gi],
+    // Tier and generation are separate families, so "Core i7" still matches
+    // "i7-1355U" (generation unknown on one side) but not "i7-1255U".
+    ['intel_core', /\b(?:core\s*)?i([3579])\b/gi],
+    ['intel_gen', /\bi[3579][-\s](\d{4,5}[a-z]{0,2})\b/gi],
+    ['intel_ultra', /\bcore\s+ultra\s+([3579])\b/gi],
+    ['ryzen', /\bryzen\s+([3579])\b/gi],
+  ];
+
+  private chips(title: string): Map<string, Set<string>> {
+    const found = new Map<string, Set<string>>();
+    const isApple = /\b(apple|macbook|imac|ipad|mac\s?mini|mac\s?studio)\b/i.test(title);
+    for (const [family, pattern] of FuzzyMatcherService.CHIP_PATTERNS) {
+      if (family === 'apple' && !isApple) continue;
+      for (const match of title.matchAll(pattern)) {
+        const token = match
+          .slice(1)
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        const set = found.get(family) ?? new Set<string>();
+        set.add(token);
+        found.set(family, set);
+      }
+    }
+    return found;
+  }
+
+  /**
+   * Detect two titles naming different chips of the same family (M4 vs M5,
+   * i5 vs i7, Ryzen 5 vs Ryzen 7). Silent unless both name a chip of the same
+   * family, and when either lists several (a "M2/M3 compatible" style title)
+   * any shared chip is enough to pass.
+   */
+  detectChipConflict(titleA: string, titleB: string): string | null {
+    const a = this.chips(titleA);
+    const b = this.chips(titleB);
+    for (const [family, chipsA] of a) {
+      const chipsB = b.get(family);
+      if (!chipsB) continue;
+      const shares = [...chipsA].some((chip) => chipsB.has(chip));
+      if (!shares) return 'chip_conflict';
+    }
+    return null;
+  }
+
   /** Storage/RAM/network-gen unit suffixes to ignore — these are formatting, not model identity. */
   private static readonly MODEL_CODE_UNIT_SUFFIXES = new Set([
     'gb', 'tb', 'mb', 'kb', 'mp', 'mah', 'mm', 'cm', 'in', 'inch',

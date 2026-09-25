@@ -547,6 +547,14 @@ export class NormalizerService {
       /\b(skin|wrap|sticker|decal)\b/i,
       /\b(replacement\s+(?:battery|part|screen))\b/i,
       /\b(compatible with|for use with|fits)\b/i,
+      // Spare parts sold under the phone's own name and model number
+      // ("Original Lcd C71 for Realme C71 Screen 100% Tested"). The extracted
+      // model agrees with the phone's, so without these they merged straight
+      // into it and became its "best deal" at a tenth of the price.
+      // An "LCD TV" or "LCD Monitor" is the product itself, not a part.
+      /\blcds?\b(?!\s*(?:tv|television|monitor|smart))/i,
+      /\b(digitizer|display\s+assembly|screen\s+assembly|touch\s+panel|back\s+glass|housing|flex\s+cable)\b/i,
+      /\b(camera\s+lens|lens\s+(?:protector|film|cover)|lens\s+guard)\b/i,
       // Arabic-language listings (common on AliExpress/Noon/Jumia for this
       // market) use their own accessory vocabulary — none of the English
       // patterns above match script other than Latin, so these need to be

@@ -55,14 +55,24 @@ export class NoonConnector implements RetailerConnector {
       // real titles have actually landed on enough cards, capped at 15s so a
       // stuck straggler can't hang the whole search (whatever hasn't hydrated
       // by then is filtered out downstream anyway, same as a missing title).
+      //
+      // Every card now carries a loading-placeholder <img alt="placeholder">
+      // *before* the real product image, permanently, so "the first img's alt"
+      // is always "placeholder". Reading that dropped every single card as
+      // untitled -- Noon returned zero listings for weeks. The title is read
+      // from the card's name heading instead, and only real (non-placeholder)
+      // images are considered as a fallback.
       await page
         .waitForFunction(
           () => {
             const anchors = Array.from(document.querySelectorAll('a[class*="productBoxLink"]'));
             if (anchors.length === 0) return false;
             const hydrated = anchors.filter((anchor) => {
-              const alt = anchor.querySelector('img')?.getAttribute('alt');
-              return !!alt && alt.trim().toLowerCase() !== 'placeholder';
+              if (anchor.querySelector('[data-qa="plp-product-box-name"]')?.textContent?.trim()) return true;
+              return Array.from(anchor.querySelectorAll('img')).some((img) => {
+                const alt = img.getAttribute('alt')?.trim().toLowerCase();
+                return !!alt && alt !== 'placeholder';
+              });
             });
             return hydrated.length >= Math.min(anchors.length, 5);
           },
@@ -80,7 +90,12 @@ export class NoonConnector implements RetailerConnector {
           seen.add(href);
 
           const priceEl = anchor.querySelector('[class*="sellingPrice"]');
-          const img = anchor.querySelector('img');
+          const img = Array.from(anchor.querySelectorAll('img')).find((candidate) => {
+            const alt = candidate.getAttribute('alt')?.trim().toLowerCase();
+            return !!alt && alt !== 'placeholder' && !/^(wishlist|add-to-cart|nudge icon|noon-[\w-]+)$/.test(alt);
+          });
+          const nameEl = anchor.querySelector('[data-qa="plp-product-box-name"]');
+          const name = nameEl?.getAttribute('title')?.trim() || nameEl?.textContent?.trim() || null;
           // Noon renders the struck-through was-price in its own element,
           // separate from sellingPrice.
           const wasPriceEl = anchor.querySelector('[class*="preReductionPrice"], [class*="oldPrice"], del');
@@ -96,7 +111,7 @@ export class NoonConnector implements RetailerConnector {
             price: priceEl ? priceEl.textContent?.trim() ?? null : null,
             wasPrice: wasPriceEl ? wasPriceEl.textContent?.trim() ?? null : null,
             soldOut,
-            title: img?.getAttribute('alt') ?? null,
+            title: name ?? img?.getAttribute('alt') ?? null,
             imageUrl: img?.getAttribute('src') ?? null,
           });
         }

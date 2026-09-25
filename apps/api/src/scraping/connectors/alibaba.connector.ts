@@ -44,6 +44,14 @@ export class AlibabaConnector implements RetailerConnector {
 
     const page = await this.browserSession.getPage(this.slug);
     try {
+      // Alibaba prices in the currency of the visitor's IP. This server
+      // geolocates to Saudi Arabia, so every listing came back in SAR and was
+      // shown to Egyptian shoppers in riyals. These pin EGP / English
+      // (confirmed live: "EGP 22,779.63" labels with them set).
+      await page.context().addCookies([
+        { name: 'sc_g_cfg_f', value: 'sc_b_currency=EGP&sc_b_locale=en_US&sc_b_site=EG', domain: '.alibaba.com', path: '/' },
+        { name: 'xman_us_f', value: 'x_locale=en_US&x_l=0&x_c_chg=1', domain: '.alibaba.com', path: '/' },
+      ]);
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await page.waitForSelector('.searchx-offer-item', { timeout: 15000 }).catch(() => undefined);
       await page.mouse.wheel(0, 1500);

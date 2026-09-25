@@ -66,3 +66,7 @@ docker/certbot/
 # deploy. Deliberately untracked: it is machine state, not source, and having
 # git able to rewrite it is what took the site down.
 docker/nginx-upstreams/*.conf
+
+# Row backups written by apps/api/scripts cleanup/merge jobs (runtime data, not source)
+backups/
+*.bak

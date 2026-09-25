@@ -63,6 +63,11 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # Browser profiles hold the one-time CAPTCHA solves and bot-wall clearance
+    # cookies the scrapers depend on. Inside the image they were wiped on every
+    # deploy, silently re-blocking Alibaba/Amazon until someone re-solved them.
+    volumes:
+      - browser_profiles:/repo/apps/api/.browser-profiles
     networks:
       - internal
       - external
@@ -111,6 +116,7 @@ services:
 
 volumes:
   postgres_data:
+  browser_profiles:
   redis_data:
   meili_data:
 

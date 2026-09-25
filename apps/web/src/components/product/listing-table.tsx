@@ -90,6 +90,14 @@ export function ListingTable({ listings, showConfidence = false }: ListingTableP
                       <Badge variant="success" dot>Best Deal</Badge>
                     )}
                   </div>
+                  {/* One product covers every color of a model, so each store's
+                      own title is what says which color (and bundle) it sells. */}
+                  <p
+                    className="mt-1 max-w-[15rem] sm:max-w-sm text-xs text-ink-500 line-clamp-2"
+                    title={listing.rawTitle}
+                  >
+                    {listing.rawTitle}
+                  </p>
                 </td>
 
                 {/* Price — the store's own, unconverted price (what you'd actually

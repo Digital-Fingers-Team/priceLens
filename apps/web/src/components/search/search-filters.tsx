@@ -1,5 +1,6 @@
 'use client';
-import { RotateCcw } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Check, RotateCcw, SlidersHorizontal, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SORT_OPTIONS } from '@/config/constants';
@@ -17,19 +18,88 @@ const tierOptions: Array<{ label: string; value: SearchFiltersType['tier'] }> = 
 const selectClassName =
   'w-full h-10 rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ink-100 focus:border-signal/60 focus:outline-none focus:ring-1 focus:ring-signal/30 transition-colors';
 
-export function SearchFilters() {
-  const filters = useSearchStore((s) => s.filters);
-  const setFilter = useSearchStore((s) => s.setFilter);
-  const resetFilters = useSearchStore((s) => s.resetFilters);
+type FilterFields = Pick<
+  SearchFiltersType,
+  'brand' | 'categoryId' | 'tier' | 'minPrice' | 'maxPrice' | 'sortBy' | 'sortDir'
+>;
 
-  const hasActiveFilters =
-    !!filters.brand ||
-    !!filters.categoryId ||
-    !!filters.tier ||
-    filters.minPrice != null ||
-    filters.maxPrice != null ||
-    (filters.sortBy != null && filters.sortBy !== 'relevance') ||
-    (filters.sortDir != null && filters.sortDir !== 'desc');
+const EMPTY_FILTERS: FilterFields = {
+  brand: undefined,
+  categoryId: undefined,
+  tier: undefined,
+  minPrice: undefined,
+  maxPrice: undefined,
+  sortBy: 'relevance',
+  sortDir: 'desc',
+};
+
+function pickFilterFields(filters: SearchFiltersType): FilterFields {
+  const { brand, categoryId, tier, minPrice, maxPrice, sortBy, sortDir } = filters;
+  return { brand, categoryId, tier, minPrice, maxPrice, sortBy, sortDir };
+}
+
+function countActive(filters: FilterFields): number {
+  return [
+    !!filters.brand,
+    !!filters.categoryId,
+    !!filters.tier,
+    filters.minPrice != null,
+    filters.maxPrice != null,
+    (filters.sortBy ?? 'relevance') !== 'relevance' || (filters.sortDir ?? 'desc') !== 'desc',
+  ].filter(Boolean).length;
+}
+
+/**
+ * Collapsed to a small "Filters" button; opening it shows the form, and the
+ * search only re-runs on Apply, which also folds the form back into the
+ * button. Edits go to a local draft until then, so typing a price does not
+ * fire a search per keystroke, and Cancel really does leave results as they were.
+ */
+export function SearchFilters() {
+  const applied = useSearchStore((s) => s.filters);
+  const setFilters = useSearchStore((s) => s.setFilters);
+  const open = useSearchStore((s) => s.isFilterPanelOpen);
+  const toggleOpen = useSearchStore((s) => s.toggleFilterPanel);
+
+  const [filters, setDraft] = useState<FilterFields>(() => pickFilterFields(applied));
+  const setFilter = <K extends keyof FilterFields>(key: K, value: FilterFields[K]) =>
+    setDraft((draft) => ({ ...draft, [key]: value }));
+
+  // Re-seed the draft from what is applied each time the form opens (the URL
+  // or a new search may have changed it while it was closed).
+  useEffect(() => {
+    if (open) setDraft(pickFilterFields(applied));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const activeCount = countActive(pickFilterFields(applied));
+  const draftIsEmpty = countActive(filters) === 0;
+
+  const apply = () => {
+    setFilters(filters);
+    toggleOpen();
+  };
+
+  if (!open) {
+    return (
+      <div className="shrink-0 lg:sticky lg:top-24">
+        <Button
+          variant="secondary"
+          size="sm"
+          leftIcon={<SlidersHorizontal className="w-4 h-4" />}
+          onClick={toggleOpen}
+          aria-expanded={false}
+        >
+          Filters
+          {activeCount > 0 && (
+            <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-signal px-1.5 text-[11px] font-bold text-ink-900">
+              {activeCount}
+            </span>
+          )}
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <aside className="w-full lg:w-80 shrink-0 rounded-xl border border-ink-700 bg-ink-900 p-5 space-y-5 lg:sticky lg:top-24">
@@ -39,15 +109,20 @@ export function SearchFilters() {
           <p className="text-xs text-ink-500 mt-1">Refine the results list</p>
         </div>
 
-        <Button
-          variant="ghost"
-          size="xs"
-          leftIcon={<RotateCcw className="w-3.5 h-3.5" />}
-          disabled={!hasActiveFilters}
-          onClick={resetFilters}
-        >
-          Reset
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="xs"
+            leftIcon={<RotateCcw className="w-3.5 h-3.5" />}
+            disabled={draftIsEmpty}
+            onClick={() => setDraft(EMPTY_FILTERS)}
+          >
+            Reset
+          </Button>
+          <Button variant="ghost" size="xs" aria-label="Close filters" onClick={toggleOpen}>
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -134,6 +209,10 @@ export function SearchFilters() {
           </div>
         </div>
       </div>
+
+      <Button className="w-full" leftIcon={<Check className="w-4 h-4" />} onClick={apply}>
+        Apply
+      </Button>
     </aside>
   );
 }

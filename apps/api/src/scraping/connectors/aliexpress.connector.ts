@@ -43,6 +43,17 @@ export class AliExpressConnector implements RetailerConnector {
 
     const page = await this.browserSession.getPage(this.slug);
     try {
+      // AliExpress picks country, language and currency from the visitor's IP.
+      // This server geolocates to Saudi Arabia, so without these every search
+      // came back in Arabic with SAR prices in a format the price parser does
+      // not read -- all listings were priceless and dropped. Pinning Egypt /
+      // English / EGP gives "EGP574.91" labels, comparable with every other
+      // store without an FX conversion.
+      await page.context().addCookies([
+        { name: 'aep_usuc_f', value: 'site=glo&c_tp=EGP&region=EG&b_locale=en_US', domain: '.aliexpress.com', path: '/' },
+        { name: 'intl_locale', value: 'en_US', domain: '.aliexpress.com', path: '/' },
+        { name: 'xman_us_f', value: 'x_locale=en_US&x_l=1&x_c_chg=1&intl_locale=en_US', domain: '.aliexpress.com', path: '/' },
+      ]);
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await page.waitForSelector('a.search-card-item', { timeout: 15000 }).catch(() => undefined);
       await page.waitForTimeout(3000);
