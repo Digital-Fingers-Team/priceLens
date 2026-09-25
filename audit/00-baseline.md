@@ -214,3 +214,9 @@ Severity: P0 = broken/unsafe · P1 = real harm · P2 = polish.
 - **D-5 — Web test runner:** approved and done (Vitest + Playwright).
 - **D-6 — New: should one product page merge colors?** Today, colors are folded into one product (Galaxy A57: Navy, Gray, Icyblue, Lilac). That's good for comparing stores, but when colors are priced differently, "Best Deal" can point at a color the user doesn't want. **Recommendation:** keep one product per model+storage+RAM, show the color on each offer row, and add a color filter on the page (Phase 06).
 - **D-7 — New: repairing F-17 data in production.** Re-splitting the mixed products changes live pages and price history. **Recommendation:** in Phase 02, fix the extraction first, then run a dry-run report of every product with mixed RAM or storage for your review before applying it with a rollback file.
+
+### Answers (2026-09-25, after phase 00)
+
+- **D-6: decided.** Keep colors combined on one product page, and **add a color filter** on the product page (each offer row shows its color). Owner: phase 06 (UX), with the variant/color data from phase 02.
+- **D-7: delegated to my recommendation** ("whatever"). Phase 02 fixes extraction and matching and builds the repair as a dry-run report plus an apply script with a rollback file. Actually applying it to production waits for the fixed matcher to be deployed; otherwise live ingestion would re-merge the variants. Neither the deploy nor the repair happens unattended.
+- The owner asked for phases 01 to 11 to run without stopping for approval. Questions that need the owner are collected at the end instead.
