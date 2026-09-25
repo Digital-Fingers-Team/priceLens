@@ -1,22 +1,21 @@
 // apps/api/test/integration/auth.integration.spec.ts
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import * as request from 'supertest';
 import { AppModule } from '../../src/app.module';
-import { TransformInterceptor } from '../../src/common/interceptors/transform.interceptor';
+import { configureApp } from '../../src/app.setup';
 
 describe('Auth (integration)', () => {
-  let app: INestApplication;
+  let app: NestExpressApplication;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
 
-    app = moduleFixture.createNestApplication();
-    app.setGlobalPrefix('api/v1');
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-    app.useGlobalInterceptors(new TransformInterceptor());
+    // Same pipes, interceptors and filters as production (main.ts).
+    app = moduleFixture.createNestApplication<NestExpressApplication>({ rawBody: true });
+    configureApp(app);
     await app.init();
   });
 
