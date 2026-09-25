@@ -1,7 +1,7 @@
 import { QueryClient } from '@tanstack/react-query';
 import type { AxiosError } from 'axios';
 
-export function makeQueryClient() {
+function makeQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {

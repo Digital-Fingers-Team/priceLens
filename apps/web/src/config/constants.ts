@@ -16,8 +16,6 @@ export const API_BASE_URL =
     ? process.env.API_INTERNAL_URL ?? PUBLIC_API_URL
     : PUBLIC_API_URL;
 
-export const PUBLIC_API_BASE_URL = PUBLIC_API_URL;
-
 export const QUERY_KEYS = {
   search: (filters: unknown) => ['search', filters] as const,
   suggest: (q: string) => ['suggest', q] as const,
@@ -33,25 +31,11 @@ export const QUERY_KEYS = {
   dashboardStats: () => ['dashboard-stats'] as const,
 } as const;
 
-export const CONFIDENCE_LABELS: Record<string, { label: string; color: string }> = {
-  high: { label: 'High Confidence', color: 'text-signal' },
-  medium: { label: 'Medium Confidence', color: 'text-amber' },
-  low: { label: 'Low Confidence', color: 'text-danger' },
-};
-
 export const TIER_LABELS: Record<string, string> = {
   BUDGET: 'Budget',
   MID_RANGE: 'Mid-Range',
   PREMIUM: 'Premium',
   ULTRA_PREMIUM: 'Ultra Premium',
-};
-
-export const MATCH_STATUS_LABELS: Record<string, string> = {
-  ACCEPTED: 'Accepted',
-  PENDING: 'Pending Review',
-  REJECTED: 'Rejected',
-  MANUAL_ACCEPT: 'Manually Accepted',
-  MANUAL_REJECT: 'Manually Rejected',
 };
 
 export const SORT_OPTIONS = [

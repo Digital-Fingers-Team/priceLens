@@ -8,7 +8,7 @@ import { useUiStore } from '@/lib/store/ui.store';
 import { getApiErrorMessage } from '@/lib/utils/api-error';
 import type { CompetitorEventType, OrgType, SellerProductRow } from '@/types/seller.types';
 
-export const sellerKeys = {
+const sellerKeys = {
   workspaces: ['seller', 'workspaces'] as const,
   summary: (orgId: string) => ['seller', orgId, 'summary'] as const,
   products: (orgId: string, search?: string) => ['seller', orgId, 'products', search ?? ''] as const,

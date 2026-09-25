@@ -81,10 +81,3 @@ export interface MatchResult {
   processingMs: number;
   engineVersion: string;
 }
-
-// Confidence thresholds
-export const CONFIDENCE_THRESHOLDS = {
-  AUTO_ACCEPT: 0.88,
-  SEND_TO_REVIEW: 0.60,
-  // Below SEND_TO_REVIEW → REJECTED
-} as const;

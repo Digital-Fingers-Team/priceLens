@@ -298,5 +298,3 @@ export function parsePlanLimits(raw: unknown): PlanLimits {
     seats: seats ?? 1,
   };
 }
-
-export { ALL_ALERT_TYPES, FREE_ALERT_TYPES };

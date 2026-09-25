@@ -12,7 +12,7 @@ import { SetMetadata } from '@nestjs/common';
 import type { Request } from 'express';
 import { ApiKeysService, ResolvedApiKey } from './api-keys.service';
 
-export const API_SCOPES_KEY = 'api_scopes';
+const API_SCOPES_KEY = 'api_scopes';
 
 /** Declares which scope a public-API route needs. */
 export const RequiresApiScope = (...scopes: string[]) => SetMetadata(API_SCOPES_KEY, scopes);

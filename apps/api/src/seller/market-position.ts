@@ -1,4 +1,4 @@
-import { median, percentile, percentileRankOf } from '../intelligence/price-statistics';
+import { median, percentileRankOf } from '../intelligence/price-statistics';
 
 /**
  * Where a seller's price sits in the market for one product.
@@ -289,5 +289,3 @@ export function recommendPrice(input: {
     rationale,
   };
 }
-
-export { percentile };

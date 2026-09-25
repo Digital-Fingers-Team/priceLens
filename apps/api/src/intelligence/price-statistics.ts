@@ -265,7 +265,7 @@ export function computeHistoryStats(points: DailyPricePoint[]): HistoryStats | n
  * "we don't know yet" — which is a legitimate, and more trustworthy, answer.
  */
 export const MIN_DAYS_FOR_VERDICT = 10;
-export const MIN_SPAN_DAYS_FOR_VERDICT = 14;
+const MIN_SPAN_DAYS_FOR_VERDICT = 14;
 
 export type VerdictCode = 'GOOD_TIME_TO_BUY' | 'FAIR_PRICE' | 'WAIT' | 'INSUFFICIENT_DATA';
 export type ConfidenceCode = 'HIGH' | 'MEDIUM' | 'LOW';
@@ -555,7 +555,7 @@ export function filterPriceOutliers<T>(
  * an Alibaba "Honor X9d" at 8,400 EGP stand as the best deal on a phone that
  * costs 24,300 at Noon and Amazon.
  */
-export const MARKET_LOWER_RATIO = 0.5;
+const MARKET_LOWER_RATIO = 0.5;
 
 /**
  * filterPriceOutliers, judged against the *market* rather than the pile of

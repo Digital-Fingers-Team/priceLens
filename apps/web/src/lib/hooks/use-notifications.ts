@@ -8,7 +8,7 @@ import { useUiStore } from '@/lib/store/ui.store';
 import { getApiErrorMessage } from '@/lib/utils/api-error';
 import type { NotificationChannelType } from '@/types/billing.types';
 
-export const notificationKeys = {
+const notificationKeys = {
   list: ['notifications', 'list'] as const,
   unread: ['notifications', 'unread'] as const,
   channels: ['notifications', 'channels'] as const,

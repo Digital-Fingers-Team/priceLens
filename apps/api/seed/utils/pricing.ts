@@ -93,6 +93,6 @@ function ramMultiplier(ram: string): number {
   return 1;
 }
 
-export function roundMoney(value: number): number {
+function roundMoney(value: number): number {
   return Math.max(19.99, Math.round(value * 100) / 100);
 }

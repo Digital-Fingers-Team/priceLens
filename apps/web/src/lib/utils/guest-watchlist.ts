@@ -16,10 +16,6 @@ function writeIds(ids: Set<string>) {
   window.localStorage.setItem(KEY, JSON.stringify(Array.from(ids)));
 }
 
-export function getGuestWatchlistIds(): Set<string> {
-  return readIds();
-}
-
 export function isGuestWatched(productId: string): boolean {
   return readIds().has(productId);
 }

@@ -1,37 +1,3 @@
-import type { PriceStats } from '@/types/product.types';
-
-export function getPriceRange(stats: PriceStats | null | undefined): {
-  min: number | null;
-  max: number | null;
-  hasRange: boolean;
-  spread: number | null;
-  spreadPercent: number | null;
-} {
-  if (!stats) {
-    return { min: null, max: null, hasRange: false, spread: null, spreadPercent: null };
-  }
-
-  const { min, max } = stats;
-  const hasRange = min != null && max != null && min !== max;
-  const spread = hasRange ? (max! - min!) : null;
-  const spreadPercent = hasRange && min! > 0 ? ((max! - min!) / min!) * 100 : null;
-
-  return { min, max, hasRange, spread, spreadPercent };
-}
-
-export function getPriceDeltaVsAvg(
-  currentPrice: number | null,
-  avgPrice: number | null,
-): { delta: number | null; deltaPercent: number | null; isBelow: boolean } {
-  if (currentPrice == null || avgPrice == null || avgPrice === 0) {
-    return { delta: null, deltaPercent: null, isBelow: false };
-  }
-
-  const delta = currentPrice - avgPrice;
-  const deltaPercent = (delta / avgPrice) * 100;
-  return { delta, deltaPercent, isBelow: delta < 0 };
-}
-
 export function getConfidenceLevel(
   confidence: number | null | undefined,
 ): 'high' | 'medium' | 'low' | 'unknown' {

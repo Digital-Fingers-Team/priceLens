@@ -19,12 +19,3 @@ export function useProduct(slug: string, initialData?: CanonicalProduct) {
     initialData,
   });
 }
-
-export function useProductListings(productId: string, page = 1) {
-  return useQuery({
-    queryKey: QUERY_KEYS.productListings(productId),
-    queryFn: () => productApi.getListings(productId, page),
-    enabled: !!productId,
-    staleTime: 60 * 1000,
-  });
-}

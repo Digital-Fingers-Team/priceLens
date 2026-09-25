@@ -8,7 +8,7 @@ import { useUiStore } from '@/lib/store/ui.store';
 import { getApiErrorMessage } from '@/lib/utils/api-error';
 import type { Entitlements } from '@/types/billing.types';
 
-export const billingKeys = {
+const billingKeys = {
   plans: ['billing', 'plans'] as const,
   me: ['billing', 'me'] as const,
 };

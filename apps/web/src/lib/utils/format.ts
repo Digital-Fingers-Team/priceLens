@@ -15,17 +15,6 @@ export function formatCurrency(
   }).format(value);
 }
 
-export function formatCompactCurrency(
-  value: number | null | undefined,
-  currency: string | null = DEFAULT_CURRENCY,
-): string {
-  if (value == null) return '—';
-  if (value >= 1000) {
-    return `${currency ?? DEFAULT_CURRENCY} ${(value / 1000).toFixed(1)}k`;
-  }
-  return formatCurrency(value, currency);
-}
-
 export function formatDate(iso: string | null | undefined): string {
   if (!iso) return '—';
   return new Intl.DateTimeFormat('en-US', {
@@ -51,11 +40,6 @@ export function formatRelativeTime(iso: string | null | undefined): string {
 export function formatNumber(value: number | null | undefined): string {
   if (value == null) return '—';
   return new Intl.NumberFormat('en-US').format(value);
-}
-
-export function formatPercent(value: number | null | undefined, decimals = 1): string {
-  if (value == null) return '—';
-  return `${value >= 0 ? '+' : ''}${value.toFixed(decimals)}%`;
 }
 
 export function formatRating(value: number | null | undefined): string {

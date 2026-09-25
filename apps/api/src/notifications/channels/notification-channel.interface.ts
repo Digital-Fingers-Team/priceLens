@@ -37,5 +37,3 @@ export interface NotificationChannelDriver {
    */
   send(destination: string, notification: OutboundNotification): Promise<DeliveryResult>;
 }
-
-export const NOTIFICATION_CHANNEL_DRIVERS = Symbol('NOTIFICATION_CHANNEL_DRIVERS');
