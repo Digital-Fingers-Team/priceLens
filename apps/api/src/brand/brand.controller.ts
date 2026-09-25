@@ -4,7 +4,6 @@ import { OrgRole, ReportPeriod, User } from '@prisma/client';
 import { CurrentUser } from '../common/decorators';
 import { FEATURES } from '../billing/plan-limits';
 import { RequiresFeature } from '../billing/requires-feature.decorator';
-import { PrismaService } from '../database/prisma.service';
 import { OrganizationsService } from '../seller/organizations.service';
 import { MapMonitoringService } from './map-monitoring.service';
 import { DistributionService } from './distribution.service';
@@ -27,7 +26,6 @@ export class BrandController {
     private readonly distribution: DistributionService,
     private readonly launches: LaunchDetectionService,
     private readonly reports: MarketReportsService,
-    private readonly prisma: PrismaService,
   ) {}
 
   // ─── MAP monitoring ─────────────────────────────────────────────────────
@@ -81,69 +79,27 @@ export class BrandController {
 
   @Get('workspaces/:orgId/watches')
   @RequiresFeature(FEATURES.LAUNCH_DETECTION)
-  async listWatches(@CurrentUser() user: User, @Param('orgId', ParseUUIDPipe) orgId: string) {
-    await this.organizations.requireMembership(user.id, orgId);
-    const watches = await this.prisma.brandWatch.findMany({
-      where: { orgId },
-      include: { category: { select: { id: true, name: true } } },
-      orderBy: { createdAt: 'asc' },
-    });
-
-    return watches.map((watch) => ({
-      id: watch.id,
-      brand: watch.brand,
-      category: watch.category,
-      isOwnBrand: watch.isOwnBrand,
-      isActive: watch.isActive,
-      createdAt: watch.createdAt.toISOString(),
-    }));
+  listWatches(@CurrentUser() user: User, @Param('orgId', ParseUUIDPipe) orgId: string) {
+    return this.launches.listWatches(user.id, orgId);
   }
 
   @Put('workspaces/:orgId/watches')
   @RequiresFeature(FEATURES.LAUNCH_DETECTION)
-  async upsertWatch(
+  upsertWatch(
     @CurrentUser() user: User,
     @Param('orgId', ParseUUIDPipe) orgId: string,
     @Body() dto: UpsertBrandWatchDto,
   ) {
-    await this.organizations.requireMembership(user.id, orgId, OrgRole.ADMIN);
-
-    // find-then-write: categoryId is nullable and Prisma's compound-unique
-    // `where` type will not accept null for it.
-    const existing = await this.prisma.brandWatch.findFirst({
-      where: { orgId, brand: dto.brand, categoryId: dto.categoryId ?? null },
-    });
-
-    const watch = existing
-      ? await this.prisma.brandWatch.update({
-          where: { id: existing.id },
-          data: {
-            ...(dto.isOwnBrand != null ? { isOwnBrand: dto.isOwnBrand } : {}),
-            ...(dto.isActive != null ? { isActive: dto.isActive } : {}),
-          },
-        })
-      : await this.prisma.brandWatch.create({
-          data: {
-            orgId,
-            brand: dto.brand.trim(),
-            categoryId: dto.categoryId ?? null,
-            isOwnBrand: dto.isOwnBrand ?? false,
-            isActive: dto.isActive ?? true,
-          },
-        });
-
-    return { id: watch.id, brand: watch.brand, isActive: watch.isActive };
+    return this.launches.upsertWatch(user.id, orgId, dto);
   }
 
   @Delete('workspaces/:orgId/watches/:watchId')
-  async deleteWatch(
+  deleteWatch(
     @CurrentUser() user: User,
     @Param('orgId', ParseUUIDPipe) orgId: string,
     @Param('watchId', ParseUUIDPipe) watchId: string,
   ) {
-    await this.organizations.requireMembership(user.id, orgId, OrgRole.ADMIN);
-    await this.prisma.brandWatch.deleteMany({ where: { id: watchId, orgId } });
-    return { ok: true };
+    return this.launches.deleteWatch(user.id, orgId, watchId);
   }
 
   @Get('workspaces/:orgId/discoveries')

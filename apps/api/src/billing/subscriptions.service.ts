@@ -211,6 +211,33 @@ export class SubscriptionsService {
     await this.entitlements.invalidate(userId);
   }
 
+  /** The user behind a provider customer id, from their most recent subscription. */
+  async findUserIdByProviderCustomer(providerCustomerId: string): Promise<string | null> {
+    const existing = await this.prisma.subscription.findFirst({
+      where: { providerCustomerId },
+      select: { userId: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    return existing?.userId ?? null;
+  }
+
+  /**
+   * An admin hand-grant (enterprise contracts, comped accounts, support
+   * fixes): the plan from now, for `days` when given.
+   */
+  async adminGrantPlan(userId: string, planKey: string, days?: number): Promise<Subscription> {
+    const target = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+    if (!target) throw new NotFoundException('User not found');
+
+    const now = new Date();
+    return this.grantPlan(userId, planKey, {
+      provider: 'manual',
+      eventType: 'manual_grant',
+      currentPeriodStart: now,
+      ...(days ? { currentPeriodEnd: new Date(now.getTime() + days * 86_400_000) } : {}),
+    });
+  }
+
   async findByProviderSubscriptionId(id: string): Promise<Subscription | null> {
     return this.prisma.subscription.findUnique({ where: { providerSubscriptionId: id } });
   }

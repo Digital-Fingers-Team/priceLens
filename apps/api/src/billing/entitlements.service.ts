@@ -161,6 +161,15 @@ export class EntitlementsService {
 
   // ─── Convenience predicates ────────────────────────────────────────────
 
+  /** Live counts of what a user has used against their plan's limits. */
+  async getUsage(userId: string): Promise<{ trackedProducts: number; activeAlerts: number }> {
+    const [trackedProducts, activeAlerts] = await Promise.all([
+      this.prisma.watchlistItem.count({ where: { userId } }),
+      this.prisma.priceAlert.count({ where: { userId, status: 'ACTIVE' } }),
+    ]);
+    return { trackedProducts, activeAlerts };
+  }
+
   async hasFeature(userId: string | null | undefined, feature: FeatureKey): Promise<boolean> {
     const { limits } = await this.getEntitlements(userId);
     return limits.features.includes(feature);

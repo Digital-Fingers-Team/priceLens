@@ -3,7 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import { User, UserRole } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 import { CurrentUser, Public, Roles } from '../common/decorators';
-import { PrismaService } from '../database/prisma.service';
 import { EntitlementsService } from './entitlements.service';
 import { PlansService } from './plans.service';
 import { StripeService } from './stripe.service';
@@ -21,7 +20,6 @@ export class BillingController {
     private readonly subscriptions: SubscriptionsService,
     private readonly entitlements: EntitlementsService,
     private readonly stripe: StripeService,
-    private readonly prisma: PrismaService,
     private readonly config: ConfigService,
   ) {}
 
@@ -44,14 +42,11 @@ export class BillingController {
   async getMyBilling(@CurrentUser() user: User) {
     const entitlements = await this.entitlements.getEntitlements(user.id);
 
-    const [trackedProducts, activeAlerts] = await Promise.all([
-      this.prisma.watchlistItem.count({ where: { userId: user.id } }),
-      this.prisma.priceAlert.count({ where: { userId: user.id, status: 'ACTIVE' } }),
-    ]);
+    const usage = await this.entitlements.getUsage(user.id);
 
     return {
       ...entitlements,
-      usage: { trackedProducts, activeAlerts },
+      usage,
       checkoutEnabled: this.stripe.isConfigured,
     };
   }
@@ -139,16 +134,7 @@ export class BillingController {
   @Roles(UserRole.ADMIN)
   @Post('admin/grant')
   async adminGrant(@CurrentUser() actor: User, @Body() dto: AdminGrantPlanDto) {
-    const target = await this.prisma.user.findUnique({ where: { id: dto.userId } });
-    if (!target) throw new UpgradeRequiredException('User not found');
-
-    const now = new Date();
-    const subscription = await this.subscriptions.grantPlan(dto.userId, dto.planKey, {
-      provider: 'manual',
-      eventType: 'manual_grant',
-      currentPeriodStart: now,
-      ...(dto.days ? { currentPeriodEnd: new Date(now.getTime() + dto.days * 86_400_000) } : {}),
-    });
+    const subscription = await this.subscriptions.adminGrantPlan(dto.userId, dto.planKey, dto.days);
 
     this.logger.log(`Admin ${actor.id} granted plan ${dto.planKey} to user ${dto.userId}`);
     return { id: subscription.id, status: subscription.status, planKey: dto.planKey };

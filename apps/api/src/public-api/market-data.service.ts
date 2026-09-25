@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { MatchStatus } from '@prisma/client';
+import { CompetitorEventType, MatchStatus } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { PriceIntelligenceService } from '../intelligence/price-intelligence.service';
 import {
@@ -85,6 +85,48 @@ export class MarketDataService {
    * integrator has whatever identifier their own system holds and should not
    * have to maintain a mapping table just to call us.
    */
+  /**
+   * A workspace's own competitor events, newest first. Scoped by the caller's
+   * organisation, never by a caller-supplied id. `since` defaults to 7 days
+   * ago; an unparseable one means "from the beginning".
+   */
+  async listCompetitorEvents(
+    orgId: string,
+    filters: { type?: CompetitorEventType; since?: string; limit?: string },
+  ) {
+    const sinceDate = filters.since ? new Date(filters.since) : new Date(Date.now() - 7 * 86_400_000);
+
+    const events = await this.prisma.competitorEvent.findMany({
+      where: {
+        orgId,
+        ...(filters.type ? { type: filters.type } : {}),
+        detectedAt: { gte: Number.isNaN(sinceDate.getTime()) ? new Date(0) : sinceDate },
+      },
+      include: {
+        platform: { select: { name: true, slug: true } },
+        sellerProduct: { select: { sku: true, name: true } },
+      },
+      orderBy: { detectedAt: 'desc' },
+      take: Math.min(Math.max(Number(filters.limit ?? 100), 1), 500),
+    });
+
+    return {
+      events: events.map((event) => ({
+        id: event.id,
+        type: event.type,
+        severity: event.severity,
+        sku: event.sellerProduct?.sku ?? null,
+        product: event.sellerProduct?.name ?? null,
+        retailer: event.platform.name,
+        retailer_slug: event.platform.slug,
+        previous_price: event.previousPrice != null ? Number(event.previousPrice) : null,
+        new_price: event.newPrice != null ? Number(event.newPrice) : null,
+        change_pct: event.changePct,
+        detected_at: event.detectedAt.toISOString(),
+      })),
+    };
+  }
+
   private async resolveProduct(sku: string) {
     const product = await this.prisma.canonicalProduct.findFirst({
       where: {

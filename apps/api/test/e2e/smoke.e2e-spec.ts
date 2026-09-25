@@ -133,7 +133,7 @@ describe('Smoke (e2e)', () => {
     expect(JSON.stringify(rows)).toContain('smoke-jumia-phone');
   });
 
-  it('auth: register, login, me, logout, and the refresh token dies', async () => {
+  it('auth: register, login, me, billing, logout, and the refresh token dies', async () => {
     const http = request(app.getHttpServer());
     const suffix = Date.now().toString(36);
     const credentials = { email: `smoke_${suffix}@example.com`, password: 'SmokePass123' };
@@ -150,6 +150,13 @@ describe('Smoke (e2e)', () => {
       .get('/api/v1/auth/me')
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
+
+    const billing = await request(app.getHttpServer())
+      .get('/api/v1/billing/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+    expect(billing.body.data.planKey).toBe('free');
+    expect(billing.body.data.usage).toEqual({ trackedProducts: 0, activeAlerts: 0 });
 
     await request(app.getHttpServer())
       .post('/api/v1/auth/logout')

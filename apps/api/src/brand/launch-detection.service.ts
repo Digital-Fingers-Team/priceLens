@@ -1,9 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { MatchStatus, Prisma } from '@prisma/client';
+import { MatchStatus, OrgRole, Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { OrganizationsService } from '../seller/organizations.service';
+import type { UpsertBrandWatchDto } from './dto/brand.dto';
 
 export interface LaunchSweepResult {
   watchesChecked: number;
@@ -177,6 +178,62 @@ export class LaunchDetectionService {
     });
 
     return sent;
+  }
+
+  // ─── Brand watches (what the sweep looks for) ───────────────────────────
+
+  async listWatches(userId: string, orgId: string) {
+    await this.organizations.requireMembership(userId, orgId);
+    const watches = await this.prisma.brandWatch.findMany({
+      where: { orgId },
+      include: { category: { select: { id: true, name: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return watches.map((watch) => ({
+      id: watch.id,
+      brand: watch.brand,
+      category: watch.category,
+      isOwnBrand: watch.isOwnBrand,
+      isActive: watch.isActive,
+      createdAt: watch.createdAt.toISOString(),
+    }));
+  }
+
+  async upsertWatch(userId: string, orgId: string, dto: UpsertBrandWatchDto) {
+    await this.organizations.requireMembership(userId, orgId, OrgRole.ADMIN);
+
+    // find-then-write: categoryId is nullable and Prisma's compound-unique
+    // `where` type will not accept null for it.
+    const existing = await this.prisma.brandWatch.findFirst({
+      where: { orgId, brand: dto.brand, categoryId: dto.categoryId ?? null },
+    });
+
+    const watch = existing
+      ? await this.prisma.brandWatch.update({
+          where: { id: existing.id },
+          data: {
+            ...(dto.isOwnBrand != null ? { isOwnBrand: dto.isOwnBrand } : {}),
+            ...(dto.isActive != null ? { isActive: dto.isActive } : {}),
+          },
+        })
+      : await this.prisma.brandWatch.create({
+          data: {
+            orgId,
+            brand: dto.brand.trim(),
+            categoryId: dto.categoryId ?? null,
+            isOwnBrand: dto.isOwnBrand ?? false,
+            isActive: dto.isActive ?? true,
+          },
+        });
+
+    return { id: watch.id, brand: watch.brand, isActive: watch.isActive };
+  }
+
+  async deleteWatch(userId: string, orgId: string, watchId: string) {
+    await this.organizations.requireMembership(userId, orgId, OrgRole.ADMIN);
+    await this.prisma.brandWatch.deleteMany({ where: { id: watchId, orgId } });
+    return { ok: true };
   }
 
   async listDiscoveries(userId: string, orgId: string, limit = 100) {

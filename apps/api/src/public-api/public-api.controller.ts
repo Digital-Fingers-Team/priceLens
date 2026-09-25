@@ -3,7 +3,6 @@ import { ApiExcludeController } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import { CompetitorEventType } from '@prisma/client';
 import { Public } from '../common/decorators';
-import { PrismaService } from '../database/prisma.service';
 import { ApiKeyGuard, ApiKeyRequest, RequiresApiScope } from './api-key.guard';
 import { MarketDataService } from './market-data.service';
 import { MarketQueryDto } from './dto/public-api.dto';
@@ -31,10 +30,7 @@ import { MarketQueryDto } from './dto/public-api.dto';
 @SkipThrottle()
 @UseGuards(ApiKeyGuard)
 export class PublicApiController {
-  constructor(
-    private readonly marketData: MarketDataService,
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly marketData: MarketDataService) {}
 
   /** GET /api/v1/partner/products/{sku}/market */
   @Get('products/:sku/market')
@@ -58,44 +54,13 @@ export class PublicApiController {
    */
   @Get('events')
   @RequiresApiScope('events:read')
-  async listEvents(
+  listEvents(
     @Req() request: ApiKeyRequest,
     @Query('type') type?: CompetitorEventType,
     @Query('since') since?: string,
     @Query('limit') limit?: string,
   ) {
-    const orgId = request.apiKey!.orgId;
-    const sinceDate = since ? new Date(since) : new Date(Date.now() - 7 * 86_400_000);
-
-    const events = await this.prisma.competitorEvent.findMany({
-      where: {
-        orgId,
-        ...(type ? { type } : {}),
-        detectedAt: { gte: Number.isNaN(sinceDate.getTime()) ? new Date(0) : sinceDate },
-      },
-      include: {
-        platform: { select: { name: true, slug: true } },
-        sellerProduct: { select: { sku: true, name: true } },
-      },
-      orderBy: { detectedAt: 'desc' },
-      take: Math.min(Math.max(Number(limit ?? 100), 1), 500),
-    });
-
-    return {
-      events: events.map((event) => ({
-        id: event.id,
-        type: event.type,
-        severity: event.severity,
-        sku: event.sellerProduct?.sku ?? null,
-        product: event.sellerProduct?.name ?? null,
-        retailer: event.platform.name,
-        retailer_slug: event.platform.slug,
-        previous_price: event.previousPrice != null ? Number(event.previousPrice) : null,
-        new_price: event.newPrice != null ? Number(event.newPrice) : null,
-        change_pct: event.changePct,
-        detected_at: event.detectedAt.toISOString(),
-      })),
-    };
+    return this.marketData.listCompetitorEvents(request.apiKey!.orgId, { type, since, limit });
   }
 
   /** Lets an integrator confirm a key works and see its remaining quota. */

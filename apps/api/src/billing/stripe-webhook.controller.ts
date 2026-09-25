@@ -6,7 +6,6 @@ import type { Request } from 'express';
 import type Stripe from 'stripe';
 import { SubscriptionStatus } from '@prisma/client';
 import { Public } from '../common/decorators';
-import { PrismaService } from '../database/prisma.service';
 import { PlansService } from './plans.service';
 import { StripeService } from './stripe.service';
 import { SubscriptionsService } from './subscriptions.service';
@@ -31,7 +30,6 @@ export class StripeWebhookController {
     private readonly stripe: StripeService,
     private readonly subscriptions: SubscriptionsService,
     private readonly plans: PlansService,
-    private readonly prisma: PrismaService,
   ) {}
 
   @Public()
@@ -166,12 +164,7 @@ export class StripeWebhookController {
 
     // Last resort: a prior subscription for the same Stripe customer.
     const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id;
-    const existing = await this.prisma.subscription.findFirst({
-      where: { providerCustomerId: customerId },
-      select: { userId: true },
-      orderBy: { createdAt: 'desc' },
-    });
-    return existing?.userId ?? null;
+    return this.subscriptions.findUserIdByProviderCustomer(customerId);
   }
 
   private subscriptionIdFromInvoice(invoice: Stripe.Invoice): string | undefined {
