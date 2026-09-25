@@ -1,9 +1,9 @@
 import { Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bull';
-import { LiveIngestionService, LiveIngestionOptions } from '../scraping/live-ingestion.service';
+import { LiveIngestionService } from '../scraping/live-ingestion.service';
 import { StoreCoverageService } from '../scraping/store-coverage.service';
-import { ReconciliationOptions, ReconciliationService } from '../matching/reconciliation.service';
+import { ReconciliationService } from '../matching/reconciliation.service';
 import { PriceAlertService } from '../watchlist/price-alert.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SubscriptionsService } from '../billing/subscriptions.service';
@@ -12,28 +12,26 @@ import { MapMonitoringService } from '../brand/map-monitoring.service';
 import { LaunchDetectionService } from '../brand/launch-detection.service';
 import { MarketReportsService } from '../brand/market-reports.service';
 
-export const INGESTION_QUEUE = 'ingestion';
-export const RUN_LIVE_INGESTION_JOB = 'run-live-ingestion';
-export const RUN_QUERY_INGESTION_JOB = 'run-query-ingestion';
-export const RUN_RECONCILIATION_JOB = 'run-reconciliation';
-export const RUN_STORE_EXPANSION_JOB = 'run-store-expansion';
-export const RUN_STORE_COVERAGE_SWEEP_JOB = 'run-store-coverage-sweep';
-export const RUN_PRICE_ALERTS_JOB = 'run-price-alerts';
-export const RUN_NOTIFICATION_RETRY_JOB = 'run-notification-retry';
-export const RUN_SUBSCRIPTION_MAINTENANCE_JOB = 'run-subscription-maintenance';
-export const RUN_COMPETITOR_DETECTION_JOB = 'run-competitor-detection';
-export const RUN_MAP_SWEEP_JOB = 'run-map-sweep';
-export const RUN_LAUNCH_DETECTION_JOB = 'run-launch-detection';
-export const RUN_WEEKLY_REPORTS_JOB = 'run-weekly-reports';
-
-interface RunQueryIngestionData extends LiveIngestionOptions {
-  query: string;
-}
-
-interface RunStoreExpansionData {
-  productId: string;
-  targetStores?: number;
-}
+import {
+  INGESTION_QUEUE,
+  LiveIngestionJobData,
+  QueryIngestionJobData,
+  RUN_COMPETITOR_DETECTION_JOB,
+  RUN_LAUNCH_DETECTION_JOB,
+  RUN_LIVE_INGESTION_JOB,
+  RUN_MAP_SWEEP_JOB,
+  RUN_NOTIFICATION_RETRY_JOB,
+  RUN_PRICE_ALERTS_JOB,
+  RUN_QUERY_INGESTION_JOB,
+  RUN_RECONCILIATION_JOB,
+  RUN_STORE_COVERAGE_SWEEP_JOB,
+  RUN_STORE_EXPANSION_JOB,
+  RUN_SUBSCRIPTION_MAINTENANCE_JOB,
+  RUN_WEEKLY_REPORTS_JOB,
+  ReconciliationJobData,
+  StoreCoverageSweepJobData,
+  StoreExpansionJobData,
+} from './ingestion.jobs';
 
 @Processor(INGESTION_QUEUE)
 export class IngestionProcessor {
@@ -134,7 +132,7 @@ export class IngestionProcessor {
   }
 
   @Process(RUN_RECONCILIATION_JOB)
-  async handleRunReconciliation(job: Job<ReconciliationOptions>) {
+  async handleRunReconciliation(job: Job<ReconciliationJobData>) {
     this.logger.log(`Starting reconciliation (job ${job.id})`);
     const report = await this.reconciliationService.reconcile(job.data ?? {});
     this.logger.log(
@@ -145,7 +143,7 @@ export class IngestionProcessor {
   }
 
   @Process(RUN_LIVE_INGESTION_JOB)
-  async handleRunLiveIngestion(job: Job<LiveIngestionOptions>) {
+  async handleRunLiveIngestion(job: Job<LiveIngestionJobData>) {
     this.logger.log(`Starting live ingestion (job ${job.id})`);
     const report = await this.liveIngestionService.runLiveIngestion(job.data ?? {});
     this.logger.log(
@@ -156,7 +154,7 @@ export class IngestionProcessor {
   }
 
   @Process(RUN_STORE_EXPANSION_JOB)
-  async handleRunStoreExpansion(job: Job<RunStoreExpansionData>) {
+  async handleRunStoreExpansion(job: Job<StoreExpansionJobData>) {
     const { productId, targetStores } = job.data;
     this.logger.log(`Starting store expansion for product ${productId} (job ${job.id})`);
     await this.storeCoverageService.expandProductStores(productId, targetStores);
@@ -164,7 +162,7 @@ export class IngestionProcessor {
   }
 
   @Process(RUN_STORE_COVERAGE_SWEEP_JOB)
-  async handleRunStoreCoverageSweep(job: Job<{ maxProducts?: number }>) {
+  async handleRunStoreCoverageSweep(job: Job<StoreCoverageSweepJobData>) {
     this.logger.log(`Starting store coverage sweep (job ${job.id})`);
     const { scanned, expanded } = await this.storeCoverageService.runStoreCoverageSweep(
       job.data?.maxProducts,
@@ -175,7 +173,7 @@ export class IngestionProcessor {
   }
 
   @Process(RUN_QUERY_INGESTION_JOB)
-  async handleRunQueryIngestion(job: Job<RunQueryIngestionData>) {
+  async handleRunQueryIngestion(job: Job<QueryIngestionJobData>) {
     const { query, ...options } = job.data;
     this.logger.log(`Starting query-triggered ingestion for "${query}" (job ${job.id})`);
     const report = await this.liveIngestionService.runQueryIngestion(query, options);

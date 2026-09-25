@@ -1,16 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bull';
 import { ConfigService } from '@nestjs/config';
-import { Queue } from 'bull';
 import { MatchStatus, Prisma, ProductTier } from '@prisma/client';
 import type { CanonicalProduct, SourceListing } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { filterMarketOutliers } from '../intelligence/price-statistics';
-import {
-  INGESTION_QUEUE,
-  RUN_QUERY_INGESTION_JOB,
-  RUN_STORE_EXPANSION_JOB,
-} from '../workers/ingestion.processor';
+import { IngestionQueue } from '../workers/ingestion-queue.service';
 
 type SortBy = 'relevance' | 'minPriceUsd' | 'maxPriceUsd' | 'listingCount' | 'updatedAt';
 type SortDir = 'asc' | 'desc';
@@ -143,7 +137,7 @@ export class ProductsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
-    @InjectQueue(INGESTION_QUEUE) private readonly ingestionQueue: Queue,
+    private readonly ingestionQueue: IngestionQueue,
   ) {
     this.baseCurrency = this.config.get<string>('pricing.fxBaseCurrency', 'EGP');
     this.minStoresPerProduct = this.config.get<number>('retailers.minStoresPerProduct', 7);
@@ -419,15 +413,7 @@ export class ProductsService {
     }
 
     try {
-      await this.ingestionQueue.add(
-        RUN_QUERY_INGESTION_JOB,
-        { query, limitPerQuery: 12 },
-        {
-          jobId: `on-demand-live-fetch:${query}`,
-          removeOnComplete: true,
-          removeOnFail: true,
-        },
-      );
+      await this.ingestionQueue.enqueueQueryIngestion(query, 12);
       this.lastLiveFetchAt.set(query, Date.now());
       return true;
     } catch {
@@ -458,15 +444,7 @@ export class ProductsService {
     }
 
     try {
-      await this.ingestionQueue.add(
-        RUN_STORE_EXPANSION_JOB,
-        { productId, targetStores: this.minStoresPerProduct },
-        {
-          jobId: `store-expansion:${productId}`,
-          removeOnComplete: true,
-          removeOnFail: true,
-        },
-      );
+      await this.ingestionQueue.enqueueStoreExpansion(productId, this.minStoresPerProduct);
       this.lastStoreExpansionAt.set(productId, Date.now());
       return true;
     } catch {

@@ -5,7 +5,8 @@ import { MatchingModule } from '../matching/matching.module';
 import { WatchlistModule } from '../watchlist/watchlist.module';
 import { SellerModule } from '../seller/seller.module';
 import { BrandModule } from '../brand/brand.module';
-import { INGESTION_QUEUE, IngestionProcessor } from './ingestion.processor';
+import { INGESTION_QUEUE } from './ingestion.jobs';
+import { IngestionProcessor } from './ingestion.processor';
 import { IngestionScheduler } from './ingestion.scheduler';
 
 @Module({

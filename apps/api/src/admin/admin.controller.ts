@@ -1,16 +1,9 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
 import { CurrentUser, Roles } from '../common/decorators';
 import { AdminService, ResolveReviewItemInput } from './admin.service';
 import type { User } from '@prisma/client';
 import { UserRole } from '@prisma/client';
-import {
-  INGESTION_QUEUE,
-  RUN_LIVE_INGESTION_JOB,
-  RUN_RECONCILIATION_JOB,
-  RUN_STORE_COVERAGE_SWEEP_JOB,
-} from '../workers/ingestion.processor';
+import { IngestionQueue } from '../workers/ingestion-queue.service';
 
 interface RunLiveIngestionBody {
   platformSlugs?: string[];
@@ -29,7 +22,7 @@ interface RunStoreCoverageSweepBody {
 @Controller('admin')
 export class AdminController {
   constructor(
-    @InjectQueue(INGESTION_QUEUE) private readonly ingestionQueue: Queue,
+    private readonly ingestionQueue: IngestionQueue,
     private readonly adminService: AdminService,
   ) {}
 
@@ -69,17 +62,8 @@ export class AdminController {
 
     // A full sweep (dozens of scraper requests per platform) can run for minutes —
     // queue it instead of blocking the request past the frontend's timeout.
-    const job = await this.ingestionQueue.add(
-      RUN_LIVE_INGESTION_JOB,
-      { platformSlugs, limitPerQuery },
-      {
-        jobId: `manual-live-fetch:${(platformSlugs ?? ['all']).join(',')}`,
-        removeOnComplete: true,
-        removeOnFail: true,
-      },
-    );
-
-    return { queued: true, jobId: String(job.id), platformSlugs: platformSlugs ?? [] };
+    const jobId = await this.ingestionQueue.enqueueLiveIngestion({ platformSlugs, limitPerQuery });
+    return { queued: true, jobId, platformSlugs: platformSlugs ?? [] };
   }
 
   @Post('reconcile')
@@ -90,17 +74,8 @@ export class AdminController {
 
     // Scanning the whole catalog + LLM calls per candidate pair can run for a
     // while — queue it rather than block the request.
-    const job = await this.ingestionQueue.add(
-      RUN_RECONCILIATION_JOB,
-      { dryRun, maxPairs },
-      {
-        jobId: `manual-reconcile:${Date.now()}`,
-        removeOnComplete: true,
-        removeOnFail: true,
-      },
-    );
-
-    return { queued: true, jobId: String(job.id), dryRun: dryRun ?? 'env-default' };
+    const jobId = await this.ingestionQueue.enqueueReconciliation({ dryRun, maxPairs });
+    return { queued: true, jobId, dryRun: dryRun ?? 'env-default' };
   }
 
   @Post('store-coverage-sweep')
@@ -110,16 +85,7 @@ export class AdminController {
 
     // Scrapes every under-covered product's missing stores -- can run for a
     // while, so queue it rather than block the request.
-    const job = await this.ingestionQueue.add(
-      RUN_STORE_COVERAGE_SWEEP_JOB,
-      { maxProducts },
-      {
-        jobId: `manual-store-coverage-sweep:${Date.now()}`,
-        removeOnComplete: true,
-        removeOnFail: true,
-      },
-    );
-
-    return { queued: true, jobId: String(job.id) };
+    const jobId = await this.ingestionQueue.enqueueStoreCoverageSweep({ maxProducts });
+    return { queued: true, jobId };
   }
 }

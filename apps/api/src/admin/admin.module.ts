@@ -1,13 +1,11 @@
 import { Module } from '@nestjs/common';
-import { BullModule } from '@nestjs/bull';
-import { ScrapingModule } from '../scraping/scraping.module';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 import { DatabaseModule } from '../database/database.module';
-import { INGESTION_QUEUE } from '../workers/ingestion.processor';
+import { IngestionQueueModule } from '../workers/ingestion-queue.module';
 
 @Module({
-  imports: [DatabaseModule, ScrapingModule, BullModule.registerQueue({ name: INGESTION_QUEUE })],
+  imports: [DatabaseModule, IngestionQueueModule],
   controllers: [AdminController],
   providers: [AdminService],
 })

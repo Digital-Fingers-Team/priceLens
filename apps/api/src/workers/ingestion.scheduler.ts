@@ -14,7 +14,7 @@ import {
   RUN_MAP_SWEEP_JOB,
   RUN_LAUNCH_DETECTION_JOB,
   RUN_WEEKLY_REPORTS_JOB,
-} from './ingestion.processor';
+} from './ingestion.jobs';
 
 const REPEATABLE_JOB_ID = 'scheduled-live-ingestion';
 const RECONCILIATION_JOB_ID = 'scheduled-reconciliation';
