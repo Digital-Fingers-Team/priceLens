@@ -25,9 +25,9 @@
     "db:generate": "dotenv -e .env -- pnpm --dir apps/api exec prisma generate",
     "db:seed": "dotenv -e .env -- pnpm --dir apps/api exec ts-node prisma/seed.ts",
     "db:studio": "dotenv -e .env -- pnpm --dir apps/api exec prisma studio",
-    "docker:up": "docker compose up -d",
-    "docker:down": "docker compose down",
-    "docker:reset": "docker compose down -v && docker compose up -d"
+    "docker:up": "docker compose -p pricelens-dev -f docker-compose.yml up -d",
+    "docker:down": "docker compose -p pricelens-dev -f docker-compose.yml down",
+    "docker:reset": "docker compose -p pricelens-dev -f docker-compose.yml down -v && docker compose -p pricelens-dev -f docker-compose.yml up -d"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
