@@ -24,6 +24,7 @@
     "db:migrate": "dotenv -e .env -- pnpm --dir apps/api exec prisma migrate deploy",
     "db:generate": "dotenv -e .env -- pnpm --dir apps/api exec prisma generate",
     "db:seed": "dotenv -e .env -- pnpm --dir apps/api exec ts-node prisma/seed.ts",
+    "test:db:migrate": "dotenv -e .env.test -- pnpm --dir apps/api exec prisma migrate deploy",
     "db:studio": "dotenv -e .env -- pnpm --dir apps/api exec prisma studio",
     "docker:up": "docker compose -p pricelens-dev -f docker-compose.yml up -d",
     "docker:down": "docker compose -p pricelens-dev -f docker-compose.yml down",

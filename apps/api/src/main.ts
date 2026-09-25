@@ -5,7 +5,7 @@ import { ValidationPipe, ClassSerializerInterceptor, Logger } from '@nestjs/comm
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 const helmet: any = require('helmet');
 const compression: any = require('compression');
-import { AppModule } from './app.module';
+import { AppModule, ENV_FILES } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
@@ -22,6 +22,11 @@ async function bootstrap() {
   });
 
   const logger = new Logger('Bootstrap');
+  logger.log(
+    ENV_FILES.length > 0
+      ? `Loaded env files: ${ENV_FILES.join(', ')}`
+      : 'No env file loaded; using the process environment only',
+  );
   const httpServer: any = app.getHttpAdapter().getInstance();
 
   httpServer.get('/', (_req: any, res: any) => {

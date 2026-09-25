@@ -8,11 +8,11 @@
     "start": "node dist/src/main",
     "lint": "eslint \"{src,test}/**/*.ts\" --fix",
     "typecheck": "tsc --noEmit",
-    "test": "dotenv -e ../../.env -- jest",
-    "test:unit": "dotenv -e ../../.env -- jest --testPathPattern=test/unit --runInBand",
-    "test:integration": "dotenv -e ../../.env -- jest --testPathPattern=test/integration",
-    "test:e2e": "dotenv -e ../../.env -- jest --config jest.e2e.config.js",
-    "test:cov": "dotenv -e ../../.env -- jest --coverage",
+    "test": "dotenv -e ../../.env.test -- jest",
+    "test:unit": "dotenv -e ../../.env.test -- jest --testPathPattern=test/unit --runInBand",
+    "test:integration": "dotenv -e ../../.env.test -- jest --testPathPattern=test/integration",
+    "test:e2e": "dotenv -e ../../.env.test -- jest --config jest.e2e.config.js",
+    "test:cov": "dotenv -e ../../.env.test -- jest --coverage",
     "prisma:generate": "dotenv -e ../../.env -- prisma generate",
     "prisma:migrate": "dotenv -e ../../.env -- prisma migrate dev",
     "prisma:seed": "dotenv -e ../../.env -- ts-node prisma/seed.ts",
@@ -113,6 +113,7 @@
     ],
     "coverageDirectory": "./coverage",
     "testEnvironment": "node",
+    "globalSetup": "<rootDir>/test/setup/global-setup.ts",
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/src/$1"
     }

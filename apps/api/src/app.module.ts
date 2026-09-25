@@ -34,6 +34,9 @@ import pricingConfig from './config/pricing.config';
 import affiliateConfig from './config/affiliate.config';
 import billingConfig from './config/billing.config';
 import notificationsConfig from './config/notifications.config';
+import { resolveEnvFiles } from './config/env-files';
+
+export const ENV_FILES = resolveEnvFiles();
 
 @Module({
   imports: [
@@ -52,8 +55,10 @@ import notificationsConfig from './config/notifications.config';
         billingConfig,
         notificationsConfig,
       ],
-      // Shared with apps/web from the repo root — see /.env.example
-      envFilePath: ['../../.env.local', '../../.env'],
+      // Shared with apps/web from the repo root — see /.env.example and
+      // config/env-files.ts for how the file is located.
+      envFilePath: ENV_FILES,
+      ignoreEnvFile: ENV_FILES.length === 0,
       cache: true,
     }),
 
