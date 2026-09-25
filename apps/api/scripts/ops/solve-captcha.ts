@@ -4,7 +4,7 @@
  * the browser once real results are showing -- so the solved session is saved
  * to the profile the connector uses.
  *
- *   ts-node scripts/solve-captcha.ts <store> <url> <resultSelector> [cookie=value;domain ...]
+ *   ts-node scripts/ops/solve-captcha.ts <store> <url> <resultSelector> [cookie=value;domain ...]
  */
 import * as fs from 'fs';
 import * as path from 'path';

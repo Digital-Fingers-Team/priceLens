@@ -6,21 +6,21 @@
  * Uses its own browser profile directory (BROWSER_PROFILE_DIR) so it can run
  * next to the live API without fighting over a profile lock.
  *
- *   ts-node scripts/diagnose-stores.ts [store,store] ["query" ...]
+ *   ts-node scripts/ops/diagnose-stores.ts [store,store] ["query" ...]
  */
 import { Test } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
-import retailersConfig from '../src/config/retailers.config';
-import { BrowserSessionService } from '../src/scraping/browser/browser-session.service';
-import { AmazonConnector } from '../src/scraping/connectors/amazon.connector';
-import { AlibabaConnector } from '../src/scraping/connectors/alibaba.connector';
-import { AliExpressConnector } from '../src/scraping/connectors/aliexpress.connector';
-import { NoonConnector } from '../src/scraping/connectors/noon.connector';
-import { JumiaConnector } from '../src/scraping/connectors/jumia.connector';
-import { CarrefourConnector } from '../src/scraping/connectors/carrefour.connector';
-import { TwoBConnector } from '../src/scraping/connectors/twob.connector';
-import { ElarabyConnector } from '../src/scraping/connectors/elaraby.connector';
-import { RetailerConnector } from '../src/scraping/interfaces/retailer-connector.interface';
+import retailersConfig from '../../src/config/retailers.config';
+import { BrowserSessionService } from '../../src/scraping/browser/browser-session.service';
+import { AmazonConnector } from '../../src/scraping/connectors/amazon.connector';
+import { AlibabaConnector } from '../../src/scraping/connectors/alibaba.connector';
+import { AliExpressConnector } from '../../src/scraping/connectors/aliexpress.connector';
+import { NoonConnector } from '../../src/scraping/connectors/noon.connector';
+import { JumiaConnector } from '../../src/scraping/connectors/jumia.connector';
+import { CarrefourConnector } from '../../src/scraping/connectors/carrefour.connector';
+import { TwoBConnector } from '../../src/scraping/connectors/twob.connector';
+import { ElarabyConnector } from '../../src/scraping/connectors/elaraby.connector';
+import { RetailerConnector } from '../../src/scraping/interfaces/retailer-connector.interface';
 
 const CONNECTORS = [
   AmazonConnector,

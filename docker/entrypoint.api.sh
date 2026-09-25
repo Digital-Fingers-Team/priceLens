@@ -10,7 +10,7 @@ fluxbox >/tmp/fluxbox.log 2>&1 &
 
 # noVNC is OFF by default. Only turn it on (ENABLE_NOVNC=true) temporarily when
 # you need to do a one-time interactive login/CAPTCHA-solve for a connector's
-# profile (see apps/api/scripts/login-store.ts), then turn it back off — it's
+# profile (see apps/api/scripts/ops/login-store.ts), then turn it back off — it's
 # a remote-control window into this container's browser session, which is why
 # it refuses to start without a real VNC_PASSWORD rather than defaulting open.
 if [ "${ENABLE_NOVNC:-false}" = "true" ]; then

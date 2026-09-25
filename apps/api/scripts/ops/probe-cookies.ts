@@ -2,7 +2,7 @@
  * Loads a page and prints every cookie whose value mentions a currency or
  * locale, to find which cookie a store keys its currency/region on.
  *
- *   ts-node scripts/probe-cookies.ts <url> [cookie=value;domain ...]
+ *   ts-node scripts/ops/probe-cookies.ts <url> [cookie=value;domain ...]
  */
 import { chromium } from 'patchright';
 

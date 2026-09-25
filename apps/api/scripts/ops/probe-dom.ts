@@ -3,7 +3,7 @@
  * selectors: the main document's response headers, then the outer HTML of the
  * first matches of a selector (attributes kept, long text trimmed).
  *
- *   ts-node scripts/probe-dom.ts <url> <selector> [count] [waitMs]
+ *   ts-node scripts/ops/probe-dom.ts <url> <selector> [count] [waitMs]
  */
 import { chromium } from 'patchright';
 
