@@ -1,9 +1,12 @@
-import { readFileSync, readdirSync, statSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { validateEnv } from '../../src/config/env.validation';
 
 const REPO_ROOT = join(__dirname, '..', '..', '..', '..');
-const EXAMPLE = readFileSync(join(REPO_ROOT, '.env.example'), 'utf8');
+// The API image carries only apps/api, and deploy-api.sh runs the unit suite
+// inside it; this check needs the whole checkout, so it only runs there.
+const IN_CHECKOUT = existsSync(join(REPO_ROOT, '.env.example'));
+const EXAMPLE = IN_CHECKOUT ? readFileSync(join(REPO_ROOT, '.env.example'), 'utf8') : '';
 
 /** Variable names in .env.example, including commented-out `# NAME=` lines. */
 function documentedNames(): Set<string> {
@@ -27,7 +30,7 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
-describe('.env.example', () => {
+(IN_CHECKOUT ? describe : describe.skip)('.env.example', () => {
   it('passes startup validation as written', () => {
     expect(() => validateEnv(parseExample())).not.toThrow();
   });

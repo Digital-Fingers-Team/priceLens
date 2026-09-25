@@ -50,8 +50,11 @@ if [[ "${1:-}" != "--no-build" ]]; then
     || die "build failed -- nothing was swapped, the API is untouched"
 
   log "running unit tests against the built image"
+  # NODE_ENV=test and a *_test database name are required: the Jest global
+  # setup refuses to run under NODE_ENV=production (the image default) or
+  # against any database not named *_test. Unit tests never connect to it.
   podman run --rm --entrypoint sh -w /repo/apps/api localhost/pricelens_api:staging \
-    -lc 'DATABASE_URL=postgresql://unused:unused@127.0.0.1:5432/unused ./node_modules/.bin/jest --testPathPattern=test/unit --runInBand' \
+    -lc 'NODE_ENV=test DATABASE_URL=postgresql://unused:unused@127.0.0.1:5432/unused_test ./node_modules/.bin/jest --testPathPattern=test/unit --runInBand' \
     >/dev/null 2>&1 || die "unit tests failed in the built image -- refusing to deploy"
 
   # Keep the image currently deployed so a bad release can be put back.
