@@ -1,314 +1,69 @@
 # PriceLens
 
-PriceLens is a monorepo for a price comparison engine that aggregates product listings from multiple shopping sources, matches them into canonical products, and exposes search, pricing, and moderation workflows through a NestJS API.
+Price comparison for Egyptian stores. PriceLens collects listings from Amazon, Noon, Jumia, Carrefour, 2B, Elaraby, AliExpress and Alibaba, matches the same product across stores into one canonical product, and shows prices, price history and alerts.
 
-## Current Repository Layout
+- `apps/api`: NestJS API plus background workers (Prisma/PostgreSQL + pgvector, Redis, Bull)
+- `apps/web`: Next.js 14 App Router frontend
 
-- `apps/api` - NestJS backend, matching services, auth, Prisma, and tests
-- `scripts/init-db.sql` - PostgreSQL bootstrap script for required extensions
-- `docker-compose.yml` - Local infrastructure for PostgreSQL, Redis, and Meilisearch
-- `docker-compose.prod.yml` - Production compose stack template
-- `package.json` - Root workspace scripts
-
-## What Runs In This Snapshot
-
-This workspace currently contains the API app under `apps/api`.
-
-- The API starts on port `3001` by default.
-- Swagger docs are available at `/docs` in non-production environments.
-- PostgreSQL, Redis, and Meilisearch are expected to run alongside the API.
+See [PROJECT_MAP.md](PROJECT_MAP.md) for the full map (modules, jobs, ports, environment) and `audit/` for the current state of each overhaul phase.
 
 ## Prerequisites
 
-Install these before running the project:
+- Node.js 22 (`.nvmrc`; the Docker images use 22)
+- pnpm 11.4.0 (`corepack enable`, or `npx pnpm@11.4.0 …` where corepack is unavailable)
+- Docker with Compose v2, or Podman with its docker shim
 
-- Node.js 20 or newer
-- pnpm 11.4.0 or newer (Corepack-enabled)
-- Docker Desktop or Docker Engine with Compose v2
-- PostgreSQL client tools are optional but useful for debugging
-
-## Local Development Setup
-
-### 1) Install dependencies
-
-From the repository root:
+## Local development
 
 ```bash
 pnpm install
+pnpm dev:up
 ```
 
-### 2) Start local infrastructure
+`pnpm dev:up` (scripts/dev.sh) runs these steps:
 
-Bring up PostgreSQL, Redis, and Meilisearch:
+1. Starts PostgreSQL, Redis and Meilisearch as compose project `pricelens-dev`, on 127.0.0.1 only.
+2. Waits for them to be healthy.
+3. Applies migrations to `pricelens_dev` and `pricelens_test`.
+4. Seeds a 240-product demo catalog if the dev database is empty.
+5. Runs the API on http://localhost:3001 (Swagger at `/docs`) and the web app on http://localhost:3000. Ctrl-C stops both.
+
+It uses the committed `.env.development`: local values, with **every store connector, scheduled scrape and paid API turned off**, so development never hits real stores. Override with `ENV_FILE`, `API_PORT`, `WEB_PORT`, or `SKIP_SEED=1`.
+
+`.env.example` documents every variable the apps read. The API validates its environment at startup and refuses to boot, listing every problem, if something is missing or malformed.
+
+## Tests
+
+| Command | What | Needs |
+|---|---|---|
+| `pnpm --filter @pricelens/api test:unit` | API unit tests | nothing |
+| `pnpm --filter @pricelens/api test:integration` | Raw SQL and auth against a real database | dev stack |
+| `pnpm --filter @pricelens/api test:e2e` | Smoke: health, a real matching-pipeline run, search, product, auth | dev stack |
+| `pnpm --filter @pricelens/web test` | Component tests (Vitest) | nothing |
+| `pnpm --filter @pricelens/web test:e2e` | Browser smoke tests (Playwright), desktop + mobile | `pnpm dev:up` running |
+
+API tests load the committed `.env.test`. They **refuse to run** unless the database is local and its name ends in `_test`, so they can never touch a real database. Run `pnpm test:db:migrate` after adding migrations.
+
+Before pushing: `pnpm lint`, `pnpm typecheck`, `pnpm build`.
+
+## Useful scripts
+
+| Script | Does |
+|---|---|
+| `pnpm docker:up` / `docker:down` / `docker:reset` | Dev infrastructure only (`pricelens-dev`). `reset` deletes the dev volumes. |
+| `pnpm db:migrate` / `db:seed` / `db:studio` | Prisma against the root `.env` |
+| `pnpm --filter @pricelens/api lint:fix` | ESLint with autofix (`lint` only checks) |
+| `apps/api/scripts/ops/` | Manual tools for store logins, CAPTCHAs and broken connectors (see its README) |
+
+The seed refuses `SEED_GENERATE_PRODUCTS=true` and `SEED_RESET=true` when `NODE_ENV=production`.
+
+## Production
+
+The live server runs `docker-compose.server.yml` behind `pricelens-proxy` (nginx, ports 80/443). Deploys go through blue/green scripts:
 
 ```bash
-pnpm docker:up
+./scripts/deploy-api.sh   # build, migrate, swap; prints the rollback command
+./scripts/deploy-web.sh
 ```
 
-This uses `docker-compose.yml` and starts:
-
-- PostgreSQL on `localhost:5432`
-- Redis on `localhost:6379`
-- Meilisearch on `localhost:7700`
-
-If you want to stop the services later:
-
-```bash
-pnpm docker:down
-```
-
-To reset the local volumes and start fresh:
-
-```bash
-pnpm docker:reset
-```
-
-### 3) Create the environment file
-
-Both `apps/api` and `apps/web` read from a single `.env` file at the repo root:
-
-```bash
-cp .env.example .env
-```
-
-Use values like these for local development:
-
-```env
-NODE_ENV=development
-PORT=3001
-API_PREFIX=api/v1
-FRONTEND_URL=http://localhost:3000
-
-DATABASE_URL=postgresql://pricelens:pricelens_dev_password@localhost:5432/pricelens_dev?schema=public
-
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=pricelens_redis_dev
-REDIS_DB=0
-REDIS_URL=redis://:pricelens_redis_dev@localhost:6379/0
-
-MEILISEARCH_URL=http://localhost:7700
-MEILISEARCH_KEY=pricelens_meili_dev_key
-
-JWT_ACCESS_SECRET=change-me-access-secret
-JWT_REFRESH_SECRET=change-me-refresh-secret
-JWT_ACCESS_TTL=15m
-JWT_REFRESH_TTL=7d
-
-THROTTLE_TTL=60000
-THROTTLE_LIMIT=100
-THROTTLE_LIMIT_AUTH=500
-LOG_LEVEL=debug
-
-OPENAI_API_KEY=
-```
-
-Notes:
-
-- The app reads `MEILISEARCH_KEY` and also accepts `MEILISEARCH_MASTER_KEY` as a fallback.
-- `REDIS_URL` is included for convenience, even though the current code path mainly uses the host/port/password fields.
-- Keep the JWT secrets strong in any non-local environment.
-
-### 4) Initialize the database
-
-The repository includes Prisma scripts at the root:
-
-- `pnpm db:generate`
-- `pnpm db:migrate`
-- `pnpm db:seed`
-
-Typical local order:
-
-```bash
-pnpm db:generate
-pnpm db:migrate
-pnpm db:seed
-```
-
-Important:
-
-- `scripts/init-db.sql` enables the PostgreSQL extensions the platform needs: `uuid-ossp`, `vector`, `pg_trgm`, and `btree_gin`.
-- In this snapshot, `apps/api/prisma/schema.prisma` is empty, so Prisma commands will not succeed until the schema is populated.
-- If you are working from a later branch or a fuller code drop, run the commands above after the schema exists.
-
-### 5) Start the API
-
-Run the API in watch mode:
-
-```bash
-pnpm dev
-```
-
-The server should be available at:
-
-- API: `http://localhost:3001`
-- Swagger UI: `http://localhost:3001/docs`
-
-## Production Build
-
-### 1) Build the workspace
-
-```bash
-pnpm build
-```
-
-### 2) Run database migrations
-
-Use the production-safe Prisma deploy command:
-
-```bash
-pnpm db:migrate
-```
-
-### 3) Seed only if you need the built-in demo accounts
-
-```bash
-pnpm db:seed
-```
-
-The seed script creates sample admin and moderator accounts:
-
-- `admin@pricelens.dev` / `admin_dev_password_change_me`
-- `mod@pricelens.dev` / `moderator_dev_password`
-
-Do not keep those passwords in a real deployment.
-
-### 4) Run the app
-
-In a bare-metal deployment, start the compiled API:
-
-```bash
-pnpm start
-```
-
-If you plan to use `docker-compose.prod.yml`, note the following:
-
-- The file references `docker/Dockerfile.api` and `docker/Dockerfile.web`
-- Those Dockerfiles are not present in this repository snapshot
-- Add the missing Dockerfiles before relying on the production compose stack
-
-## Available Scripts
-
-From the repository root:
-
-- `pnpm dev` - run all workspace apps in watch mode
-- `pnpm build` - build all workspace apps
-- `pnpm test` - run all tests
-- `pnpm test:unit` - run unit tests
-- `pnpm test:integration` - run integration tests
-- `pnpm test:e2e` - run e2e tests
-- `pnpm lint` - lint all workspace apps
-- `pnpm typecheck` - run TypeScript type checking
-- `pnpm clean` - remove build artifacts and root `node_modules`
-- `pnpm db:generate` - generate Prisma client
-- `pnpm db:migrate` - deploy Prisma migrations
-- `pnpm db:seed` - seed the database
-- `pnpm db:studio` - open Prisma Studio
-- `pnpm docker:up` - start local infra services
-- `pnpm docker:down` - stop local infra services
-- `pnpm docker:reset` - stop local infra services and remove volumes
-
-## Testing
-
-Recommended test sequence during development:
-
-```bash
-pnpm test:unit
-pnpm test:integration
-pnpm test
-```
-
-You can also run the broader checks before a release:
-
-```bash
-pnpm lint
-pnpm typecheck
-pnpm build
-```
-
-## API Behavior
-
-- Global validation is enabled with NestJS `ValidationPipe`
-- Responses are normalized through global interceptors
-- Prisma errors are mapped through a global exception filter
-- Rate limiting is enabled through `@nestjs/throttler`
-- Redis-backed caching and Bull job queues are wired into the application module
-- Swagger is only enabled when `NODE_ENV !== production`
-
-## Matching Engine Notes
-
-The project is designed around canonical products and layered matching.
-
-- Exact identifiers such as GTIN, UPC, EAN, MPN, and SKU should take priority when present
-- Structured attributes should be extracted before fuzzy or semantic matching is used
-- Accessories should not be merged into a main product
-- Variants such as storage, RAM, and model trims should stay separate
-- Every accept/reject decision should leave an audit trail
-
-## Known Gaps In This Snapshot
-
-This README reflects the repository as it exists in this workspace.
-
-- `apps/api/prisma/schema.prisma` is empty
-- `docker-compose.prod.yml` references Dockerfiles that are not present in the repo
-- There is no frontend app checked into `apps/` yet
-
-If you are continuing the project, fill those pieces in before treating the production stack as complete.
-
-## Suggested Local Workflow
-
-1. Start infra with `pnpm docker:up`
-2. Add a root `.env` (copy from `.env.example`)
-3. Restore or create the Prisma schema and migrations
-4. Run `pnpm db:generate`
-5. Run `pnpm db:migrate`
-6. Run `pnpm db:seed`
-7. Start the API with `pnpm dev`
-8. Open `http://localhost:3001/docs`
-
-
-## End-to-End Commands (Fresh Setup → Production Ready)
-
-Use this exact command sequence from a clean clone to a production-ready build and run:
-
-```bash
-# 1) Install dependencies
-pnpm install
-
-# 2) Start required local infrastructure (PostgreSQL, Redis, Meilisearch)
-pnpm docker:up
-
-# 3) Create the shared env file (first time only)
-cp .env.example .env
-
-# make this if first time for database
-# cd apps/api
-# pnpm --dir apps/api exec prisma migrate dev --name init
-# 4) Prepare database
-pnpm db:generate
-pnpm db:migrate
-pnpm db:seed
-
-# 5) Run quality gates
-pnpm lint
-pnpm typecheck
-pnpm test
-
-# 6) Build production artifacts
-pnpm build
-
-# 7) Start in production mode
-pnpm start
-```
-
-Optional shutdown/reset commands:
-
-```bash
-pnpm docker:down   # stop infra
-pnpm docker:reset  # stop infra + delete volumes
-```
-```bash
-if the port is busy in backend :
-
-Get-NetTCPConnection -LocalPort 3001 -State Listen | Select-Object -Expand OwningProcess | ForEach-Object { Stop-Process -Id $_ -Force }
-```
+The API container applies pending migrations on start (`docker/entrypoint.api.sh`).
