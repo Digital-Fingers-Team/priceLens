@@ -30,6 +30,7 @@ const PROFILE_DEFAULTS: Record<SeedProfile, Pick<SeedConfig,
 };
 
 export function loadSeedConfig(env: NodeJS.ProcessEnv = process.env): SeedConfig {
+  assertSeedAllowed(env);
   const profile = parseProfile(env.SEED_PROFILE);
   const defaults = PROFILE_DEFAULTS[profile];
   const historyRowsPerListing = positiveInt(env.SEED_HISTORY_TARGET, defaults.historyRowsPerListing);
@@ -53,7 +54,29 @@ export function loadSeedConfig(env: NodeJS.ProcessEnv = process.env): SeedConfig
 
 function parseProfile(value: string | undefined): SeedProfile {
   if (value === 'demo' || value === 'medium' || value === 'full') return value;
-  return 'full';
+  // The small profile is the default: `full` writes ~20M price-history rows,
+  // which is a load test, not something to get by forgetting a variable.
+  return 'demo';
+}
+
+/**
+ * Synthetic products and SEED_RESET only make sense on a development
+ * database. In production the first mixes invented listings into the real
+ * catalog and the second deletes marketplace rows, so both are refused there
+ * outright rather than trusted to a correctly-set variable.
+ */
+export function assertSeedAllowed(env: NodeJS.ProcessEnv = process.env): void {
+  if (env.NODE_ENV !== 'production') return;
+  const refused = [
+    env.SEED_GENERATE_PRODUCTS === 'true' ? 'SEED_GENERATE_PRODUCTS=true' : null,
+    env.SEED_RESET === 'true' ? 'SEED_RESET=true' : null,
+  ].filter((flag): flag is string => flag !== null);
+  if (refused.length > 0) {
+    throw new Error(
+      `[seed] Refusing ${refused.join(' and ')} with NODE_ENV=production: ` +
+        'synthetic data and resets are for development databases only.',
+    );
+  }
 }
 
 function positiveInt(value: string | undefined, fallback: number): number {

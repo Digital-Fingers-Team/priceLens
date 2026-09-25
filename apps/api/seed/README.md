@@ -6,7 +6,7 @@ By default `pnpm db:seed` only bootstraps users, categories, and store/platform 
 
 ## Profiles
 
-`pnpm db:seed` defaults to `SEED_PROFILE=full` (only relevant when `SEED_GENERATE_PRODUCTS=true`).
+`pnpm db:seed` defaults to `SEED_PROFILE=demo` (only relevant when `SEED_GENERATE_PRODUCTS=true`).
 
 | Profile | Products | Listings/product | Challenge listings | History/listing |
 | --- | ---: | ---: | ---: | ---: |
@@ -27,7 +27,7 @@ SEED_PROFILE=medium SEED_BATCH_SIZE=5000 pnpm db:seed
 ## Environment
 
 - `SEED_GENERATE_PRODUCTS=true` enables synthetic canonical product/listing/price-history generation; omitted or any other value skips it
-- `SEED_PROFILE=full|medium|demo`, default `full`
+- `SEED_PROFILE=full|medium|demo`, default `demo`
 - `SEED_RESET=true` deletes generated marketplace rows before seeding
 - `SEED_RESUME=false` starts a new run instead of resuming an active one
 - `SEED_BATCH_SIZE` controls COPY batch size
