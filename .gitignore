@@ -73,3 +73,7 @@ docker/nginx-upstreams/*.conf
 # Row backups written by apps/api/scripts cleanup/merge jobs (runtime data, not source)
 backups/
 *.bak
+
+# Playwright output
+**/test-results/
+**/playwright-report/
