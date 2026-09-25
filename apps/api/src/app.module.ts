@@ -36,6 +36,7 @@ import billingConfig from './config/billing.config';
 import notificationsConfig from './config/notifications.config';
 import { resolveEnvFiles } from './config/env-files';
 import { validateEnv } from './config/env.validation';
+import { RedisCacheShutdown } from './common/redis-cache-shutdown';
 
 export const ENV_FILES = resolveEnvFiles();
 
@@ -136,6 +137,7 @@ export const ENV_FILES = resolveEnvFiles();
     // registered, every @Throttle decorator in the app is inert and endpoints
     // like login and the scrape-triggering search are unthrottled.
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    RedisCacheShutdown,
     // FeatureGuard (@RequiresFeature) is registered in AuthModule, directly
     // after JwtAuthGuard -- it needs request.user, so it must not run before
     // authentication has populated it.
