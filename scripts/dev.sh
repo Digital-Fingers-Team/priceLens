@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One command for local development: `pnpm dev:up`
 #
-#   1. start Postgres/Redis/Meilisearch (docker-compose.yml, project pricelens-dev)
+#   1. start Postgres and Redis (docker-compose.yml, project pricelens-dev)
 #   2. wait until they are healthy
 #   3. apply migrations to the dev and test databases
 #   4. seed the demo catalog if the dev database has no products yet
@@ -36,8 +36,7 @@ log "Starting infrastructure (project pricelens-dev)..."
 log "Waiting for services to become healthy..."
 for _ in $(seq 1 60); do
   if docker exec pricelens-dev-postgres pg_isready -U pricelens -d pricelens_dev >/dev/null 2>&1 &&
-     docker exec pricelens-dev-redis redis-cli -a pricelens_redis_dev --no-auth-warning ping 2>/dev/null | grep -q PONG &&
-     curl -fs http://127.0.0.1:7700/health >/dev/null 2>&1; then
+     docker exec pricelens-dev-redis redis-cli -a pricelens_redis_dev --no-auth-warning ping 2>/dev/null | grep -q PONG; then
     ready=1
     break
   fi

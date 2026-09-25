@@ -49,8 +49,3 @@
     text-wrap: balance;
   }
 }
-
-/* Meilisearch highlight marks */
-mark {
-  background: transparent;
-}

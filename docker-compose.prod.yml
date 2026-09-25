@@ -32,17 +32,6 @@ services:
       timeout: 5s
       retries: 5
 
-  meilisearch:
-    image: docker.io/getmeili/meilisearch:v1.6
-    restart: always
-    environment:
-      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
-      MEILI_ENV: production
-    volumes:
-      - meili_data:/meili_data
-    networks:
-      - internal
-
   api:
     build:
       context: .
@@ -86,7 +75,6 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  meili_data:
 
 networks:
   internal:

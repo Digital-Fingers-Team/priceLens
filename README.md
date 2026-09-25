@@ -22,7 +22,7 @@ pnpm dev:up
 
 `pnpm dev:up` (scripts/dev.sh) runs these steps:
 
-1. Starts PostgreSQL, Redis and Meilisearch as compose project `pricelens-dev`, on 127.0.0.1 only.
+1. Starts PostgreSQL and Redis as compose project `pricelens-dev`, on 127.0.0.1 only.
 2. Waits for them to be healthy.
 3. Applies migrations to `pricelens_dev` and `pricelens_test`.
 4. Seeds a 240-product demo catalog if the dev database is empty.

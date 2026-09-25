@@ -1,4 +1,4 @@
-# Local development infrastructure only (Postgres + pgvector, Redis, Meilisearch).
+# Local development infrastructure only (Postgres + pgvector, Redis).
 #
 # The explicit project name keeps this stack's containers and volumes apart
 # from production. Without it, compose derives the project from the directory
@@ -44,24 +44,6 @@ services:
       timeout: 5s
       retries: 10
 
-  meilisearch:
-    image: docker.io/getmeili/meilisearch:v1.6
-    container_name: pricelens-dev-meilisearch
-    restart: unless-stopped
-    environment:
-      MEILI_MASTER_KEY: pricelens_meili_dev_key
-      MEILI_ENV: development
-    ports:
-      - "127.0.0.1:7700:7700"
-    volumes:
-      - meili_data:/meili_data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
 volumes:
   postgres_data:
   redis_data:
-  meili_data:

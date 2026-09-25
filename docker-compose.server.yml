@@ -39,17 +39,9 @@ services:
       timeout: 5s
       retries: 5
 
-  meilisearch:
-    image: docker.io/getmeili/meilisearch:v1.6
-    container_name: pricelens-meilisearch
-    restart: always
-    environment:
-      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
-      MEILI_ENV: production
-    volumes:
-      - meili_data:/meili_data
-    networks:
-      - internal
+  # Meilisearch was removed (ADR 0003): nothing queried it. The container that
+  # may still be running from before is no longer part of this stack; stopping
+  # it and deleting its volume is an owner decision (audit 01, D-8).
 
   api:
     image: localhost/pricelens_api:latest
@@ -118,7 +110,6 @@ volumes:
   postgres_data:
   browser_profiles:
   redis_data:
-  meili_data:
 
 networks:
   internal:

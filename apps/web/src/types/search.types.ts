@@ -5,11 +5,6 @@ export interface SearchHit extends CanonicalProduct {
   maxPriceUsd: number | null;
   listingCount: number;
   storeCount: number;
-  _formatted?: {
-    title?: string;
-    brand?: string;
-    model?: string;
-  };
 }
 
 export interface SearchResponse {

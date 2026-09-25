@@ -2,8 +2,6 @@
 import { registerAs } from '@nestjs/config';
 
 export default registerAs('search', () => ({
-  meilisearchUrl: process.env.MEILISEARCH_URL ?? 'http://localhost:7700',
-  meilisearchKey: process.env.MEILISEARCH_KEY ?? process.env.MEILISEARCH_MASTER_KEY ?? '',
   // Match-judgement and embeddings both run via OpenRouter (cloud) -- this app
   // needs internet access anyway to scrape live retailer sites, and a local
   // Ollama model was both slower and less reliable on this machine's hardware.

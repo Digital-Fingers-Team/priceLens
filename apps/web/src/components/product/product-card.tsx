@@ -23,7 +23,6 @@ export function ProductCard({ product }: ProductCardProps) {
 
   const hasPrice = product.minPriceUsd != null;
   const hasPriceRange = hasPrice && product.maxPriceUsd != null && product.minPriceUsd !== product.maxPriceUsd;
-  const titleHtml = product._formatted?.title ?? product.title;
 
   function handleWatchlist(e: React.MouseEvent) {
     e.preventDefault();
@@ -104,11 +103,8 @@ export function ProductCard({ product }: ProductCardProps) {
             </p>
           )}
 
-          {/* Title — Meilisearch highlights with <mark> */}
-          <h3
-            className="text-sm font-semibold text-ink-100 leading-snug line-clamp-2 [&_mark]:bg-signal/20 [&_mark]:text-signal [&_mark]:rounded"
-            dangerouslySetInnerHTML={{ __html: titleHtml }}
-          />
+          {/* Title: store-supplied text, always rendered as text */}
+          <h3 className="text-sm font-semibold text-ink-100 leading-snug line-clamp-2">{product.title}</h3>
 
           {/* Store count (distinct retailers, not raw listing rows) */}
           <div className="flex items-center gap-1 text-xs text-ink-500">

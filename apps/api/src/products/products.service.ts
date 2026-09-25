@@ -680,11 +680,6 @@ export class ProductsService {
       minPriceUsd: stats.minPriceUsd,
       maxPriceUsd: stats.maxPriceUsd,
       listingCount: stats.listingCount,
-      _formatted: {
-        title: product.title,
-        brand: product.brand ?? undefined,
-        model: product.model ?? undefined,
-      },
     };
   }
 
