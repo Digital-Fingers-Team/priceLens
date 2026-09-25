@@ -35,6 +35,7 @@ import affiliateConfig from './config/affiliate.config';
 import billingConfig from './config/billing.config';
 import notificationsConfig from './config/notifications.config';
 import { resolveEnvFiles } from './config/env-files';
+import { validateEnv } from './config/env.validation';
 
 export const ENV_FILES = resolveEnvFiles();
 
@@ -59,6 +60,7 @@ export const ENV_FILES = resolveEnvFiles();
       // config/env-files.ts for how the file is located.
       envFilePath: ENV_FILES,
       ignoreEnvFile: ENV_FILES.length === 0,
+      validate: validateEnv,
       cache: true,
     }),
 
