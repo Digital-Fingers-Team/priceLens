@@ -10,4 +10,7 @@ module.exports = {
   moduleNameMapper: { '^@/(.*)$': '<rootDir>/src/$1' },
   globalSetup: '<rootDir>/test/setup/global-setup.ts',
   testTimeout: 60000,
+  // Every e2e file truncates and refills the same test database, so files
+  // must never run concurrently.
+  maxWorkers: 1,
 };
