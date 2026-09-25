@@ -8,6 +8,7 @@
     "build:web": "pnpm --filter @pricelens/web build",
     "build:api": "pnpm --filter @pricelens/api build",
     "dev": "turbo run dev --parallel",
+    "dev:up": "bash scripts/dev.sh",
     "dev:api": "pnpm --filter @pricelens/api dev",
     "dev:web": "pnpm --filter @pricelens/web dev",
     "prestart": "pnpm run build",

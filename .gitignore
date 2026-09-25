@@ -26,6 +26,7 @@ coverage/
 !/.deploy.env.example
 # Local throwaway values only (tests refuse any non-local, non-*_test database)
 !/.env.test
+!/.env.development
 
 # Logs
 *.log
