@@ -6,7 +6,8 @@ import { PrismaService } from '../database/prisma.service';
 import { FuzzyMatcherService } from './fuzzy-matcher.service';
 import { NormalizerService } from './normalizer.service';
 import { SemanticService } from './semantic.service';
-import { identifiersConflict } from './pipeline';
+import { capacityGb, checkConflicts, normalizeListing } from './pipeline';
+import type { MatchingTools } from './pipeline';
 
 interface CandidatePair {
   a_id: string;
@@ -46,12 +47,17 @@ export interface ReconciliationReport {
  * re-running conflict guards + model agreement + LLM judgement over the stored
  * catalog and collapsing confirmed duplicates onto one canonical.
  *
- * Its guards are NOT the pipeline's (step 8): it treats color as a conflict
- * and skips the product-type and chip guards. See audit 01, A-12.
+ * Its guards ARE the pipeline's (step 8, checkConflicts), so a pair the
+ * ingestion matcher would keep apart is never merged here, and color is never
+ * a conflict (owner decision D-6). On top of them it is stricter about
+ * variants a title leaves out: merging two stored products is destructive,
+ * so one that states its RAM or storage is never merged with one that does
+ * not (audit 02, L-04).
  */
 @Injectable()
 export class ReconciliationService {
   private readonly logger = new Logger(ReconciliationService.name);
+  private readonly tools: MatchingTools;
 
   constructor(
     private readonly config: ConfigService,
@@ -59,7 +65,9 @@ export class ReconciliationService {
     private readonly semantic: SemanticService,
     private readonly fuzzyMatcher: FuzzyMatcherService,
     private readonly normalizer: NormalizerService,
-  ) {}
+  ) {
+    this.tools = { normalizer, fuzzy: fuzzyMatcher };
+  }
 
   async reconcile(options: ReconciliationOptions = {}): Promise<ReconciliationReport> {
     const dryRun = options.dryRun ?? this.config.get<boolean>('search.reconciliationDryRun', true);
@@ -108,7 +116,9 @@ export class ReconciliationService {
       // several phone brands. Skip the LLM call entirely when it agrees.
       const modelA = this.normalizer.extractAttributes(a.title).model?.trim().toLowerCase();
       const modelB = this.normalizer.extractAttributes(b.title).model?.trim().toLowerCase();
-      const modelsAgree = !!modelA && !!modelB && modelA === modelB;
+      // Not for accessories: their model is the phone they fit, which every
+      // case and screen protector for that phone shares.
+      const modelsAgree = !!modelA && !!modelB && modelA === modelB && !this.normalizer.isAccessory(a.title);
 
       const verdict = modelsAgree ? true : await this.semantic.judgeSameProduct(a.title, b.title);
       if (verdict !== true) continue;
@@ -160,7 +170,7 @@ export class ReconciliationService {
    * checking one directly: a known duplicate pair sat at 0.54, a known
    * non-duplicate pair sat at 1.0). Trigram similarity ranks these sanely —
    * the true duplicate outscores the wrong-color variant — and the
-   * `hasHardConflict` guard below (brand/color/storage/RAM/identifier) still
+   * `hasHardConflict` guard below (the pipeline's step 8 guards) still
    * does the real precision filtering before any pair reaches the LLM.
    */
   private async findCandidatePairs(
@@ -257,43 +267,32 @@ export class ReconciliationService {
   }
 
   /**
-   * Mirror of LiveIngestionService's ingestion-time guards, but comparing two
-   * stored canonicals: brand, accessory-vs-product, variant tier, conflicting
-   * identifiers, and storage/RAM/color. Any hard conflict means "definitely not
-   * the same product" — skip before spending an LLM call.
+   * The pipeline's step 8 guards between two stored products (one read as the
+   * "listing", the other as the candidate), plus: RAM or storage stated by
+   * one and not the other, and the variant fields of the stored `attributes`
+   * column. Any of these means "not provably the same product" -- skip
+   * before spending an LLM call. Color is never a conflict (D-6).
    */
   private hasHardConflict(a: CanonicalRow, b: CanonicalRow): boolean {
-    const brandA = a.brand?.trim().toLowerCase() ?? null;
-    const brandB = b.brand?.trim().toLowerCase() ?? null;
-    if (brandA && brandB && brandA !== brandB) return true;
+    const input = normalizeListing(
+      {
+        title: a.title,
+        priceUsd: null,
+        currency: 'EGP',
+        brand: a.brand,
+        model: a.model,
+        identifiers: { gtin: a.gtin, upc: a.upc, ean: a.ean, mpn: a.mpn },
+      },
+      this.tools,
+    );
+    const guard = checkConflicts(input, b, this.tools);
+    if (guard.conflict !== null) return true;
 
-    if (this.normalizer.isAccessory(a.title) !== this.normalizer.isAccessory(b.title)) return true;
-
-    if (this.fuzzyMatcher.detectVariantConflict(a.title, b.title)) return true;
-
-    if (this.fuzzyMatcher.detectModelCodeSuffixConflict(a.title, b.title)) return true;
-
-    if (this.fuzzyMatcher.detectDisjointModelConflict(a.title, b.title)) return true;
-
-    if (identifiersConflict(a, b)) return true;
-
-    if (this.fuzzyMatcher.detectConditionConflict(a.title, b.title)) return true;
-
-    // Recomputed fresh from the title rather than trusting the stored
-    // `attributes` column: older/previously-merged canonical rows can have
-    // stale or never-populated storage/RAM/color/display data (a real false
-    // merge this caused: "Cobalt Violet" merged with "Black" because the
-    // stored attributes on one side had no color at all, even though it's
-    // extractable straight from the title).
-    const extractedA = this.normalizer.extractAttributes(a.title);
-    const extractedB = this.normalizer.extractAttributes(b.title);
-    if (
-      this.fuzzyMatcher.detectStorageConflict(extractedA.storage, extractedB.storage) ||
-      this.fuzzyMatcher.detectRamConflict(extractedA.ram, extractedB.ram) ||
-      this.fuzzyMatcher.detectColorConflict(extractedA.color, extractedB.color) ||
-      this.fuzzyMatcher.detectDisplaySizeConflict(extractedA.displaySize, extractedB.displaySize)
-    ) {
-      return true;
+    for (const dimension of ['ram', 'storage'] as const) {
+      const stated = [input.extracted[dimension], guard.candidateExtracted[dimension]].filter(
+        (value) => capacityGb(value) !== null,
+      ).length;
+      if (stated === 1) return true;
     }
 
     // The stored `attributes` column is checked as well as the title, because a
@@ -305,23 +304,17 @@ export class ReconciliationService {
     // one, which destroys their separate price histories.
     const storedA = this.readVariantAttributes(a);
     const storedB = this.readVariantAttributes(b);
-    if (
+    return !!(
       this.fuzzyMatcher.detectStorageConflict(storedA.storage, storedB.storage) ||
       this.fuzzyMatcher.detectRamConflict(storedA.ram, storedB.ram) ||
-      this.fuzzyMatcher.detectColorConflict(storedA.color, storedB.color) ||
       this.fuzzyMatcher.detectDisplaySizeConflict(storedA.displaySize, storedB.displaySize)
-    ) {
-      return true;
-    }
-
-    return false;
+    );
   }
 
   /** Variant-defining fields as recorded on the canonical row itself. */
   private readVariantAttributes(row: CanonicalRow): {
     storage?: string;
     ram?: string;
-    color?: string;
     displaySize?: string;
   } {
     const attributes = (row.attributes ?? {}) as Record<string, unknown>;
@@ -335,7 +328,6 @@ export class ReconciliationService {
     return {
       storage: read('storage'),
       ram: read('ram'),
-      color: read('color'),
       displaySize: read('displaySize') ?? read('display_size') ?? read('screenSize'),
     };
   }

@@ -93,4 +93,66 @@ describe('NormalizerService', () => {
       expect(service.isAccessory('Apple 2024 MacBook Pro Laptop with M4 Pro: Built for Apple Intelligence')).toBe(false);
     });
   });
+
+  describe('model extraction (phase 02)', () => {
+    it.each([
+      ['Apple iPhone 16 Pro (256 GB) - Black Titanium', 'iPhone 16 Pro'],
+      ['Apple iPhone 16 Pro 256GB Desert Titanium', 'iPhone 16 Pro'],
+      ['iPhone 16 Pro Max (256 GB) - Black Titanium', 'iPhone 16 Pro Max'],
+      ['Apple iPhone 16 128GB Black', 'iPhone 16'],
+      ['ايفون 16 برو 256 جيجا', 'iphone 16 pro'],
+      ['Samsung Galaxy A57 5G 8GB RAM 256GB', 'Galaxy A57'],
+      ['Samsung A57 5G Smartphone 8GB RAM 256GB Storage Navy', 'Galaxy A57'],
+      ['سامسونج جالاكسي A57 رام 12 جيجا', 'galaxy A57'],
+      ['Xiaomi Redmi Note 14 Pro 8GB RAM 256GB Black', 'redmi note 14'],
+      ['Redmi Note 14 Pro 5G 8GB 256GB Midnight Black', 'redmi note 14'],
+      ['Infinix HOT 50 - 256GB/8GB - Titanium Grey', 'hot 50'],
+      ['OPPO A6 - 8GB RAM - 256GB - Sapphire Blue', 'a6'],
+      ['OPPO Reno 15 5G 12GB 512GB', 'reno15'],
+      ['Honor X9c 12GB RAM 256GB Titanium Black', 'x9c'],
+      ['Nokia 105 Feature Phone Dual SIM', '105'],
+      ['Honor Phone 5G 128GB', undefined],
+    ])('%s -> %s', (title, model) => {
+      const extracted = service.extractAttributes(title).model;
+      expect(extracted === undefined ? undefined : extracted.toLowerCase()).toBe(model?.toLowerCase());
+    });
+  });
+
+  describe('color (stored per offer for the phase 06 color filter)', () => {
+    it.each([
+      ['Samsung Galaxy A57 5G 256GB 8GB RAM Awesome Navy', 'awesome navy'],
+      ['Apple iPhone 16 Pro 256GB Desert Titanium', 'desert titanium'],
+      ['Samsung Galaxy A57 5G 12GB - 256GB - Awesome Icyblue', 'awesome icyblue'],
+      ['سامسونج جالاكسي A57 256 جيجا أزرق', 'blue'],
+      ['Xiaomi Redmi Note 14 Pro 8GB RAM 256GB Black', 'black'],
+      // "Redmi" is not red.
+      ['Xiaomi Redmi Note 14 Pro 8GB 256GB', undefined],
+    ])('%s -> %s', (title, color) => {
+      expect(service.extractAttributes(title).color).toBe(color);
+    });
+
+    it('prefers a color the store gives as an attribute', () => {
+      expect(service.extractAttributes('Galaxy A57', { color: 'Lilac' }).color).toBe('lilac');
+    });
+  });
+
+  describe('accessories in Arabic and accessory kinds', () => {
+    it('flags Arabic accessory titles whatever the letter forms', () => {
+      expect(service.isAccessory('جراب سامسونج جالاكسي A57 شفاف')).toBe(true);
+      expect(service.isAccessory('زجاج مقوى لايفون 16 برو')).toBe(true);
+      expect(service.isAccessory('حافظة ايفون 16')).toBe(true);
+      expect(service.isAccessory('سامسونج جالاكسي A57 رام 8 جيجا')).toBe(false);
+    });
+
+    it.each([
+      ['Silicone Case for Samsung Galaxy A57 5G - Black', 'case'],
+      ['جراب سامسونج جالاكسي A57 شفاف', 'case'],
+      ['Tempered Glass Screen Protector for iPhone 16 Pro', 'screen-protector'],
+      ['Apple 20W USB-C Power Adapter for iPhone 16 Pro', 'charger'],
+      ['Original Lcd C71 for Realme C71 Screen', 'part'],
+      ['Samsung Galaxy A57 5G 256GB', null],
+    ])('%s is a %s', (title, kind) => {
+      expect(service.accessoryKind(title)).toBe(kind);
+    });
+  });
 });

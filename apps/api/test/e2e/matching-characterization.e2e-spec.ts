@@ -27,16 +27,15 @@ import { generateStores } from '../../seed/generators/generateStores';
  * check, a re-run that changes prices, cross-store backfill, on-demand store
  * expansion and the coverage sweep.
  *
- * Left out on purpose: titles whose RAM the normalizer cannot read
- * ("256GB/8GB", F-17). Such a listing is compatible with every RAM variant
- * of its model, they all tie at the model-agreement score, and the winner is
- * whichever the candidate query returns first -- which Postgres does not fix.
- * Phase 02 makes that case deterministic; until then it would make this
- * suite flaky rather than informative.
+ * Phase 02 added the F-17 listings phase 01 had to leave out: Jumia's
+ * "256GB/8GB" / "8GB - 256GB" formats and a title with no RAM at all. Before
+ * phase 02 the normalizer could not read their RAM, they tied across the
+ * A57's RAM variants, and the winner depended on Postgres row order.
  *
  * The snapshot was recorded against the code BEFORE the phase 01 refactor. A
  * refactor must leave it byte-for-byte unchanged. A deliberate matching change
- * (phase 02) updates it on purpose, and the diff is the review.
+ * updates it on purpose, and the diff is the review (phase 02's changes are
+ * explained case by case in audit/02-logic.md).
  *
  * Store connectors are the only fakes. Everything else -- normalizer, guards,
  * FX (offline fallback table), Postgres -- is real.
@@ -90,6 +89,9 @@ const PASSES: Record<string, Record<string, Fixture[]>> = {
       ['j7', 'Honor X9c 12GB RAM 256GB Titanium Black', 16999],
       ['j8', 'Samsung Galaxy A57 5G 128GB 8GB RAM Navy', 16999],
       ['j9', 'Tempered Glass Screen Protector for iPhone 16 Pro', 250],
+      ['j10', 'Samsung Galaxy A57 5G, 256GB/8GB, Awesome Gray', 18399],
+      ['j11', 'Samsung Galaxy A57 5G, 256GB/12GB, Awesome Navy', 21499],
+      ['j12', 'Samsung Galaxy A57 5G 12GB - 256GB - Awesome Icyblue', 21599],
     ],
     noon: [
       ['n1', 'Samsung Galaxy A57 5G Dual SIM 256GB 8GB RAM Awesome Navy', 18799],
@@ -98,6 +100,8 @@ const PASSES: Record<string, Record<string, Fixture[]>> = {
       ['n4', 'Xiaomi Redmi Note 14 Pro 5G 8GB 256GB Midnight Black', 15299],
       ['n5', 'Samsung Galaxy A57 bulk order 50 units', 9000],
       ['n6', 'iPhone 16 Pro 256GB Desert Titanium', 20000, { brand: 'Apple' }],
+      ['n7', 'SAMSUNG Galaxy A57 5G (8+256) Icyblue', 18899],
+      ['n8', 'Samsung Galaxy A57 5G 256GB Awesome Lilac', 19999],
     ],
     '2b': [
       ['b1', 'Samsung Galaxy A57 5G, 8GB RAM, 256GB, Navy', 18650],

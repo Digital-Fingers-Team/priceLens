@@ -1,5 +1,6 @@
 // apps/api/src/matching/fuzzy-matcher.service.ts
 import { Injectable } from '@nestjs/common';
+import { extractModelYear, extractQuantitySpec, isBundle } from './text/specs';
 
 @Injectable()
 export class FuzzyMatcherService {
@@ -138,14 +139,66 @@ export class FuzzyMatcherService {
     return normalizeRam(ramA) !== normalizeRam(ramB) ? 'ram_conflict' : null;
   }
 
-  /**
-   * Detect conflicting color values.
-   * Color is its own SKU for phones/laptops — a black unit and a blue unit
-   * must never be merged into one canonical product.
+  /*
+   * There is deliberately no color conflict: one product covers every color
+   * of a model/storage/RAM, and each offer keeps its own color (owner
+   * decision D-6).
    */
-  detectColorConflict(colorA?: string, colorB?: string): string | null {
-    if (!colorA || !colorB) return null;
-    return colorA.trim().toLowerCase() !== colorB.trim().toLowerCase() ? 'color_conflict' : null;
+
+  /**
+   * Detect different sizes of a consumable: 500 ml vs 1 L, 100 g vs 200 g,
+   * a single can vs a pack of 6. Titles are the matching text (see
+   * NormalizerService.matchingText). A title that names no pack is one unit,
+   * so "Pepsi 330ml" and "Pepsi 330ml pack of 6" conflict; a size only one
+   * side states is not a conflict.
+   */
+  detectQuantityConflict(titleA: string, titleB: string): string | null {
+    const a = extractQuantitySpec(titleA);
+    const b = extractQuantitySpec(titleB);
+    const differs = (x?: number, y?: number) => x !== undefined && y !== undefined && Math.abs(x - y) > Math.max(x, y) * 0.01;
+    if (differs(a.volumeMl, b.volumeMl)) return 'volume_conflict';
+    if (differs(a.weightG, b.weightG)) return 'weight_conflict';
+    if ((a.packCount ?? 1) !== (b.packCount ?? 1)) return 'pack_conflict';
+    return null;
+  }
+
+  /** A bundle (console + game, phone + earbuds) is not the item sold alone. */
+  detectBundleConflict(titleA: string, titleB: string): string | null {
+    return isBundle(titleA) !== isBundle(titleB) ? 'bundle_conflict' : null;
+  }
+
+  /** "Nokia 105 (2023)" vs "Nokia 105 (2019)". Silent unless both state a year. */
+  detectModelYearConflict(titleA: string, titleB: string): string | null {
+    const a = extractModelYear(titleA);
+    const b = extractModelYear(titleB);
+    return a !== undefined && b !== undefined && a !== b ? 'model_year_conflict' : null;
+  }
+
+  /**
+   * Both titles carry the same strong product code ("24U411A-B", "U8000F",
+   * "15IAX9"): letters and at least three digits. Store copy around such a
+   * code varies wildly, but the code itself is the manufacturer's SKU name.
+   */
+  sharesStrongModelCode(titleA: string, titleB: string): boolean {
+    const strong = (title: string) =>
+      new Set(
+        title
+          .toLowerCase()
+          .split(/[^a-z0-9]+/)
+          .filter((token) => {
+            const letters = token.replace(/\d/g, '');
+            const digits = token.replace(/[a-z]/g, '');
+            return (
+              token.length >= 5 &&
+              letters.length > 0 &&
+              digits.length >= 3 &&
+              !FuzzyMatcherService.MODEL_CODE_UNIT_SUFFIXES.has(letters)
+            );
+          }),
+      );
+    const a = strong(titleA);
+    const b = strong(titleB);
+    return [...a].some((code) => b.has(code));
   }
 
   /**

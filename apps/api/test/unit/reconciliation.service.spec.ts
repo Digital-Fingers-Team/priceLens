@@ -79,6 +79,54 @@ describe('ReconciliationService', () => {
       ).toBe(true);
     });
 
+    it('never treats color as a conflict (D-6)', () => {
+      expect(
+        conflict(
+          canonical({ title: 'Samsung Galaxy A57 5G 256GB 8GB RAM Awesome Navy' }),
+          canonical({ title: 'Samsung Galaxy A57 5G 256GB 8GB RAM Awesome Lilac' }),
+        ),
+      ).toBe(false);
+      expect(
+        conflict(
+          canonical({ attributes: { color: 'navy' } }),
+          canonical({ attributes: { color: 'lilac' } }),
+        ),
+      ).toBe(false);
+    });
+
+    it('blocks different RAM read from Jumia-style titles (F-17)', () => {
+      expect(
+        conflict(
+          canonical({ title: 'Samsung Galaxy A57 5G, 256GB/8GB, Awesome Gray' }),
+          canonical({ title: 'Samsung Galaxy A57 5G, 256GB/12GB, Awesome Navy' }),
+        ),
+      ).toBe(true);
+    });
+
+    it('blocks a product that states its RAM from merging with one that does not', () => {
+      expect(
+        conflict(
+          canonical({ title: 'Samsung Galaxy A57 5G 256GB 8GB RAM Navy' }),
+          canonical({ title: 'Samsung Galaxy A57 5G 256GB Navy' }),
+        ),
+      ).toBe(true);
+    });
+
+    it('uses the pipeline guards it used to skip: product type and chip', () => {
+      expect(
+        conflict(
+          canonical({ brand: null, title: 'Lenovo LOQ 15 Gaming Laptop RTX 5050 16GB 512GB' }),
+          canonical({ brand: null, title: 'GeForce RTX 5050 8GB Graphics Card' }),
+        ),
+      ).toBe(true);
+      expect(
+        conflict(
+          canonical({ brand: 'Apple', title: 'Apple MacBook Air 13-inch M4 16GB 512GB' }),
+          canonical({ brand: 'Apple', title: 'Apple MacBook Air 13-inch M5 16GB 512GB' }),
+        ),
+      ).toBe(true);
+    });
+
     it('allows two same-brand listings with no conflicting attributes', () => {
       expect(
         conflict(

@@ -220,6 +220,17 @@ describe('matching pipeline', () => {
       ['condition', 'Xiaomi Redmi Note 14 Pro 8GB RAM 256GB Refurbished', 'Xiaomi Redmi Note 14 Pro 8GB RAM 256GB'],
       ['chip', 'Apple MacBook Air 13-inch M5 16GB 512GB', 'Apple MacBook Air 13-inch M4 16GB 512GB'],
       ['variant', 'ASUS Dual GeForce RTX 5060 8GB OC', 'ASUS Dual GeForce RTX 5060 Ti 16GB OC'],
+      ['ram', 'Samsung Galaxy A57 5G, 256GB/8GB, Awesome Gray', 'Samsung Galaxy A57 5G, 256GB/12GB, Awesome Navy'],
+      ['ram', 'Samsung Galaxy A57 5G 8GB - 256GB - Awesome Lilac', 'SAMSUNG Galaxy A57 5G (12+256) Icyblue'],
+      ['ram', 'سامسونج جالاكسي A57 رام ١٢ جيجا ذاكرة ٢٥٦ جيجا', 'Samsung Galaxy A57 5G 256GB 8GB RAM'],
+      ['accessory-kind', 'Silicone Case for Samsung Galaxy A57', 'Tempered Glass Screen Protector for Samsung Galaxy A57'],
+      ['bundle', 'PlayStation 5 Slim Disc Console + EA Sports FC 25 Bundle', 'PlayStation 5 Slim Console Disc Edition'],
+      ['model-year', 'Nokia 105 (2023) Dual SIM Charcoal', 'Nokia 105 (2019) Dual SIM Black'],
+      ['quantity', 'Pepsi Soft Drink Can 330ml', 'Pepsi Soft Drink Can 330ml - Pack of 6'],
+      ['quantity', 'Pepsi Soft Drink Bottle 500ml', 'Pepsi Soft Drink Bottle 1L'],
+      ['quantity', 'Nescafe Classic Instant Coffee 100g', 'Nescafe Classic Instant Coffee 200g'],
+      ['condition', 'ايفون 16 برو 256 جيجا مستعمل', 'Apple iPhone 16 Pro 256GB'],
+      ['display-size', 'Samsung 55 Inch Crystal UHD 4K Smart TV U8000F', 'Samsung 65 Inch Crystal UHD 4K Smart TV U8000F'],
     ])('%s guard fires: %s vs %s', (guard, listing, cand) => {
       expect(conflictOf(listing, cand)).toBe(guard);
     });
@@ -269,12 +280,67 @@ describe('matching pipeline', () => {
       expect(top.score).toBeGreaterThanOrEqual(MODEL_AGREEMENT_SCORE);
     });
 
-    it('keeps the given order among equal scores (stable)', () => {
-      const a = candidate('Honor X9c 12GB RAM 256GB Black');
-      const b = candidate('Honor X9c 12GB RAM 256GB Black');
-      const ranked = rankCandidates(input('Honor X9c 12GB RAM 256GB Black'), [a, b], tools);
-      expect(ranked.map((r) => r.candidate)).toEqual([a, b]);
-      expect(rankCandidates(input('Honor X9c 12GB RAM 256GB Black'), [b, a], tools).map((r) => r.candidate)).toEqual([b, a]);
+    it('breaks equal scores by candidate id, whatever order the candidates came in (L-03)', () => {
+      const a = candidate('Honor X9c 12GB RAM 256GB Black', { id: 'a' });
+      const b = candidate('Honor X9c 12GB RAM 256GB Black', { id: 'b' });
+      const listing = input('Honor X9c 12GB RAM 256GB Black');
+      expect(rankCandidates(listing, [a, b], tools).map((r) => r.candidate)).toEqual([a, b]);
+      expect(rankCandidates(listing, [b, a], tools).map((r) => r.candidate)).toEqual([a, b]);
+    });
+
+  });
+
+  describe('step 9a: unknown variants (F-17)', () => {
+    const galaxy = (title: string, id: string) => candidate(title, { id, brand: 'Samsung' });
+    const eight = galaxy('Samsung Galaxy A57 5G 256GB 8GB RAM Awesome Navy', 'p8');
+    const twelve = galaxy('Samsung Galaxy A57 5G 256GB 12GB RAM Awesome Gray', 'p12');
+    const unknown = galaxy('Samsung Galaxy A57 5G 256GB Awesome Lilac', 'pu');
+    const ids = (title: string, pool: CatalogCandidate[]) => rankCandidates(input(title), pool, tools).map((r) => r.candidate.id);
+
+    it.each([
+      ['Samsung Galaxy A57 5G, 256GB/8GB, Awesome Gray', ['p8']],
+      ['Samsung Galaxy A57 5G 8GB - 256GB - Awesome Lilac', ['p8']],
+      ['SAMSUNG Galaxy A57 5G (8+256) Icyblue', ['p8']],
+      ['Samsung Galaxy A57 5G, 256GB/12GB, Awesome Navy', ['p12']],
+      ['سامسونج جالاكسي A57 رام ١٢ جيجا ذاكرة ٢٥٦ جيجا', ['p12']],
+    ])('a listing that states its RAM (%s) reaches only the product with that RAM', (title, expected) => {
+      expect(ids(title, [unknown, twelve, eight])).toEqual(expected);
+    });
+
+    it('a listing without RAM is not forced onto either RAM variant when both exist', () => {
+      expect(ids('Samsung Galaxy A57 5G 256GB Awesome Navy', [eight, twelve])).toEqual([]);
+      expect(ids('Samsung Galaxy A57 5G 256GB Awesome Navy', [eight, twelve, unknown])).toEqual(['pu']);
+    });
+
+    it('a listing without RAM may join the only RAM variant the model has', () => {
+      expect(ids('Samsung Galaxy A57 5G 256GB Awesome Navy', [eight])).toEqual(['p8']);
+    });
+
+    it('counts a variant the RAM guard removed as evidence that the model has several', () => {
+      // The 12GB product never survives step 8 for an 8GB listing, but it
+      // still tells an unknown-RAM listing that 8GB is not the only choice.
+      expect(ids('Samsung Galaxy A57 5G 256GB', [eight, twelve])).toEqual([]);
+    });
+
+    it('a listing that states its RAM never joins a product that does not', () => {
+      expect(ids('Samsung Galaxy A57 5G 256GB 8GB RAM', [unknown])).toEqual([]);
+    });
+
+    it('applies the same rule to storage', () => {
+      const s256 = candidate('Apple iPhone 16 Pro 256GB Desert Titanium', { id: 's256' });
+      const s512 = candidate('Apple iPhone 16 Pro 512GB Desert Titanium', { id: 's512' });
+      expect(ids('Apple iPhone 16 Pro Black Titanium', [s256, s512])).toEqual([]);
+      expect(ids('Apple iPhone 16 Pro (256 GB) - Black Titanium', [s256, s512])).toEqual(['s256']);
+    });
+
+    it('gives accessories no model-agreement boost: every case for the phone agrees on the model', () => {
+      const [top] = rankCandidates(input('Silicone Case for Samsung Galaxy A57 5G - Black'), [candidate('Clear Case for Samsung Galaxy A57')], tools);
+      expect(top.score).toBeLessThan(MODEL_AGREEMENT_SCORE);
+    });
+
+    it('treats a shared strong product code as model agreement', () => {
+      const [top] = rankCandidates(input('LG 24U411A-B 24" Full HD Monitor 120Hz'), [candidate('LG 24U411A-B 24 inch IPS Monitor')], tools);
+      expect(top.score).toBeGreaterThanOrEqual(MODEL_AGREEMENT_SCORE);
     });
   });
 

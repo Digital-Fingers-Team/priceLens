@@ -1,51 +1,40 @@
 import type { CatalogCandidate, MatchingTools, NormalizedListing } from '../types';
-import { identifiersConflict } from './06-identifier-match';
+import { checkConflicts } from './08-conflict-guards';
 import { listingKeys } from './listing-keys';
 
 /**
  * Step 7 -- exact-title match.
  *
- * The first candidate whose normalized title equals the listing's, unless
- * brand, model, identifiers, condition (new vs used) or product type say
- * otherwise. Candidates are tried in the order given.
+ * A candidate whose normalized title equals the listing's, unless the stores'
+ * model fields disagree or any step 8 guard says otherwise. (Normalization drops words such as "bundle", "kit"
+ * and "new", so equal normalized titles can still be different products.)
+ * When several qualify, the lowest id wins, so the outcome never depends on
+ * the order the database returned them in.
  */
 export function findExactTitleMatch<C extends CatalogCandidate>(
   input: NormalizedListing,
   candidates: C[],
-  { fuzzy }: Pick<MatchingTools, 'fuzzy'>,
+  tools: MatchingTools,
 ): C | null {
-  const { listing, normalized } = input;
   const keys = listingKeys(input);
+  const listingIsAccessory = tools.normalizer.isAccessory(input.listing.title);
+  let best: C | null = null;
 
   for (const candidate of candidates) {
-    if (candidate.normalizedTitle.trim().toLowerCase() !== normalized.normalized) {
+    if (candidate.normalizedTitle.trim().toLowerCase() !== input.normalized.normalized) {
       continue;
     }
-
-    const candidateBrand = candidate.brand?.trim().toLowerCase() ?? null;
-    if (candidateBrand && keys.brand && candidateBrand !== keys.brand) {
-      continue;
-    }
-
-    const candidateModel = candidate.model?.trim().toLowerCase() ?? null;
+    const candidateModel = candidate.model?.trim().toLowerCase() || null;
     if (candidateModel && keys.model && candidateModel !== keys.model) {
       continue;
     }
-
-    if (identifiersConflict(listing.identifiers, candidate)) {
+    if (checkConflicts(input, candidate, tools, keys, listingIsAccessory).conflict !== null) {
       continue;
     }
-
-    if (fuzzy.detectConditionConflict(listing.title, candidate.title)) {
-      continue;
+    if (!best || candidate.id < best.id) {
+      best = candidate;
     }
-
-    if (fuzzy.detectProductTypeConflict(listing.title, candidate.title)) {
-      continue;
-    }
-
-    return candidate;
   }
 
-  return null;
+  return best;
 }

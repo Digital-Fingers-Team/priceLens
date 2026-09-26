@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ExtractedAttributes, NormalizedTitle } from './interfaces/matching.interfaces';
+import { normalizeArabic, toMatchingText } from './text/arabic';
+import { extractMemorySpec } from './text/specs';
 
 const BRAND_ALIASES: Record<string, string> = {
   nvidia: 'NVIDIA',
@@ -57,6 +59,7 @@ const BRAND_ALIASES: Record<string, string> = {
   tecno: 'Tecno',
   itel: 'itel',
   nothing: 'Nothing',
+  playstation: 'Sony',
 };
 
 const CRITICAL_VARIANTS = [
@@ -89,23 +92,33 @@ const GENERIC_MODEL_BRANDS = new Set([
   'nokia', 'infinix', 'tecno', 'itel', 'nothing', 'oneplus', 'motorola', 'reno',
 ]);
 
+/** Words that mean the tokens after a brand are not a model name ("Xiaomi Smart Band 9" is fine, "Honor Phone 5G" is not). */
+const GENERIC_MODEL_STOP_WORDS = new Set(['phone', 'smartphone', 'mobile', 'dual', 'sim', 'new', 'original', 'for', 'with', 'and', 'the']);
+
+/** Aliases that are a line of a parent brand; kept at the front of the model. */
+const SUB_BRAND_PREFIXES = new Set(['redmi', 'poco', 'reno']);
+
 const MODEL_TOKEN_UNIT_SUFFIXES = new Set([
   'gb', 'tb', 'mb', 'kb', 'mp', 'mah', 'mm', 'cm', 'in', 'inch',
   'hz', 'khz', 'mhz', 'ghz', 'fps', 'db', 'kw', 'ma', 'g', 'k', 'p', 'w', 'v',
 ]);
 
-const STORAGE_PATTERN = /\b(\d+(?:\.\d+)?)\s*(TB|GB|MB)\b/gi;
-const RAM_PATTERNS = [
-  /\b(\d+)\s*GB\s*(?:RAM|LPDDR\d*|DDR\d*|SDRAM|Memory)\b/gi,
-  /\b(?:RAM|LPDDR\d*|DDR\d*|SDRAM|Memory)\s*(\d+)\s*GB\b/gi,
-];
 const CPU_PATTERN = /\b(i[3579]-\d{4,5}[A-Z]*|Core\s+i[3579]|Ryzen\s+\d+|M[123]\s+(?:Pro|Max|Ultra)?|Snapdragon\s+\d+)\b/gi;
 const DISPLAY_PATTERN = /\b(\d{1,2}(?:\.\d)?)[-\s]?(?:inch|"|in\b|'')/gi;
 
 @Injectable()
 export class NormalizerService {
+  /**
+   * The title as every matching decision reads it: Arabic normalized and
+   * its fixed-meaning words in English (see text/arabic.ts). English titles
+   * come back unchanged except for Arabic-Indic digits.
+   */
+  matchingText(raw: string): string {
+    return toMatchingText(raw);
+  }
+
   normalizeTitle(raw: string): NormalizedTitle {
-    let text = raw;
+    let text = this.matchingText(raw);
 
     text = text.replace(/<[^>]+>/g, ' ');
     text = text.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
@@ -156,8 +169,9 @@ export class NormalizerService {
       .split(/[\s,\-/()[\]{}]+/)
       .filter((token) => token.length > 0);
 
-    const brand = this.extractBrandFromTitle(raw);
-    const model = this.extractModelFromTitle(raw);
+    const matching = this.matchingText(raw);
+    const brand = this.extractBrandFromTitle(matching);
+    const model = this.extractModelFromTitle(matching);
 
     return { raw, normalized: text, tokens, brand, model };
   }
@@ -167,17 +181,19 @@ export class NormalizerService {
     rawAttributes: Record<string, unknown> = {},
   ): ExtractedAttributes {
     const result: ExtractedAttributes = { extra: {} };
+    const title = this.matchingText(rawTitle);
+    const memory = extractMemorySpec(title);
 
-    result.brand = this.extractBrandFromTitle(rawTitle) ?? this.extractBrandFromAttributes(rawAttributes);
-    result.model = this.extractModelFromTitle(rawTitle);
-    result.variant = this.extractVariant(rawTitle);
-    result.storage = this.extractStorage(rawTitle, rawAttributes);
-    result.ram = this.extractRam(rawTitle, rawAttributes);
-    result.displaySize = this.extractDisplaySize(rawTitle, rawAttributes);
-    result.cpu = this.extractCpu(rawTitle, rawAttributes);
-    result.color = this.extractColor(rawTitle, rawAttributes);
-    result.os = this.extractOs(rawTitle, rawAttributes);
-    result.generation = this.extractGeneration(rawTitle);
+    result.brand = this.extractBrandFromTitle(title) ?? this.extractBrandFromAttributes(rawAttributes);
+    result.model = this.extractModelFromTitle(title);
+    result.variant = this.extractVariant(title);
+    result.storage = this.attributeCapacity(rawAttributes, ['storage', 'hard_drive', 'ssd', 'hdd', 'capacity', 'hard drive']) ?? memory.storage;
+    result.ram = this.attributeCapacity(rawAttributes, ['ram', 'memory', 'dram']) ?? memory.ram;
+    result.displaySize = this.extractDisplaySize(title, rawAttributes);
+    result.cpu = this.extractCpu(title, rawAttributes);
+    result.color = this.extractColor(title, rawAttributes);
+    result.os = this.extractOs(title, rawAttributes);
+    result.generation = this.extractGeneration(title);
 
     for (const [key, value] of Object.entries(rawAttributes)) {
       const normalizedKey = key.toLowerCase().replace(/\s+/g, '_');
@@ -254,9 +270,19 @@ export class NormalizerService {
     const galaxyMatch = galaxyPattern.exec(title);
     if (galaxyMatch) return galaxyMatch[1];
 
-    const iphonePattern = /\b(iPhone\s+\d+(?:\s+(?:Pro\s+)?(?:Max|Plus|Mini)?)?)\b/i;
+    // "Samsung A57 5G ..." -- the Galaxy line name left out. Same model as
+    // "Galaxy A57", so it is spelled that way.
+    const samsungPattern = /\bSamsung\s+([AMSFZ]\d{2,3})(?:\s+(Ultra|Plus|FE))?\b/i;
+    const samsungMatch = samsungPattern.exec(title);
+    if (samsungMatch) {
+      const code = samsungMatch[1].toUpperCase();
+      return samsungMatch[2] ? `Galaxy ${code} ${samsungMatch[2]}` : `Galaxy ${code}`;
+    }
+
+    // "iPhone 16", "iPhone 16e", "iPhone 16 Pro", "iPhone 16 Pro Max", "iPhone 17 Air".
+    const iphonePattern = /\b(iPhone\s+\d+e?(?:\s+Pro)?(?:\s+(?:Max|Plus|Mini|Air))?)(?![a-z])/i;
     const iphoneMatch = iphonePattern.exec(title);
-    if (iphoneMatch) return iphoneMatch[1];
+    if (iphoneMatch) return iphoneMatch[1].trim();
 
     return this.extractGenericPhoneModel(title);
   }
@@ -299,16 +325,34 @@ export class NormalizerService {
     if (!matchedAlias || brandEnd === -1) return undefined;
 
     const rest = lower.slice(brandEnd);
-    const firstToken = rest.split(/[\s,\-/()[\]{}:]+/).filter(Boolean)[0];
-    if (!firstToken || !/\d/.test(firstToken)) return undefined;
+    const tokens = rest.split(/[\s,\-/()[\]{}:]+/).filter(Boolean);
 
-    const letters = firstToken.replace(/[0-9]/g, '');
+    // The model is the first token carrying a digit, with up to two
+    // product-line words in front of it: "A6", "X9c", "Hot 50", "Redmi Note
+    // 14", "Spark 30". Tier words after it (Pro, Max, ...) are the variant
+    // guard's business, not part of the model.
+    const line: string[] = [];
+    let code: string | undefined;
+    for (const token of tokens.slice(0, 4)) {
+      if (/\d/.test(token)) {
+        code = token;
+        break;
+      }
+      if (!/^[a-z]+$/.test(token) || line.length === 2) return undefined;
+      line.push(token);
+    }
+    if (!code) return undefined;
+
+    const letters = code.replace(/[0-9]/g, '');
     if (letters && MODEL_TOKEN_UNIT_SUFFIXES.has(letters)) return undefined;
+    if (line.some((word) => GENERIC_MODEL_STOP_WORDS.has(word))) return undefined;
 
-    // "reno" is a product line, not a full brand name -- fold it back into
-    // the captured number so it matches a title that spells it as one word
-    // elsewhere ("Reno15").
-    return matchedAlias === 'reno' ? `reno${firstToken}` : firstToken;
+    // Sub-brands sold under a parent brand ("Xiaomi Redmi Note 14" vs "Redmi
+    // Note 14") and product lines written with or without a space ("Reno 15"
+    // vs "Reno15") must produce one spelling.
+    if (SUB_BRAND_PREFIXES.has(matchedAlias)) line.unshift(matchedAlias);
+    const model = [...line, code].join(' ');
+    return model.replace(/^reno (\d)/, 'reno$1');
   }
 
   extractVariant(title: string): string | undefined {
@@ -319,53 +363,13 @@ export class NormalizerService {
     return undefined;
   }
 
-  private extractStorage(title: string, attrs: Record<string, unknown>): string | undefined {
-    for (const key of ['storage', 'hard_drive', 'ssd', 'hdd', 'capacity', 'hard drive']) {
+  /** A capacity the store gave as a structured attribute, normalized ("8 GB" -> "8GB"). */
+  private attributeCapacity(attrs: Record<string, unknown>, keys: string[]): string | undefined {
+    for (const key of keys) {
       if (typeof attrs[key] === 'string') {
         return this.normalizeStorageValue(attrs[key] as string);
       }
     }
-
-    const matches = [...title.matchAll(STORAGE_PATTERN)];
-    if (matches.length === 0) return undefined;
-
-    const candidates = matches
-      .map((match) => {
-        const context = title.slice(Math.max(0, match.index! - 20), match.index! + 20);
-        return {
-          match,
-          isRamContext: /(RAM|LPDDR|DDR|memory)/i.test(context),
-          capacity: this.capacityInGb(`${match[1]}${match[2]}`) ?? -1,
-        };
-      })
-      .filter((candidate) => !candidate.isRamContext);
-
-    const ranked = candidates.length > 0
-      ? candidates
-      : matches.map((match) => ({
-          match,
-          isRamContext: false,
-          capacity: this.capacityInGb(`${match[1]}${match[2]}`) ?? -1,
-        }));
-
-    const best = ranked.reduce((current, next) => (next.capacity > current.capacity ? next : current));
-    return `${best.match[1]}${best.match[2].toUpperCase()}`;
-  }
-
-  private extractRam(title: string, attrs: Record<string, unknown>): string | undefined {
-    for (const key of ['ram', 'memory', 'dram']) {
-      if (typeof attrs[key] === 'string') {
-        return this.normalizeStorageValue(attrs[key] as string);
-      }
-    }
-
-    for (const pattern of RAM_PATTERNS) {
-      const matches = [...title.matchAll(pattern)];
-      if (matches.length > 0) {
-        return `${matches[0][1]}GB`;
-      }
-    }
-
     return undefined;
   }
 
@@ -396,6 +400,28 @@ export class NormalizerService {
       // shades both collapse to the same generic bucket and look identical to
       // the color-conflict guard.
       'cosmic orange',
+      'awesome navy',
+      'awesome gray',
+      'awesome grey',
+      'awesome lilac',
+      'awesome icyblue',
+      'awesome iceblue',
+      'icy blue',
+      'icyblue',
+      'desert titanium',
+      'black titanium',
+      'white titanium',
+      'natural titanium',
+      'titanium black',
+      'titanium grey',
+      'titanium gray',
+      'sapphire blue',
+      'aurora gold',
+      'aurora purple',
+      'midnight black',
+      'obsidian black',
+      'jade cyan',
+      'sleek black',
       'cobalt violet',
       'sky blue',
       'deep blue',
@@ -450,6 +476,9 @@ export class NormalizerService {
       'olive',
       'gray',
       'grey',
+      'lilac',
+      'ultramarine',
+      'cyan',
     ];
 
     for (const key of ['color', 'colour']) {
@@ -457,7 +486,8 @@ export class NormalizerService {
     }
 
     const lower = title.toLowerCase();
-    return colors.find((color) => lower.includes(color));
+    // Whole words only: "Redmi" is not red, "Goldfish" is not gold.
+    return colors.find((color) => new RegExp(`(?<![a-z])${color}(?![a-z])`).test(lower));
   }
 
   private extractOs(title: string, attrs: Record<string, unknown>): string | undefined {
@@ -498,18 +528,6 @@ export class NormalizerService {
     const match = /(\d+(?:\.\d+)?)\s*(TB|GB|MB)/i.exec(val);
     if (!match) return val.trim();
     return `${match[1]}${match[2].toUpperCase()}`;
-  }
-
-  private capacityInGb(val: string): number | null {
-    const match = /(\d+(?:\.\d+)?)\s*(TB|GB|MB)/i.exec(val);
-    if (!match) return null;
-
-    const amount = parseFloat(match[1]);
-    const unit = match[2].toUpperCase();
-
-    if (unit === 'TB') return amount * 1000;
-    if (unit === 'MB') return amount / 1000;
-    return amount;
   }
 
   private isAlreadyExtracted(key: string): boolean {
@@ -559,9 +577,31 @@ export class NormalizerService {
       // market) use their own accessory vocabulary — none of the English
       // patterns above match script other than Latin, so these need to be
       // checked separately rather than relying on translation.
-      /(واقي|جراب|كفر|غطاء|حافظة|شاحن|كابل|زجاج\s*مقوى|لاصقة|حامل)/,
+      /(واقي|جراب|كفر|غطاء|حافظه|شاحن|كابل|زجاج\s*مقوي|لاصقه|حامل)/,
     ];
 
-    return accessoryPatterns.some((pattern) => pattern.test(title));
+    const text = normalizeArabic(this.matchingText(title));
+    return accessoryPatterns.some((pattern) => pattern.test(text));
+  }
+
+  /**
+   * What kind of accessory a title describes, for telling two accessories of
+   * the same phone apart (a case is not a screen protector). Null when the
+   * title is not an accessory or its kind is not one of these.
+   */
+  accessoryKind(title: string): string | null {
+    const text = normalizeArabic(this.matchingText(title));
+    const kinds: Array<[string, RegExp]> = [
+      ['screen-protector', /\b(screen\s+protector|tempered\s+glass|screen\s+guard|film)\b|زجاج|لاصقه|واقي\s+شاشه/i],
+      ['lens-protector', /\b(camera\s+lens|lens\s+(?:protector|film|cover|guard))\b/i],
+      ['case', /\b(case|cover|sleeve|bag|holster|pouch|bumper)\b|جراب|كفر|غطاء|حافظه/i],
+      ['charger', /\b(charger|adapter|power\s+bank)\b|شاحن/i],
+      ['cable', /\b(cable|cord|wire)\b|كابل/i],
+      ['part', /\blcds?\b|\b(digitizer|display\s+assembly|screen\s+assembly|touch\s+panel|back\s+glass|housing|replacement)\b/i],
+      ['mount', /\b(stand|mount|dock|holder)\b|حامل/i],
+      ['skin', /\b(skin|wrap|sticker|decal)\b/i],
+    ];
+    const hit = kinds.find(([, pattern]) => pattern.test(text));
+    return hit ? hit[0] : null;
   }
 }

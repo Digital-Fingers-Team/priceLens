@@ -1,5 +1,6 @@
 import { findExactTitleMatch } from './steps/07-exact-title-match';
 import { decideMatch, rankCandidates } from './steps/09-rank-and-decide';
+import { listingKeys } from './steps/listing-keys';
 import type {
   CandidateSource,
   CatalogCandidate,
@@ -25,7 +26,10 @@ export async function findCanonicalMatch<C extends CatalogCandidate>(
     return identifierMatch;
   }
 
-  const candidates = await ports.candidates.findInCategory(categoryId);
+  const candidates = await ports.candidates.findInCategory(categoryId, {
+    normalizedTitle: input.normalized.normalized,
+    model: listingKeys(input).model,
+  });
 
   // Step 7: same normalized title, no conflict.
   const exact = findExactTitleMatch(input, candidates, tools);

@@ -10,10 +10,12 @@
  *   5  category sanity     checkCategorySanity     accessory-in-device-category, price floor
  *   6  identifier match    identifierLookupClauses GTIN/UPC/EAN/MPN lookup (+ identifiersConflict)
  *   7  exact-title match   findExactTitleMatch     same normalized title, no conflict
- *   8  conflict guards     checkConflicts          brand, accessory, type, chip, variant, model code,
- *                                                  identifier, condition, storage, RAM, display size
- *   9  rank + decide       rankCandidates,         fuzzy score (+ model agreement), auto-accept,
- *                          decideMatch             LLM confirm, fuzzy fallback
+ *   8  conflict guards     checkConflicts          brand, accessory (+ kind), type, chip, variant, model code,
+ *                                                  identifier, condition, bundle, model year, storage, RAM,
+ *                                                  display size, quantity (volume/weight/pack)
+ *   9  rank + decide       rankCandidates,         fuzzy score (+ model/code agreement), unknown-variant
+ *                          decideMatch             ambiguity, deterministic ties, auto-accept, LLM confirm,
+ *                                                  fuzzy fallback
  *  10  market outlier      checkMarketOutlier      price far from the product's other stores
  *
  * Steps 6-9 run together in findCanonicalMatch. Running the steps in order
@@ -32,7 +34,7 @@ export { identifierLookupClauses, identifiersConflict } from './steps/06-identif
 export { findExactTitleMatch } from './steps/07-exact-title-match';
 export { checkConflicts } from './steps/08-conflict-guards';
 export type { ConflictGuard, GuardResult } from './steps/08-conflict-guards';
-export { rankCandidates, decideMatch } from './steps/09-rank-and-decide';
+export { rankCandidates, decideMatch, capacityGb } from './steps/09-rank-and-decide';
 export { checkMarketOutlier } from './steps/10-market-outlier';
 export type { PricedOffer } from './steps/10-market-outlier';
 export { findCanonicalMatch } from './find-canonical-match';

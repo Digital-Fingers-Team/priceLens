@@ -7,6 +7,7 @@ import { ListingKeys, listingKeys } from './listing-keys';
 export type ConflictGuard =
   | 'brand'
   | 'accessory'
+  | 'accessory-kind'
   | 'product-type'
   | 'chip'
   | 'variant'
@@ -14,9 +15,12 @@ export type ConflictGuard =
   | 'disjoint-model'
   | 'identifier'
   | 'condition'
+  | 'bundle'
+  | 'model-year'
   | 'storage'
   | 'ram'
-  | 'display-size';
+  | 'display-size'
+  | 'quantity';
 
 export type GuardResult =
   | { conflict: ConflictGuard }
@@ -28,6 +32,13 @@ export type GuardResult =
  * Hard reasons a candidate is NOT the listing's product, whatever the text
  * similarity says. Returns the first guard that fires, or -- when none does
  * -- the candidate's attributes, extracted fresh from its title for step 9.
+ *
+ * Every guard reads the matching text (NormalizerService.matchingText), so an
+ * Arabic title is judged on the same words as an English one.
+ *
+ * A guard fires only when BOTH sides state the attribute and they differ. A
+ * side that does not state it (a title with no RAM) is handled in step 9,
+ * which refuses to guess when the product family has several values.
  *
  * Color is deliberately not a guard: one product covers every color of a
  * model/storage/RAM, and each store row shows its own color (owner decision
@@ -45,6 +56,8 @@ export function checkConflicts(
   listingIsAccessory: boolean = normalizer.isAccessory(input.listing.title),
 ): GuardResult {
   const { listing, extracted } = input;
+  const listingText = normalizer.matchingText(listing.title);
+  const candidateText = normalizer.matchingText(candidate.title);
 
   const candidateBrand = candidate.brand?.trim().toLowerCase() ?? null;
   if (candidateBrand && keys.brand && candidateBrand !== keys.brand) {
@@ -54,32 +67,42 @@ export function checkConflicts(
   // An accessory's title routinely *names* the product it's compatible with
   // ("Case for Samsung Galaxy S26 Ultra") -- that would otherwise satisfy the
   // brand/model/title checks and merge a phone case into the phone.
-  if (listingIsAccessory !== normalizer.isAccessory(candidate.title)) {
+  const candidateIsAccessory = normalizer.isAccessory(candidate.title);
+  if (listingIsAccessory !== candidateIsAccessory) {
     return { conflict: 'accessory' };
+  }
+  // Two accessories of one phone agree on brand and model too: a case is
+  // still not a screen protector.
+  if (listingIsAccessory) {
+    const kindA = normalizer.accessoryKind(listing.title);
+    const kindB = normalizer.accessoryKind(candidate.title);
+    if (kindA !== kindB) {
+      return { conflict: 'accessory-kind' };
+    }
   }
 
   // A laptop titled "... RTX 5050" and an "RTX 5050" card agree on model
   // number, which alone clears the auto-accept in step 9. Different kinds of
   // product are never the same product, whatever they share.
-  if (fuzzy.detectProductTypeConflict(listing.title, candidate.title)) {
+  if (fuzzy.detectProductTypeConflict(listingText, candidateText)) {
     return { conflict: 'product-type' };
   }
 
   // "MacBook Air M4" vs "MacBook Air M5": same brand and model name, and the
   // chip is too short for the model-code guards below to notice.
-  if (fuzzy.detectChipConflict(listing.title, candidate.title)) {
+  if (fuzzy.detectChipConflict(listingText, candidateText)) {
     return { conflict: 'chip' };
   }
 
-  if (fuzzy.detectVariantConflict(listing.title, candidate.title)) {
+  if (fuzzy.detectVariantConflict(listingText, candidateText)) {
     return { conflict: 'variant' };
   }
 
-  if (fuzzy.detectModelCodeSuffixConflict(listing.title, candidate.title)) {
+  if (fuzzy.detectModelCodeSuffixConflict(listingText, candidateText)) {
     return { conflict: 'model-code-suffix' };
   }
 
-  if (fuzzy.detectDisjointModelConflict(listing.title, candidate.title)) {
+  if (fuzzy.detectDisjointModelConflict(listingText, candidateText)) {
     return { conflict: 'disjoint-model' };
   }
 
@@ -87,8 +110,18 @@ export function checkConflicts(
     return { conflict: 'identifier' };
   }
 
-  if (fuzzy.detectConditionConflict(listing.title, candidate.title)) {
+  if (fuzzy.detectConditionConflict(listingText, candidateText)) {
     return { conflict: 'condition' };
+  }
+
+  // "PS5 + FC 25 Bundle" is not the console alone. The normalized title drops
+  // the word "bundle", so this has to read the matching text.
+  if (fuzzy.detectBundleConflict(listingText, candidateText)) {
+    return { conflict: 'bundle' };
+  }
+
+  if (fuzzy.detectModelYearConflict(listingText, candidateText)) {
+    return { conflict: 'model-year' };
   }
 
   // Recomputed fresh from the candidate's title rather than trusting its
@@ -103,6 +136,10 @@ export function checkConflicts(
   }
   if (fuzzy.detectDisplaySizeConflict(extracted.displaySize ?? undefined, candidateExtracted.displaySize)) {
     return { conflict: 'display-size' };
+  }
+  // 500 ml vs 1 L, 100 g vs 200 g, one can vs a pack of 6.
+  if (fuzzy.detectQuantityConflict(listingText, candidateText)) {
+    return { conflict: 'quantity' };
   }
 
   return { conflict: null, candidateExtracted };

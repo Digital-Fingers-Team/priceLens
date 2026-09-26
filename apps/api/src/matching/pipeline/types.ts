@@ -59,10 +59,23 @@ export interface RankedCandidate<C extends CatalogCandidate = CatalogCandidate> 
   score: number;
 }
 
-/** Where step 6-9 candidates come from. Implemented over Prisma in the app. */
+/** What the candidate lookup knows about the listing, to fetch the products nearest to it. */
+export interface CandidateHint {
+  normalizedTitle: string;
+  /** Lowercased model, when known. */
+  model: string | null;
+}
+
+/**
+ * Where step 6-9 candidates come from. Implemented over Prisma in the app.
+ *
+ * `findInCategory` returns the category's products nearest the listing: the
+ * most similar titles plus every product of the same model, capped. The
+ * steps never depend on the order it returns them in.
+ */
 export interface CandidateSource<C extends CatalogCandidate = CatalogCandidate> {
   findByIdentifier(identifiers: ListingIdentifiers): Promise<C | null>;
-  findInCategory(categoryId: string): Promise<C[]>;
+  findInCategory(categoryId: string, near: CandidateHint): Promise<C[]>;
 }
 
 /**

@@ -5,6 +5,7 @@ import { PrismaService } from '../../database/prisma.service';
 import {
   CANDIDATE_POOL_SIZE,
   CATEGORY_MEDIAN_TTL_MS,
+  CandidateHint,
   CandidateSource,
   ListingIdentifiers,
   MIN_LISTINGS_FOR_CATEGORY_FLOOR,
@@ -150,9 +151,42 @@ export class IngestionRepository {
       }
       return this.prisma.canonicalProduct.findFirst({ where: { OR: clauses } });
     },
-    findInCategory: (categoryId: string) =>
-      this.prisma.canonicalProduct.findMany({ where: { categoryId }, take: CANDIDATE_POOL_SIZE }),
+    findInCategory: (categoryId: string, near: CandidateHint) => this.findCandidatesInCategory(categoryId, near),
   };
+
+  /**
+   * The category's products nearest a listing: the CANDIDATE_POOL_SIZE most
+   * similar normalized titles (pg_trgm), plus every product whose model is
+   * the listing's (so the step 9 variant-family check sees all of them).
+   *
+   * This used to be the first 200 rows of the category in whatever order
+   * Postgres returned them. In a larger category the right product could be
+   * outside that window, and which of two tied candidates won depended on
+   * row order (audit 02, L-03). Ties by title similarity break on id, and the
+   * result is returned in id order.
+   */
+  private async findCandidatesInCategory(categoryId: string, near: CandidateHint): Promise<CanonicalProduct[]> {
+    const sameModel = near.model
+      ? Prisma.sql`
+          UNION
+          (SELECT id FROM canonical_products
+           WHERE category_id = ${categoryId} AND lower(trim(model)) = ${near.model}
+           ORDER BY id
+           LIMIT ${CANDIDATE_POOL_SIZE})`
+      : Prisma.empty;
+    const rows = await this.prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      (SELECT id FROM canonical_products
+       WHERE category_id = ${categoryId}
+       ORDER BY similarity(normalized_title, ${near.normalizedTitle}) DESC, id
+       LIMIT ${CANDIDATE_POOL_SIZE})
+      ${sameModel}
+    `);
+    if (rows.length === 0) return [];
+    return this.prisma.canonicalProduct.findMany({
+      where: { id: { in: rows.map((row) => row.id) } },
+      orderBy: { id: 'asc' },
+    });
+  }
 
   /**
    * Median accepted price in a category, cached for an hour; null while the
