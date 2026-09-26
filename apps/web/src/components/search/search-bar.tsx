@@ -96,7 +96,6 @@ export function SearchBar({ initialValue = '', size = 'default', onSearch, class
             type="search"
             name="q"
             aria-label={t.search.label}
-            dir="auto"
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -108,7 +107,9 @@ export function SearchBar({ initialValue = '', size = 'default', onSearch, class
             placeholder={t.search.placeholder}
             autoComplete="off"
             className={cn(
-              'w-full rounded-full border border-border-strong bg-surface text-fg transition-colors placeholder:text-muted',
+              // plaintext: a Latin query in the Arabic UI reads left-to-right, but the
+              // padding keeps following the page, so the text clears the buttons.
+              'w-full rounded-full border border-border-strong bg-surface [unicode-bidi:plaintext] text-fg transition-colors placeholder:text-muted',
               'hover:border-fg/60 focus-visible:border-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-brand/40',
               // Room for the clear and submit buttons at the end.
               isHero ? 'h-12 pe-24 ps-11 text-base' : 'h-10 pe-20 ps-11 text-sm',
