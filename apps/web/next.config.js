@@ -2,6 +2,10 @@
 const nextConfig = {
   reactStrictMode: true,
   images: {
+    // The optimizer (/_next/image) decodes remote images with sharp/libheif;
+    // Next 14 has an unpatched RCE there via AVIF (GHSA-2xp9-vwfh-vxw4, S-03).
+    // Images load straight from the retailer CDNs until the Next 15 upgrade.
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
