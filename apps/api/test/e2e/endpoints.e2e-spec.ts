@@ -288,6 +288,12 @@ describe('Every endpoint (e2e)', () => {
     await call('GET', '/api/v1/search/suggest', 200, { query: { q: 'iph' } });
     await call('GET', '/api/v1/search/suggest', 400, { query: { q: 'iph', limit: 0 } });
 
+    // D-24: only categories that hold products, with their counts.
+    const categories = await call('GET', '/api/v1/categories', 200);
+    const rows = categories.body.data as { slug: string; productCount: number }[];
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((row) => row.productCount > 0)).toBe(true);
+
     await call('GET', '/api/v1/prices/{productId}/history', 200, { params: { productId }, query: { days: 30 } });
     await call('GET', '/api/v1/prices/{productId}/history', 400, { params: { productId: 'not-a-uuid' } });
     await call('GET', '/api/v1/prices/{productId}/current', 200, { params: { productId } });

@@ -9,6 +9,7 @@ import { BullModule } from '@nestjs/bull';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './auth/auth.module';
 import { ProductsModule } from './products/products.module';
+import { CategoriesModule } from './categories/categories.module';
 import { SearchModule } from './search/search.module';
 import { MatchingModule } from './matching/matching.module';
 import { ScrapingModule } from './scraping/scraping.module';
@@ -122,6 +123,7 @@ export const ENV_FILES = resolveEnvFiles();
     DatabaseModule,
     AuthModule,
     ProductsModule,
+    CategoriesModule,
     SearchModule,
     MatchingModule,
     ScrapingModule,
