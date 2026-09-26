@@ -61,6 +61,23 @@ describe('FuzzyMatcherService', () => {
       expect(conflict).not.toBeNull();
     });
 
+    it('reads "+" after a model as its own tier, not "Pro"', () => {
+      // Merged in production on 2026-09-26 by the reconciliation job.
+      expect(
+        service.detectVariantConflict(
+          'Infinix Hot 60 Pro Dual SIM Sleek Black 8+8GB RAM 256GB 4G',
+          'Infinix Hot 60 Pro+ Dual SIM Sleek Black 8+8GB RAM 256 GB 4G',
+        ),
+      ).not.toBeNull();
+      expect(
+        service.detectVariantConflict('Infinix Hot 60 Dual SIM 6+6GB RAM 128GB 5G', 'Infinix HOT 60 5G+ Smartphone 128GB'),
+      ).not.toBeNull();
+      expect(service.detectVariantConflict('Samsung Galaxy S24+ 256GB', 'Samsung Galaxy S24 256GB')).not.toBeNull();
+      // Same tier, written two ways; and a memory "+" is not a tier.
+      expect(service.detectVariantConflict('Infinix Hot 60 Pro+ 256GB', 'Infinix HOT 60 Pro Plus 256GB')).toBeNull();
+      expect(service.detectVariantConflict('Samsung Galaxy A57 (8+256)', 'Samsung Galaxy A57 8GB 256GB')).toBeNull();
+    });
+
     it('returns null for identical variants', () => {
       const conflict = service.detectVariantConflict(
         'NVIDIA RTX 4090 Founders Edition',

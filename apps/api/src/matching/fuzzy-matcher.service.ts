@@ -1,6 +1,7 @@
 // apps/api/src/matching/fuzzy-matcher.service.ts
 import { Injectable } from '@nestjs/common';
 import { extractModelYear, extractQuantitySpec, isBundle } from './text/specs';
+import { spellOutPlusTier } from './text/tier';
 
 @Injectable()
 export class FuzzyMatcherService {
@@ -101,13 +102,16 @@ export class FuzzyMatcherService {
   detectVariantConflict(titleA: string, titleB: string): string | null {
     const VARIANT_PATTERNS: Array<{ name: string; pattern: RegExp }> = [
       { name: 'variant_suffix', pattern: /\b(XT X|XTX|Super|Ti|GRE|XT)\b/i },
-      { name: 'pro_tier', pattern: /\b(Pro Max|Ultra|Plus|Pro|Max)\b/i },
+      { name: 'pro_tier', pattern: /\b(Pro Max|Pro Plus|Ultra|Plus|Pro|Max)\b/i },
       { name: 'mini_se', pattern: /\b(Mini|Lite|SE)\b/i },
     ];
 
+    // "Pro+" is its own tier, not "Pro" (see spellOutPlusTier).
+    const textA = spellOutPlusTier(titleA);
+    const textB = spellOutPlusTier(titleB);
     for (const { name, pattern } of VARIANT_PATTERNS) {
-      const matchA = (pattern.exec(titleA) ?? [])[0]?.toLowerCase();
-      const matchB = (pattern.exec(titleB) ?? [])[0]?.toLowerCase();
+      const matchA = (pattern.exec(textA) ?? [])[0]?.toLowerCase();
+      const matchB = (pattern.exec(textB) ?? [])[0]?.toLowerCase();
 
       // Both have variant but different ones → conflict
       if (matchA && matchB && matchA !== matchB) return `${name}_conflict`;

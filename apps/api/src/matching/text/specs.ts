@@ -6,7 +6,7 @@
  * RAM and storage cover every format stores use in this market:
  *   "8GB RAM", "8 GB RAM", "RAM 8GB", "8GB LPDDR5", "16GB Unified Memory"
  *   "256GB/8GB", "8GB/256GB", "8/256GB", "8GB - 256GB", "8GB, 256GB"
- *   "8+256", "(8+256)", "8GB+256GB", "12GB 256GB", "256GB ROM", "512GB SSD"
+ *   "8+256", "(8+256)", "8GB+256GB", "8 * 256GB", "12GB 256GB", "256GB ROM", "512GB SSD"
  *   "رام ٨ جيجا", "٢٥٦ جيجابايت" (after toMatchingText)
  * An unlabelled pair is read as RAM + storage only when the smaller number is
  * a plausible RAM size and the larger a plausible storage size, so a GPU's
@@ -44,8 +44,8 @@ const STORAGE_AFTER =
   /(?<![\w.])(\d+(?:\.\d+)?)\s*(tb|gb)\s*(?:ssd|hdd|emmc|ufs|rom|nvme|storage|internal(?:\s+(?:storage|memory))?|hard\s+drive)(?![a-z])/gi;
 /** "Storage 256GB", "ROM: 256 GB", "SSD 512GB". */
 const STORAGE_BEFORE = /(?<![a-z])(?:storage|rom|ssd)\s*:?\s*(\d+(?:\.\d+)?)\s*(tb|gb)(?![a-z])/gi;
-/** Unit-less pairs: "8+256", "(8+256)", "8/256GB", "8GB+256GB", "12+1TB". */
-const PAIR = /(?<![\w.])(\d{1,3})\s*(gb)?\s*([+/])\s*(\d{1,4})\s*(gb|tb)?(?![a-z\d])/gi;
+/** Unit-less pairs: "8+256", "(8+256)", "8/256GB", "8GB+256GB", "12+1TB", "8 * 256GB". */
+const PAIR = /(?<![\w.])(\d{1,3})\s*(gb)?\s*([+/*×])\s*(\d{1,4})\s*(gb|tb)?(?![a-z\d])/gi;
 
 function toGb(amount: number, unit: string): number {
   return unit.toLowerCase() === 'tb' ? amount * 1000 : amount;
@@ -132,9 +132,9 @@ export function extractMemorySpec(matchingText: string): MemorySpec {
 function findPair(text: string): { ram: number; storage: number; ramPositions: Array<[number, number]> } | null {
   for (const match of text.matchAll(PAIR)) {
     const [, first, firstUnit, operator, second, secondUnit] = match;
-    // "8/256" with no unit anywhere is only a pair with "+", which stores use
+    // "8/256" or "8 * 256" with no unit anywhere is only a pair with "+", which stores use
     // for exactly this; a bare "a/b" could be anything.
-    if (!firstUnit && !secondUnit && operator === '/') continue;
+    if (!firstUnit && !secondUnit && operator !== '+') continue;
     const a = toGb(parseInt(first, 10), firstUnit ?? secondUnit ?? 'gb');
     const b = toGb(parseInt(second, 10), secondUnit ?? 'gb');
     const pair = asRamStoragePair(a, b);

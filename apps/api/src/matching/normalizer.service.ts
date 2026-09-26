@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ExtractedAttributes, NormalizedTitle } from './interfaces/matching.interfaces';
 import { normalizeArabic, toMatchingText } from './text/arabic';
 import { extractMemorySpec } from './text/specs';
+import { spellOutPlusTier } from './text/tier';
 
 const BRAND_ALIASES: Record<string, string> = {
   nvidia: 'NVIDIA',
@@ -66,6 +67,7 @@ const CRITICAL_VARIANTS = [
   /\bXT X\b/i,
   /\bXTX\b/i,
   /\bPro Max\b/i,
+  /\bPro Plus\b/i,
   /\bSuper\b/i,
   /\bUltra\b/i,
   /\bPlus\b/i,
@@ -356,8 +358,9 @@ export class NormalizerService {
   }
 
   extractVariant(title: string): string | undefined {
+    const text = spellOutPlusTier(title);
     for (const pattern of CRITICAL_VARIANTS) {
-      const match = pattern.exec(title);
+      const match = pattern.exec(text);
       if (match) return match[0].trim();
     }
     return undefined;
@@ -573,6 +576,10 @@ export class NormalizerService {
       /\blcds?\b(?!\s*(?:tv|television|monitor|smart))/i,
       /\b(digitizer|display\s+assembly|screen\s+assembly|touch\s+panel|back\s+glass|housing|flex\s+cable)\b/i,
       /\b(camera\s+lens|lens\s+(?:protector|film|cover)|lens\s+guard)\b/i,
+      // A phone's board sold as a spare ("Motherboard for Redmi A3 Tested
+      // Circuit Plate Main Logic Board"). Only the "for <device>" and board
+      // phrasings: a PC motherboard on its own is a product, not a part.
+      /\b((?:mother|main)\s*board\s+for|logic\s+board|circuit\s+plate)\b/i,
       // Arabic-language listings (common on AliExpress/Noon/Jumia for this
       // market) use their own accessory vocabulary — none of the English
       // patterns above match script other than Latin, so these need to be
@@ -597,7 +604,7 @@ export class NormalizerService {
       ['case', /\b(case|cover|sleeve|bag|holster|pouch|bumper)\b|جراب|كفر|غطاء|حافظه/i],
       ['charger', /\b(charger|adapter|power\s+bank)\b|شاحن/i],
       ['cable', /\b(cable|cord|wire)\b|كابل/i],
-      ['part', /\blcds?\b|\b(digitizer|display\s+assembly|screen\s+assembly|touch\s+panel|back\s+glass|housing|replacement)\b/i],
+      ['part', /\blcds?\b|\b(digitizer|display\s+assembly|screen\s+assembly|touch\s+panel|back\s+glass|housing|replacement|logic\s+board|circuit\s+plate)\b|\b(?:mother|main)\s*board\s+for\b/i],
       ['mount', /\b(stand|mount|dock|holder)\b|حامل/i],
       ['skin', /\b(skin|wrap|sticker|decal)\b/i],
     ];

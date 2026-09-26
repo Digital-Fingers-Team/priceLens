@@ -77,6 +77,11 @@ describe('NormalizerService', () => {
       expect(service.isAccessory('Mobile Phone LCDs Display Pantalla 100% Tested for Itel A100c')).toBe(true);
       expect(service.isAccessory('GOLDEN MASK For Realme C53/Realme Narzo N53 Camera Lens Protector')).toBe(true);
       expect(service.isAccessory('Back Glass Housing Replacement Galaxy S24')).toBe(true);
+      expect(
+        service.isAccessory(
+          'Global Version Original Unlocked Motherboard for Redmi A3 Tested Circuit Plate Main Logic Board for Redmi A3',
+        ),
+      ).toBe(true);
     });
 
     it('does not flag actual products', () => {
@@ -89,6 +94,7 @@ describe('NormalizerService', () => {
       expect(service.isAccessory('Samsung 55 Inch OLED Display 4K Smart TV')).toBe(false);
       expect(service.isAccessory('LG 24 Inch LCD Monitor Full HD')).toBe(false);
       expect(service.isAccessory('TORNADO 32 Inch LCD TV HD')).toBe(false);
+      expect(service.isAccessory('ASUS PRIME B650M-A WIFI AM5 Motherboard DDR5')).toBe(false);
       // "for <brand>" is not an accessory signal on its own.
       expect(service.isAccessory('Apple 2024 MacBook Pro Laptop with M4 Pro: Built for Apple Intelligence')).toBe(false);
     });

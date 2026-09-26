@@ -22,6 +22,13 @@ import { withTimeout } from '../common/redis-resilience';
 export const ENQUEUE_TIMEOUT_MS = 1_000;
 
 /**
+ * Bull priorities, 1 = first. A shopper waiting on a search must not queue
+ * behind hundreds of background store expansions: it did, for 45 minutes.
+ * Bull inserts a prioritised job ahead of every unprioritised one.
+ */
+export const JOB_PRIORITY = { userSearch: 1, admin: 2, storeExpansion: 10 } as const;
+
+/**
  * The one place on-demand ingestion jobs are enqueued. Each method fixes the
  * job's name, payload shape and deduplication id. On-demand jobs are removed
  * when done (completed or failed): they are triggers, not records. Every
@@ -43,7 +50,12 @@ export class IngestionQueue {
     await this.add(
       RUN_QUERY_INGESTION_JOB,
       { query, limitPerQuery },
-      { jobId: `on-demand-live-fetch:${query}`, removeOnComplete: true, removeOnFail: true },
+      {
+        jobId: `on-demand-live-fetch:${query}`,
+        priority: JOB_PRIORITY.userSearch,
+        removeOnComplete: true,
+        removeOnFail: true,
+      },
     );
   }
 
@@ -52,7 +64,12 @@ export class IngestionQueue {
     await this.add(
       RUN_STORE_EXPANSION_JOB,
       { productId, targetStores },
-      { jobId: `store-expansion:${productId}`, removeOnComplete: true, removeOnFail: true },
+      {
+        jobId: `store-expansion:${productId}`,
+        priority: JOB_PRIORITY.storeExpansion,
+        removeOnComplete: true,
+        removeOnFail: true,
+      },
     );
   }
 
@@ -60,6 +77,7 @@ export class IngestionQueue {
   async enqueueLiveIngestion(data: LiveIngestionJobData): Promise<string> {
     const job = await this.add(RUN_LIVE_INGESTION_JOB, data, {
       jobId: `manual-live-fetch:${(data.platformSlugs ?? ['all']).join(',')}`,
+      priority: JOB_PRIORITY.admin,
       removeOnComplete: true,
       removeOnFail: true,
     });
@@ -70,6 +88,7 @@ export class IngestionQueue {
   async enqueueReconciliation(data: ReconciliationJobData): Promise<string> {
     const job = await this.add(RUN_RECONCILIATION_JOB, data, {
       jobId: `manual-reconcile:${Date.now()}`,
+      priority: JOB_PRIORITY.admin,
       removeOnComplete: true,
       removeOnFail: true,
     });
@@ -80,6 +99,7 @@ export class IngestionQueue {
   async enqueueStoreCoverageSweep(data: StoreCoverageSweepJobData): Promise<string> {
     const job = await this.add(RUN_STORE_COVERAGE_SWEEP_JOB, data, {
       jobId: `manual-store-coverage-sweep:${Date.now()}`,
+      priority: JOB_PRIORITY.admin,
       removeOnComplete: true,
       removeOnFail: true,
     });

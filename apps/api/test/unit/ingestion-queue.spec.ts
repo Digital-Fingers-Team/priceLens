@@ -1,5 +1,5 @@
 import type { Queue } from 'bull';
-import { ENQUEUE_TIMEOUT_MS, IngestionQueue } from '../../src/workers/ingestion-queue.service';
+import { ENQUEUE_TIMEOUT_MS, IngestionQueue, JOB_PRIORITY } from '../../src/workers/ingestion-queue.service';
 import { RedisTimeoutError } from '../../src/common/redis-resilience';
 import {
   RUN_LIVE_INGESTION_JOB,
@@ -26,12 +26,19 @@ describe('IngestionQueue (producer)', () => {
 
     expect(add).toHaveBeenNthCalledWith(1, RUN_QUERY_INGESTION_JOB, { query: 'iphone 16', limitPerQuery: 12 }, {
       jobId: 'on-demand-live-fetch:iphone 16',
+      priority: JOB_PRIORITY.userSearch,
       ...ON_DEMAND,
     });
     expect(add).toHaveBeenNthCalledWith(2, RUN_STORE_EXPANSION_JOB, { productId: 'p-1', targetStores: 4 }, {
       jobId: 'store-expansion:p-1',
+      priority: JOB_PRIORITY.storeExpansion,
       ...ON_DEMAND,
     });
+  });
+
+  it('runs a shopper search before background store expansions', () => {
+    expect(JOB_PRIORITY.userSearch).toBeLessThan(JOB_PRIORITY.admin);
+    expect(JOB_PRIORITY.admin).toBeLessThan(JOB_PRIORITY.storeExpansion);
   });
 
   it('enqueues admin runs and returns the job id', async () => {
@@ -41,11 +48,12 @@ describe('IngestionQueue (producer)', () => {
     expect(await producer.enqueueLiveIngestion({ platformSlugs: ['noon', 'jumia'] })).toBe('42');
     expect(add).toHaveBeenLastCalledWith(RUN_LIVE_INGESTION_JOB, { platformSlugs: ['noon', 'jumia'] }, {
       jobId: 'manual-live-fetch:noon,jumia',
+      priority: JOB_PRIORITY.admin,
       ...ON_DEMAND,
     });
 
     await producer.enqueueLiveIngestion({});
-    expect(add).toHaveBeenLastCalledWith(RUN_LIVE_INGESTION_JOB, {}, { jobId: 'manual-live-fetch:all', ...ON_DEMAND });
+    expect(add).toHaveBeenLastCalledWith(RUN_LIVE_INGESTION_JOB, {}, { jobId: 'manual-live-fetch:all', priority: JOB_PRIORITY.admin, ...ON_DEMAND });
 
     await producer.enqueueReconciliation({ dryRun: true });
     expect(add).toHaveBeenLastCalledWith(
