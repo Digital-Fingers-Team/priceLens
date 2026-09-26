@@ -9,3 +9,10 @@ allowBuilds:
   msgpackr-extract: true
   prisma: true
   unrs-resolver: true
+# Security floors for transitive dependencies (audit/04-security.md S-17):
+# lodash via @nestjs/config (_.template code injection), qs via express
+# (query-string parsing, remotely reachable), js-yaml via @nestjs/swagger.
+overrides:
+  lodash: ^4.18.1
+  qs: ^6.16.0
+  js-yaml: ^4.3.2
