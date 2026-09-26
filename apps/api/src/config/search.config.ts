@@ -10,6 +10,12 @@ export default registerAs('search', () => ({
   openRouterApiKey: process.env.OPENROUTER_API_KEY ?? process.env.OPENAI_API_KEY ?? '',
   openRouterBaseUrl: process.env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1',
   openRouterMatchModel: process.env.OPENROUTER_MATCH_MODEL ?? 'google/gemini-2.5-flash',
+  // Google's Gemini API directly. Takes precedence over OpenRouter when set.
+  // Empty = no Gemini. OPENROUTER_FALLBACK_ENABLED=false turns the judge off
+  // whichever provider is configured.
+  geminiApiKey: process.env.GEMINI_API_KEY ?? '',
+  geminiMatchModel: process.env.GEMINI_MATCH_MODEL ?? 'gemini-2.5-flash-lite',
+  geminiBaseUrl: process.env.GEMINI_BASE_URL ?? 'https://generativelanguage.googleapis.com/v1beta',
   // Background reconciliation job that re-checks EXISTING canonical products for
   // duplicates and merges them (fixes the "1 store" problem). Runs on a cron and
   // can also be triggered manually. Dry-run only logs proposed merges.

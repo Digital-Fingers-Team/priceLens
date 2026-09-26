@@ -2,6 +2,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
+import type { ProductMerge } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { FuzzyMatcherService } from './fuzzy-matcher.service';
 import { NormalizerService } from './normalizer.service';
@@ -24,18 +25,24 @@ export interface ReconciliationOptions {
   maxPairs?: number;
 }
 
+/** Who approved a merge: the AI judge, or the code rules while the judge was unavailable. */
+export type MergeDecision = 'ai' | 'rules';
+
 export interface ProposedMerge {
   keepId: string;
   keepTitle: string;
   mergeId: string;
   mergeTitle: string;
   similarity: number;
+  decidedBy: MergeDecision;
 }
 
 export interface ReconciliationReport {
   dryRun: boolean;
   pairsExamined: number;
   merges: ProposedMerge[];
+  /** Earlier rules-only merges the AI judge reviewed this run, when it could. */
+  review?: { approved: number; undone: number };
 }
 
 /**
@@ -53,6 +60,12 @@ export interface ReconciliationReport {
  * variants a title leaves out: merging two stored products is destructive,
  * so one that states its RAM or storage is never merged with one that does
  * not (audit 02, L-04).
+ *
+ * After the guards, the AI judge (SemanticService) decides whenever it
+ * answers, and its "no" overrides the code rules. When it cannot answer the
+ * rules decide alone, and every merge is logged (product_merges) with what it
+ * moved: the next run with the judge reviews those unreviewed merges and
+ * undoes the ones it rejects.
  */
 @Injectable()
 export class ReconciliationService {
@@ -74,6 +87,9 @@ export class ReconciliationService {
     const maxPairs = options.maxPairs ?? this.config.get<number>('search.reconciliationMaxPairs', 500);
     const threshold = this.config.get<number>('search.reconciliationSimilarityThreshold', 0.82);
     const neighborsPerProduct = this.config.get<number>('search.reconciliationNeighborsPerProduct', 5);
+
+    // First, let the judge review what the rules merged while it was away.
+    const review = !dryRun && this.semantic.isAvailable() ? await this.reviewUnreviewedMerges() : undefined;
 
     // Two complementary candidate sources, deduped. Trigram similarity catches
     // near-identical titles; model-agreement catches genuine cross-store
@@ -106,22 +122,23 @@ export class ReconciliationService {
 
       if (this.hasHardConflict(a, b)) continue;
 
-      // If the model number extracted fresh from each title agrees, that's a
-      // stronger, more reliable signal than the small local LLM judge: testing
-      // showed qwen2.5:1.5b incorrectly rejects real duplicates worded
-      // differently by two stores (e.g. "Oppo A6 - 8GB RAM - 256GB" vs "OPPO
-      // A6 Smartphone, 256 GB, ... 8 GB RAM") even though every structured
-      // attribute agrees. Recomputed from the title rather than trusting the
-      // stored `model` column, since older rows predate model extraction for
-      // several phone brands. Skip the LLM call entirely when it agrees.
+      // The code rules' verdict: the model extracted fresh from each title
+      // agrees (recomputed rather than read from the `model` column, which
+      // older rows lack). Not for accessories: their model is the phone they
+      // fit, which every case for that phone shares.
       const modelA = this.normalizer.extractAttributes(a.title).model?.trim().toLowerCase();
       const modelB = this.normalizer.extractAttributes(b.title).model?.trim().toLowerCase();
-      // Not for accessories: their model is the phone they fit, which every
-      // case and screen protector for that phone shares.
-      const modelsAgree = !!modelA && !!modelB && modelA === modelB && !this.normalizer.isAccessory(a.title);
+      const rulesSay = !!modelA && !!modelB && modelA === modelB && !this.normalizer.isAccessory(a.title);
 
-      const verdict = modelsAgree ? true : await this.semantic.judgeSameProduct(a.title, b.title);
-      if (verdict !== true) continue;
+      // The AI judge has the last word whenever it answers: a "no" blocks
+      // even a merge the rules approve (it tells "Pro" from "Pro+", and RAM
+      // written in ways the rules miss). While it cannot answer, the rules
+      // decide alone and the merge is logged as unreviewed, for the judge to
+      // review once it is back (reviewUnreviewedMerges).
+      const aiSays = await this.semantic.judgeSameProduct(a.title, b.title);
+      if (aiSays === false) continue;
+      if (aiSays === null && !rulesSay) continue;
+      const decidedBy: MergeDecision = aiSays === true ? 'ai' : 'rules';
 
       // Keep the older canonical (stable ids, older price history), merge the newer in.
       const [keep, merge] = a.createdAt <= b.createdAt ? [a, b] : [b, a];
@@ -131,26 +148,57 @@ export class ReconciliationService {
         mergeId: merge.id,
         mergeTitle: merge.title,
         similarity: pair.similarity,
+        decidedBy,
       });
 
       if (dryRun) {
         this.logger.log(
           `[dry-run] would merge "${merge.title}" (${merge.id}) → "${keep.title}" (${keep.id}) ` +
-            `[sim ${pair.similarity.toFixed(3)}]`,
+            `[decided by ${decidedBy}]`,
         );
       } else {
-        await this.mergeCanonicals(keep, merge);
-        this.logger.log(
-          `Merged "${merge.title}" (${merge.id}) → "${keep.title}" (${keep.id}) [sim ${pair.similarity.toFixed(3)}]`,
-        );
+        await this.mergeCanonicals(keep, merge, decidedBy);
+        this.logger.log(`Merged "${merge.title}" (${merge.id}) → "${keep.title}" (${keep.id}) [decided by ${decidedBy}]`);
       }
       consumed.add(merge.id);
     }
 
     this.logger.log(
-      `Reconciliation done (dryRun=${dryRun}): ${merges.length} ${dryRun ? 'proposed' : 'executed'} merge(s)`,
+      `Reconciliation done (dryRun=${dryRun}): ${merges.length} ${dryRun ? 'proposed' : 'executed'} merge(s)` +
+        (review ? `; reviewed ${review.approved + review.undone} earlier merge(s), undid ${review.undone}` : ''),
     );
-    return { dryRun, pairsExamined: pairs.length, merges };
+    return { dryRun, pairsExamined: pairs.length, merges, review };
+  }
+
+  /**
+   * Merges the code rules made while the AI judge was unavailable, reviewed
+   * by the judge now that it answers: approved ones are marked, rejected ones
+   * undone. Stops at the first pair the judge cannot answer.
+   */
+  async reviewUnreviewedMerges(limit = 200): Promise<{ approved: number; undone: number }> {
+    const result = { approved: 0, undone: 0 };
+    const pending = await this.prisma.productMerge.findMany({
+      where: { aiVerdict: null, undoneAt: null },
+      orderBy: { createdAt: 'asc' },
+      take: limit,
+    });
+
+    for (const merge of pending) {
+      const verdict = await this.semantic.judgeSameProduct(merge.mergedTitle, merge.keptTitle);
+      if (verdict === null) break;
+      if (verdict) {
+        await this.prisma.productMerge.update({
+          where: { id: merge.id },
+          data: { aiVerdict: true, reviewedAt: new Date() },
+        });
+        result.approved++;
+      } else {
+        await this.undoMerge(merge);
+        result.undone++;
+        this.logger.warn(`Undid merge "${merge.mergedTitle}" → "${merge.keptTitle}": the AI judge says they differ`);
+      }
+    }
+    return result;
   }
 
   /**
@@ -341,10 +389,16 @@ export class ReconciliationService {
    * Before deleting, any identifier / image the loser has but the keeper lacks is
    * copied onto the keeper so a unique GTIN/UPC/EAN/MPN isn't lost with the row.
    */
-  private async mergeCanonicals(keep: CanonicalRow, merge: CanonicalRow): Promise<void> {
+  private async mergeCanonicals(keep: CanonicalRow, merge: CanonicalRow, decidedBy: MergeDecision): Promise<void> {
     const keepId = keep.id;
     const mergeId = merge.id;
     await this.prisma.$transaction(async (tx) => {
+      // What moves is recorded first, so the merge can be undone (undoMerge).
+      const ids = async (rows: Promise<Array<{ id: string }>>) => (await rows).map((row) => row.id);
+      const movedListingIds = await ids(tx.sourceListing.findMany({ where: { canonicalProductId: mergeId }, select: { id: true } }));
+      const movedAlertIds = await ids(tx.priceAlert.findMany({ where: { canonicalProductId: mergeId }, select: { id: true } }));
+      const movedReviewItemIds = await ids(tx.reviewQueue.findMany({ where: { canonicalProductId: mergeId }, select: { id: true } }));
+
       await tx.sourceListing.updateMany({
         where: { canonicalProductId: mergeId },
         data: { canonicalProductId: keepId },
@@ -373,14 +427,18 @@ export class ReconciliationService {
         where: { canonicalProductId: mergeId },
         select: { id: true, userId: true },
       });
+      const movedWatchlistItemIds: string[] = [];
+      const droppedWatcherUserIds: string[] = [];
       for (const w of mergeWatchers) {
         if (keepWatcherIds.has(w.userId)) {
           await tx.watchlistItem.delete({ where: { id: w.id } });
+          droppedWatcherUserIds.push(w.userId);
         } else {
           await tx.watchlistItem.update({
             where: { id: w.id },
             data: { canonicalProductId: keepId },
           });
+          movedWatchlistItemIds.push(w.id);
         }
       }
 
@@ -389,6 +447,87 @@ export class ReconciliationService {
       // @unique constraints on gtin/upc/ean.
       await tx.canonicalProduct.delete({ where: { id: mergeId } });
       await this.backfillKeeper(tx, keep, merge);
+
+      await tx.productMerge.create({
+        data: {
+          keptProductId: keepId,
+          mergedProductId: mergeId,
+          keptTitle: keep.title,
+          mergedTitle: merge.title,
+          mergedSnapshot: JSON.parse(JSON.stringify(merge)) as Prisma.InputJsonValue,
+          movedListingIds,
+          movedAlertIds,
+          movedReviewItemIds,
+          movedWatchlistItemIds,
+          droppedWatcherUserIds,
+          decidedBy,
+          aiVerdict: decidedBy === 'ai' ? true : null,
+          reviewedAt: decidedBy === 'ai' ? new Date() : null,
+        },
+      });
+    });
+  }
+
+  /**
+   * Put a merged product back: recreate it from its snapshot and move back
+   * what the merge moved, wherever it is now (the keeper may itself have been
+   * merged since). Price history follows its listings. Identifiers the keeper
+   * took over stay with the keeper; the restored product goes without them.
+   */
+  private async undoMerge(merge: ProductMerge): Promise<void> {
+    const snapshot = merge.mergedSnapshot as unknown as CanonicalRow;
+    await this.prisma.$transaction(async (tx) => {
+      const taken = async (field: 'gtin' | 'upc' | 'ean' | 'slug', value: string | null) =>
+        value !== null && (await tx.canonicalProduct.findFirst({ where: { [field]: value }, select: { id: true } })) !== null;
+
+      const slug = (await taken('slug', snapshot.slug)) ? `${snapshot.slug}-${merge.id.slice(0, 8)}` : snapshot.slug;
+      await tx.canonicalProduct.create({
+        data: {
+          id: snapshot.id,
+          categoryId: snapshot.categoryId,
+          slug,
+          title: snapshot.title,
+          normalizedTitle: snapshot.normalizedTitle,
+          brand: snapshot.brand,
+          model: snapshot.model,
+          sku: snapshot.sku,
+          gtin: (await taken('gtin', snapshot.gtin)) ? null : snapshot.gtin,
+          upc: (await taken('upc', snapshot.upc)) ? null : snapshot.upc,
+          ean: (await taken('ean', snapshot.ean)) ? null : snapshot.ean,
+          mpn: snapshot.mpn,
+          attributes: (snapshot.attributes ?? {}) as Prisma.InputJsonValue,
+          imageUrl: snapshot.imageUrl,
+          thumbnailUrl: snapshot.thumbnailUrl,
+          tier: snapshot.tier,
+          isVerified: snapshot.isVerified,
+          searchBoost: snapshot.searchBoost,
+          createdAt: new Date(snapshot.createdAt),
+        },
+      });
+
+      const restoredId = snapshot.id;
+      await tx.sourceListing.updateMany({ where: { id: { in: merge.movedListingIds } }, data: { canonicalProductId: restoredId } });
+      await tx.priceHistory.updateMany({
+        where: { sourceListingId: { in: merge.movedListingIds } },
+        data: { canonicalProductId: restoredId },
+      });
+      await tx.priceAlert.updateMany({ where: { id: { in: merge.movedAlertIds } }, data: { canonicalProductId: restoredId } });
+      await tx.reviewQueue.updateMany({ where: { id: { in: merge.movedReviewItemIds } }, data: { canonicalProductId: restoredId } });
+      await tx.watchlistItem.updateMany({
+        where: { id: { in: merge.movedWatchlistItemIds } },
+        data: { canonicalProductId: restoredId },
+      });
+      if (merge.droppedWatcherUserIds.length > 0) {
+        await tx.watchlistItem.createMany({
+          data: merge.droppedWatcherUserIds.map((userId) => ({ userId, canonicalProductId: restoredId })),
+          skipDuplicates: true,
+        });
+      }
+
+      await tx.productMerge.update({
+        where: { id: merge.id },
+        data: { aiVerdict: false, reviewedAt: new Date(), undoneAt: new Date() },
+      });
     });
   }
 

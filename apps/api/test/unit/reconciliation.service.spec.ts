@@ -103,6 +103,21 @@ describe('ReconciliationService', () => {
       ).toBe(true);
     });
 
+    it('blocks the two merges production made on 2026-09-26', () => {
+      expect(
+        conflict(
+          canonical({ brand: 'OPPO', title: 'OPPO RENO 16F 5G 8 * 256GB POP WHITE (NEW MODEL)' }),
+          canonical({ brand: 'OPPO', title: 'OPPO RENO 16F 5G 12 * 256GB TWILIGHT VIOLET (NEW MODEL)' }),
+        ),
+      ).toBe(true);
+      expect(
+        conflict(
+          canonical({ brand: 'Infinix', title: 'Infinix Hot 60 Pro Dual SIM Sleek Black 8+8GB RAM 256GB 4G' }),
+          canonical({ brand: 'Infinix', title: 'Infinix Hot 60 Pro+ Dual SIM Sleek Black 8+8GB RAM 256 GB 4G' }),
+        ),
+      ).toBe(true);
+    });
+
     it('blocks a product that states its RAM from merging with one that does not', () => {
       expect(
         conflict(

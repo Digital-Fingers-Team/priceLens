@@ -343,6 +343,53 @@ model PriceHistory {
   @@map("price_history")
 }
 
+// ─── Reconciliation merges ───────────────────────────────────────────────────
+
+/// One merge of two canonical products by the reconciliation job, with what
+/// is needed to undo it. A merge the code rules made while the AI judge was
+/// unavailable has aiVerdict = null; the next run with the judge reviews it and
+/// undoes it if the judge says the two were different products.
+model ProductMerge {
+  id                    String    @id @default(uuid())
+  keptProductId         String    @map("kept_product_id")
+  mergedProductId       String    @map("merged_product_id")
+  keptTitle             String    @map("kept_title")
+  mergedTitle           String    @map("merged_title")
+  /// The deleted product row, to recreate it on undo.
+  mergedSnapshot        Json      @map("merged_snapshot")
+  movedListingIds       String[]  @map("moved_listing_ids")
+  movedAlertIds         String[]  @map("moved_alert_ids")
+  movedReviewItemIds    String[]  @map("moved_review_item_ids")
+  movedWatchlistItemIds String[]  @map("moved_watchlist_item_ids")
+  /// Users who watched both products; their row on the merged one was deleted.
+  droppedWatcherUserIds String[]  @map("dropped_watcher_user_ids")
+  /// "ai" (the judge approved) or "rules" (the judge was unavailable).
+  decidedBy             String    @map("decided_by") @db.VarChar(16)
+  /// null until the AI judge has reviewed the merge.
+  aiVerdict             Boolean?  @map("ai_verdict")
+  reviewedAt            DateTime? @map("reviewed_at")
+  undoneAt              DateTime? @map("undone_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+
+  @@index([aiVerdict, undoneAt, createdAt])
+  @@index([keptProductId])
+  @@map("product_merges")
+}
+
+/// The AI judge's answer for one pair of titles, so a pair is asked once.
+model MatchJudgement {
+  id        String   @id @default(uuid())
+  /// sha256 of the two normalized titles, sorted, so (a, b) and (b, a) match.
+  pairKey   String   @unique @map("pair_key") @db.VarChar(64)
+  titleA    String   @map("title_a")
+  titleB    String   @map("title_b")
+  same      Boolean
+  model     String   @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("match_judgements")
+}
+
 // ─── Match Decision Audit Trail ──────────────────────────────────────────────
 
 model MatchDecision {
