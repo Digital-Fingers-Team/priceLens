@@ -17,6 +17,7 @@ import {
 } from '@/lib/hooks/use-seller';
 import { formatCurrency } from '@/lib/utils/format';
 import { cn } from '@/lib/utils/cn';
+import { safeExternalHref } from '@/lib/utils/safe-href';
 
 export default function SellerProductPage() {
   const params = useParams<{ orgId: string; productId: string }>();
@@ -192,9 +193,9 @@ export default function SellerProductPage() {
                           )}
                         </td>
                         <td className="py-2 text-right">
-                          {competitor.url && (
+                          {safeExternalHref(competitor.url) && (
                             <a
-                              href={competitor.url}
+                              href={safeExternalHref(competitor.url)}
                               target="_blank"
                               rel="noopener noreferrer nofollow"
                               className="text-ink-500 hover:text-ink-300"

@@ -27,6 +27,7 @@ import {
 import { formatCurrency } from '@/lib/utils/format';
 import { cn } from '@/lib/utils/cn';
 import type { CompetitorEvent, CompetitorEventType } from '@/types/seller.types';
+import { safeExternalHref } from '@/lib/utils/safe-href';
 
 const EVENT_META: Record<
   CompetitorEventType,
@@ -212,9 +213,9 @@ function EventRow({ event, onAcknowledge }: { event: CompetitorEvent; onAcknowle
           <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-ink-600">
             <time dateTime={event.detectedAt}>{new Date(event.detectedAt).toLocaleString()}</time>
             {/* The listing the claim came from — evidence, not assertion. */}
-            {evidenceUrl && (
+            {safeExternalHref(evidenceUrl) && (
               <a
-                href={evidenceUrl}
+                href={safeExternalHref(evidenceUrl)}
                 target="_blank"
                 rel="noopener noreferrer nofollow"
                 className="text-ink-500 underline hover:text-ink-300"

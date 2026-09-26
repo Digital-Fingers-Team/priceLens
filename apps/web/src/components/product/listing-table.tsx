@@ -11,6 +11,7 @@ import {
   bestDealIds,
 } from '@/lib/utils/price';
 import { cn } from '@/lib/utils/cn';
+import { safeExternalHref } from '@/lib/utils/safe-href';
 
 interface ListingTableProps {
   listings: SourceListing[];
@@ -171,7 +172,7 @@ export function ListingTable({ listings, showConfidence = false }: ListingTableP
                 {/* View link */}
                 <td className="px-4 py-3.5 text-right">
                   <a
-                    href={listing.externalUrl}
+                    href={safeExternalHref(listing.externalUrl)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-signal border border-signal/20 hover:bg-signal/10 transition-colors"

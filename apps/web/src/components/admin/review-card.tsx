@@ -8,6 +8,7 @@ import { formatCurrency, formatRelativeTime } from '@/lib/utils/format';
 import { getConfidenceLevel, getConfidenceColor } from '@/lib/utils/price';
 import { useResolveQueueItem } from '@/lib/hooks/use-admin';
 import { cn } from '@/lib/utils/cn';
+import { safeExternalHref } from '@/lib/utils/safe-href';
 
 interface ReviewCardProps {
   item: ReviewQueueItem;
@@ -87,7 +88,7 @@ export function ReviewCard({ item }: ReviewCardProps) {
               </span>
             )}
             <a
-              href={item.sourceListing.externalUrl}
+              href={safeExternalHref(item.sourceListing.externalUrl)}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 hover:text-signal transition-colors"
