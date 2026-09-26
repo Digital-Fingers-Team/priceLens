@@ -183,7 +183,7 @@ New dependencies: none. Upgrades only, plus pnpm `overrides` floors.
 
 ## Remaining items
 
-- **Deploy.** The fixes reach users only after `deploy-api.sh` + `deploy-web.sh`. The permission classifier blocked me twice, including after the owner's chat OK (morning list). Until then the live login stays broken (S-02).
+- **Deploy → moved to phase 05, step 0 (owner, 2026-09-26).** The fixes reach users only after `deploy-api.sh` + `deploy-web.sh`. The permission classifier blocked me twice in phase 04, including after the owner's chat OK. Until then the live login stays broken (S-02).
 - Next 15 upgrade: clears the remaining critical/high advisories and lets the CSP drop `'unsafe-inline'` with nonces.
 - Nest 11 upgrade (`multer` etc.; not reachable today).
 - Remove the raw-refresh-token fallback after 2026-10-26.
@@ -192,6 +192,7 @@ New dependencies: none. Upgrades only, plus pnpm `overrides` floors.
 ## Handoff → other phases
 
 - **05 Frontend**
+  - **Step 0, before anything else: deploy phase 04** (D-19, approved by the owner). From `~/pricelens` on the server at tag `phase-04-done`: `./scripts/deploy-api.sh && ./scripts/deploy-web.sh`. Then verify: a login POST with `Origin: https://pricelens.work.gd` returns 401 for bad credentials (not 403) with the ACAO header; `/_next/image` returns 404; the product page carries the CSP header; `ss -ltn` shows `127.0.0.1:3002`. The MEILI lines are already gone from the prod `.env`. Record the new container StartedAt values as the phase 05 baseline.
   - Upgrade Next 14 → 15.5.24+ with React 19 (S-03/S-17). Afterwards re-enable the image optimizer only if AVIF decoding is patched, and add CSP nonces via middleware to drop `script-src 'unsafe-inline'`.
   - `listing-table` "View" links go straight to the store (`externalUrl`), bypassing `/affiliate/go` click tracking. Product decision, not security.
 - **06 UX**
@@ -211,6 +212,6 @@ New dependencies: none. Upgrades only, plus pnpm `overrides` floors.
   - **Recommendation:** yes, in phase 05 after the Next 15 upgrade, keeping bearer tokens for the partner API. Until then CSP plus the S-01/S-09 fixes cover the known paths.
 - **D-18 — MongoDB (AradoBot's `aradobotd-mongo`) is published on `0.0.0.0:27017`.** firewalld doesn't open 27017, so it's probably unreachable from outside, but one firewall change away from exposing a database.
   - **Recommendation:** bind it to `127.0.0.1` the next time you touch AradoBot, and make sure it has auth enabled.
-- **D-19 — Deploy the phase 04 fixes now.** Login/sign-up are broken live until the API is redeployed (S-02).
+- **D-19 — Deploy the phase 04 fixes now.** → Moved to phase 05 step 0 (owner, 2026-09-26). Login/sign-up are broken live until the API is redeployed (S-02).
   - **Recommendation:** run `ssh pricelens 'cd ~/pricelens && ./scripts/deploy-api.sh && ./scripts/deploy-web.sh'`, or add a permission rule so I can. Then check a real login in the browser.
   - Everyone gets one silent token refresh after the API deploy: old access tokens carry no session id.
