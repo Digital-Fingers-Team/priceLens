@@ -2,9 +2,10 @@
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Logger } from '@nestjs/common';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { SwaggerModule } from '@nestjs/swagger';
 import { AppModule, ENV_FILES } from './app.module';
 import { configureApp } from './app.setup';
+import { createOpenApiDocument } from './openapi';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -27,29 +28,7 @@ async function bootstrap() {
 
   // ─── Swagger ─────────────────────────────────────────────────────────────
   if (process.env.NODE_ENV !== 'production') {
-    const config = new DocumentBuilder()
-      .setTitle('PriceLens API')
-      .setDescription(
-        'Cross-platform price comparison engine API. ' +
-        'Uses a 10-step layered matching pipeline to identify and aggregate ' +
-        'product listings across multiple shopping platforms.',
-      )
-      .setVersion('1.0.0')
-      .addBearerAuth(
-        { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
-        'access-token',
-      )
-      .addTag('auth', 'Authentication & session management')
-      .addTag('products', 'Canonical product management')
-      .addTag('search', 'Product search and discovery')
-      .addTag('prices', 'Price history and aggregation')
-      .addTag('watchlist', 'User watchlist')
-      .addTag('alerts', 'Price drop alerts')
-      .addTag('admin', 'Admin and moderation tools')
-      .addTag('affiliate', 'Affiliate link tracking and store redirects')
-      .build();
-
-    const document = SwaggerModule.createDocument(app, config);
+    const document = createOpenApiDocument(app);
     SwaggerModule.setup('docs', app, document, {
       swaggerOptions: {
         persistAuthorization: true,

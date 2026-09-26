@@ -1,0 +1,3134 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/v1/auth/register": {
+      "post": {
+        "operationId": "AuthController_register",
+        "summary": "Register a new account",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "summary": "Login with email and password",
+        "description": "The body is validated like every other one (LoginDto) and checked here.\nIt used to go through passport-local, whose guard runs before pipes, so\nthe body was never validated and unknown fields were accepted (B-04).",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "operationId": "AuthController_refresh",
+        "summary": "Refresh access token using a refresh token",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "summary": "Revoke current session",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "auth"
+        ],
+        "security": [
+          {
+            "access-token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/sessions": {
+      "delete": {
+        "operationId": "AuthController_logoutAll",
+        "summary": "Revoke all sessions (logout everywhere)",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "auth"
+        ],
+        "security": [
+          {
+            "access-token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "operationId": "AuthController_me",
+        "summary": "Get current user profile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ],
+        "security": [
+          {
+            "access-token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/products/{slug}": {
+      "get": {
+        "operationId": "ProductsController_getBySlug",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "products"
+        ]
+      }
+    },
+    "/api/v1/products/{id}/listings": {
+      "get": {
+        "operationId": "ProductsController_getListings",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "products"
+        ]
+      }
+    },
+    "/api/v1/search": {
+      "get": {
+        "operationId": "SearchController_search",
+        "summary": "Search products; a query also queues a live scrape of it",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "What the user typed. Empty lists the catalog, most-compared products first.",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "brand",
+            "required": false,
+            "in": "query",
+            "description": "Exact brand, case-insensitive.",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "minPrice",
+            "required": false,
+            "in": "query",
+            "description": "Lowest live offer at or above this, in the base currency.",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "maxPrice",
+            "required": false,
+            "in": "query",
+            "description": "Highest live offer at or below this, in the base currency.",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "relevance",
+                "minPriceUsd",
+                "maxPriceUsd",
+                "listingCount",
+                "updatedAt"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortDir",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 1000,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "search"
+        ]
+      }
+    },
+    "/api/v1/search/suggest": {
+      "get": {
+        "operationId": "SearchController_suggest",
+        "summary": "Type-ahead suggestions (2+ characters)",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "At least 2 characters give suggestions; shorter returns an empty list.",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "search"
+        ]
+      }
+    },
+    "/api/v1/admin/dashboard": {
+      "get": {
+        "operationId": "AdminController_getDashboard",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/review-queue": {
+      "get": {
+        "operationId": "AdminController_getReviewQueue",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/review-queue/{id}/resolve": {
+      "patch": {
+        "operationId": "AdminController_resolveReviewItem",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveReviewItemDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/platforms": {
+      "get": {
+        "operationId": "AdminController_getPlatforms",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/ingest/live": {
+      "post": {
+        "operationId": "AdminController_runLiveIngestion",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunLiveIngestionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/reconcile": {
+      "post": {
+        "operationId": "AdminController_runReconciliation",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunReconciliationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/store-coverage-sweep": {
+      "post": {
+        "operationId": "AdminController_runStoreCoverageSweep",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunStoreCoverageSweepDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/watchlist": {
+      "get": {
+        "operationId": "WatchlistController_getWatchlist",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "watchlist"
+        ]
+      },
+      "post": {
+        "operationId": "WatchlistController_addToWatchlist",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddWatchlistDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "watchlist"
+        ]
+      }
+    },
+    "/api/v1/watchlist/{productId}": {
+      "delete": {
+        "operationId": "WatchlistController_removeFromWatchlist",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "watchlist"
+        ]
+      }
+    },
+    "/api/v1/watchlist/alerts": {
+      "get": {
+        "operationId": "WatchlistController_getAlerts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "watchlist"
+        ]
+      }
+    },
+    "/api/v1/watchlist/{productId}/alerts": {
+      "post": {
+        "operationId": "WatchlistController_createAlert",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAlertDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "watchlist"
+        ]
+      }
+    },
+    "/api/v1/watchlist/alerts/{alertId}/reactivate": {
+      "post": {
+        "operationId": "WatchlistController_reactivateAlert",
+        "summary": "",
+        "description": "Re-arm an alert that has already fired.",
+        "parameters": [
+          {
+            "name": "alertId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "watchlist"
+        ]
+      }
+    },
+    "/api/v1/watchlist/alerts/{alertId}": {
+      "delete": {
+        "operationId": "WatchlistController_deleteAlert",
+        "parameters": [
+          {
+            "name": "alertId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "watchlist"
+        ]
+      }
+    },
+    "/api/v1/prices/{productId}/history": {
+      "get": {
+        "operationId": "PricesController_getHistory",
+        "summary": "",
+        "description": "Price history, clamped to the caller's plan window.\n\nDeliberately still @Public: an anonymous visitor gets the free-tier window\nof *real* data rather than a login wall, which is what makes the product\nindexable and worth sharing. The response states the window it actually\ncovered and whether it was truncated, so the UI can offer the upgrade\nhonestly instead of silently showing a short chart.",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "days",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "prices"
+        ]
+      }
+    },
+    "/api/v1/prices/{productId}/current": {
+      "get": {
+        "operationId": "PricesController_getCurrent",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "prices"
+        ]
+      }
+    },
+    "/api/v1/prices/{productId}/stats": {
+      "get": {
+        "operationId": "PricesController_getStats",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "prices"
+        ]
+      }
+    },
+    "/api/v1/seller/workspaces": {
+      "get": {
+        "operationId": "SellerController_listWorkspaces",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      },
+      "post": {
+        "operationId": "SellerController_createWorkspace",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrganizationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      }
+    },
+    "/api/v1/seller/workspaces/{orgId}/summary": {
+      "get": {
+        "operationId": "SellerController_summary",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      }
+    },
+    "/api/v1/seller/workspaces/{orgId}/members": {
+      "get": {
+        "operationId": "SellerController_listMembers",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      },
+      "post": {
+        "operationId": "SellerController_addMember",
+        "summary": "",
+        "description": "Not gated on a feature flag: the seat *count* is the limit, and\nOrganizationsService.addMember already refuses when they are used up.\nRequiring FEATURES.TEAM_SEATS here locked the Seller plan out of the\nthree seats it pays for, because that flag only exists on Enterprise.",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddMemberDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      }
+    },
+    "/api/v1/seller/workspaces/{orgId}/members/{memberId}": {
+      "delete": {
+        "operationId": "SellerController_removeMember",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "memberId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      }
+    },
+    "/api/v1/seller/workspaces/{orgId}/products": {
+      "get": {
+        "operationId": "SellerController_listProducts",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      },
+      "put": {
+        "operationId": "SellerController_upsertProduct",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertSellerProductDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      }
+    },
+    "/api/v1/seller/workspaces/{orgId}/products/{productId}": {
+      "get": {
+        "operationId": "SellerController_getProduct",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      },
+      "delete": {
+        "operationId": "SellerController_deleteProduct",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      }
+    },
+    "/api/v1/seller/workspaces/{orgId}/products/{productId}/match-suggestions": {
+      "get": {
+        "operationId": "SellerController_suggestMatches",
+        "summary": "",
+        "description": "Catalogue products this SKU might be. Mapping unlocks everything else.",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      }
+    },
+    "/api/v1/seller/workspaces/{orgId}/events": {
+      "get": {
+        "operationId": "SellerController_listEvents",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sellerProductId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unacknowledgedOnly",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      }
+    },
+    "/api/v1/seller/workspaces/{orgId}/events/{eventId}/acknowledge": {
+      "post": {
+        "operationId": "SellerController_acknowledgeEvent",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "eventId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      }
+    },
+    "/api/v1/seller/workspaces/{orgId}/events/acknowledge-all": {
+      "post": {
+        "operationId": "SellerController_acknowledgeAll",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      }
+    },
+    "/api/v1/seller/workspaces/{orgId}/alert-rules": {
+      "get": {
+        "operationId": "SellerController_listRules",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      },
+      "put": {
+        "operationId": "SellerController_upsertRule",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertAlertRuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      }
+    },
+    "/api/v1/seller/workspaces/{orgId}/alert-rules/{ruleId}": {
+      "delete": {
+        "operationId": "SellerController_deleteRule",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ruleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      }
+    },
+    "/api/v1/brand/workspaces/{orgId}/map/violations": {
+      "get": {
+        "operationId": "BrandController_listViolations",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unacknowledgedOnly",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "brand"
+        ]
+      }
+    },
+    "/api/v1/brand/workspaces/{orgId}/distribution/summary": {
+      "get": {
+        "operationId": "BrandController_distributionSummary",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "brand"
+        ]
+      }
+    },
+    "/api/v1/brand/workspaces/{orgId}/distribution": {
+      "get": {
+        "operationId": "BrandController_listDistribution",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "retailerSlug",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 64,
+              "type": "string"
+            }
+          },
+          {
+            "name": "sellerProductId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "inStock",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "belowMapOnly",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "minPrice",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "maxPrice",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 1000,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "brand"
+        ]
+      }
+    },
+    "/api/v1/brand/workspaces/{orgId}/distribution/retailers": {
+      "get": {
+        "operationId": "BrandController_listRetailers",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "brand"
+        ]
+      }
+    },
+    "/api/v1/brand/workspaces/{orgId}/distribution/lapsed": {
+      "get": {
+        "operationId": "BrandController_listLapsed",
+        "summary": "",
+        "description": "Listings we have stopped seeing — reported as \"not seen since\", not \"delisted\".",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "brand"
+        ]
+      }
+    },
+    "/api/v1/brand/workspaces/{orgId}/watches": {
+      "get": {
+        "operationId": "BrandController_listWatches",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "brand"
+        ]
+      },
+      "put": {
+        "operationId": "BrandController_upsertWatch",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertBrandWatchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "brand"
+        ]
+      }
+    },
+    "/api/v1/brand/workspaces/{orgId}/watches/{watchId}": {
+      "delete": {
+        "operationId": "BrandController_deleteWatch",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "watchId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "brand"
+        ]
+      }
+    },
+    "/api/v1/brand/workspaces/{orgId}/discoveries": {
+      "get": {
+        "operationId": "BrandController_listDiscoveries",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "brand"
+        ]
+      }
+    },
+    "/api/v1/brand/workspaces/{orgId}/reports": {
+      "get": {
+        "operationId": "BrandController_listReports",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "brand"
+        ]
+      },
+      "post": {
+        "operationId": "BrandController_generateReport",
+        "summary": "",
+        "description": "Generate on demand. Idempotent for a given period.",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateReportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "brand"
+        ]
+      }
+    },
+    "/api/v1/brand/workspaces/{orgId}/reports/{reportId}": {
+      "get": {
+        "operationId": "BrandController_getReport",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "reportId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "brand"
+        ]
+      }
+    },
+    "/api/v1/affiliate/go/{listingId}": {
+      "get": {
+        "operationId": "AffiliateController_goToStore",
+        "summary": "",
+        "description": "The only way out to a retailer's site. Always records a click and\nalways redirects through the generated affiliate URL -- never the raw\nSourceListing.externalUrl directly. Public: anonymous visitors can\nclick \"Go to Store\" too, so auth here is best-effort (see\nextractOptionalUserId), not required.",
+        "parameters": [
+          {
+            "name": "listingId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "affiliate"
+        ]
+      }
+    },
+    "/api/v1/affiliate/configs": {
+      "get": {
+        "operationId": "AffiliateController_listConfigs",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "affiliate"
+        ]
+      }
+    },
+    "/api/v1/affiliate/configs/{platformId}": {
+      "put": {
+        "operationId": "AffiliateController_upsertConfig",
+        "parameters": [
+          {
+            "name": "platformId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertAffiliateConfigDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "affiliate"
+        ]
+      }
+    },
+    "/api/v1/affiliate/conversions/webhook/{networkKey}": {
+      "post": {
+        "operationId": "AffiliateConversionsController_handleWebhook",
+        "summary": "",
+        "description": "Inbound postback target: register this URL (with ?secret=... baked in)\nas the network's Action Tracker / postback callback. Public route, but\nthe shared secret stands in for real request auth since the network\ncalls this anonymously.",
+        "parameters": [
+          {
+            "name": "networkKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "affiliate"
+        ]
+      }
+    },
+    "/api/v1/affiliate/conversions/poll": {
+      "post": {
+        "operationId": "AffiliateConversionsController_triggerPoll",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "affiliate"
+        ]
+      }
+    },
+    "/api/v1/affiliate/conversions": {
+      "get": {
+        "operationId": "AffiliateConversionsController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "affiliate"
+        ]
+      }
+    },
+    "/api/v1/affiliate/conversions/summary": {
+      "get": {
+        "operationId": "AffiliateConversionsController_summary",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "affiliate"
+        ]
+      }
+    },
+    "/api/v1/billing/plans": {
+      "get": {
+        "operationId": "BillingController_listPlans",
+        "summary": "",
+        "description": "Pricing page. Public on purpose.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/billing/me": {
+      "get": {
+        "operationId": "BillingController_getMyBilling",
+        "summary": "",
+        "description": "Everything the client needs to decide what to show: the resolved plan,\nthe limits, and live usage counts so the UI can render \"7 of 10 tracked\"\nwithout a second round trip.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/billing/checkout": {
+      "post": {
+        "operationId": "BillingController_createCheckout",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCheckoutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/billing/portal": {
+      "post": {
+        "operationId": "BillingController_createPortal",
+        "summary": "",
+        "description": "Stripe-hosted billing portal: card updates, invoices, self-cancel.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/billing/cancel": {
+      "post": {
+        "operationId": "BillingController_cancel",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelSubscriptionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/billing/admin/grant": {
+      "post": {
+        "operationId": "BillingController_adminGrant",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminGrantPlanDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/billing/admin/plans": {
+      "get": {
+        "operationId": "BillingController_adminListPlans",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/notifications": {
+      "get": {
+        "operationId": "NotificationsController_list",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unreadOnly",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/unread-count": {
+      "get": {
+        "operationId": "NotificationsController_unreadCount",
+        "summary": "",
+        "description": "Polled by the navbar bell; deliberately tiny.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/{id}/read": {
+      "post": {
+        "operationId": "NotificationsController_markRead",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/read-all": {
+      "post": {
+        "operationId": "NotificationsController_markAllRead",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/channels": {
+      "get": {
+        "operationId": "NotificationsController_listChannels",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "notifications"
+        ]
+      },
+      "post": {
+        "operationId": "NotificationsController_upsertChannel",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertChannelDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/channels/verify": {
+      "post": {
+        "operationId": "NotificationsController_verifyChannel",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyChannelDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/channels/active": {
+      "post": {
+        "operationId": "NotificationsController_setChannelActive",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetChannelActiveDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/channels/{type}": {
+      "delete": {
+        "operationId": "NotificationsController_removeChannel",
+        "parameters": [
+          {
+            "name": "type",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/intelligence/products/{productId}": {
+      "get": {
+        "operationId": "IntelligenceController_getProductIntelligence",
+        "summary": "",
+        "description": "The full intelligence panel for a product.\n\nAuthenticated but not feature-gated: the history window is already\nclamped per plan inside the service, so a free user gets a real (shorter)\nanswer rather than a locked panel. That is the funnel — showing a genuine\n30-day verdict is what makes the 365-day one worth paying for.",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "days",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "intelligence"
+        ]
+      }
+    },
+    "/api/v1/intelligence/products/{productId}/verdict": {
+      "get": {
+        "operationId": "IntelligenceController_getVerdict",
+        "summary": "",
+        "description": "The Buy/Wait call on its own, for compact placements like cards.",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "intelligence"
+        ]
+      }
+    },
+    "/api/v1/intelligence/products/{productId}/discount-check": {
+      "get": {
+        "operationId": "IntelligenceController_getDiscountCheck",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "intelligence"
+        ]
+      }
+    },
+    "/api/v1/deal-hunter": {
+      "get": {
+        "operationId": "DealHunterController_hunt",
+        "summary": "",
+        "description": "The Deal Hunter itself.\n\nA paid feature: it is the single most expensive read in the consumer\nproduct (a history series per candidate), and it is the clearest\nexpression of what the subscription is for.\n\nThrottled more tightly than the default because each call fans out to\ndozens of per-product history queries.",
+        "parameters": [
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "description": "The user's description of what they want.",
+            "schema": {
+              "minLength": 2,
+              "maxLength": 300,
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 25,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "deal-hunter"
+        ]
+      }
+    },
+    "/api/v1/deal-hunter/interpret": {
+      "get": {
+        "operationId": "DealHunterController_interpret",
+        "summary": "",
+        "description": "Shows what the parser understood, without running a search.\n\nPublic and cheap: it powers live \"we read this as ...\" feedback as the\nuser types, which is what makes a natural-language box trustworthy rather\nthan a black box. It reveals nothing about pricing.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "deal-hunter"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{orgId}/api-keys": {
+      "get": {
+        "operationId": "ApiKeysController_list",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "api-keys"
+        ]
+      },
+      "post": {
+        "operationId": "ApiKeysController_issue",
+        "summary": "",
+        "description": "The plaintext key is in this response and nowhere else, ever again.",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueApiKeyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "api-keys"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{orgId}/api-keys/{keyId}": {
+      "delete": {
+        "operationId": "ApiKeysController_revoke",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "keyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "api-keys"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{orgId}/api-keys/usage": {
+      "get": {
+        "operationId": "ApiKeysController_usage",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "days",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "api-keys"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "HealthController_live",
+        "summary": "Liveness: the process answers HTTP",
+        "description": "Liveness: the process is up and serving HTTP. Checks no dependency on purpose.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "HealthController_ready",
+        "summary": "Readiness: Postgres, cache Redis and queue Redis all answer",
+        "description": "Readiness: Postgres and both Redis connections answer. 503 with per-dependency detail otherwise.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "health"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "PriceLens API",
+    "description": "Cross-platform price comparison API: one canonical product per item, with every store listing matched to it and its price history.",
+    "version": "1.0.0",
+    "contact": {}
+  },
+  "tags": [
+    {
+      "name": "admin",
+      "description": "Admin and moderation tools"
+    },
+    {
+      "name": "affiliate",
+      "description": "Affiliate link tracking, store redirects and conversions"
+    },
+    {
+      "name": "api-keys",
+      "description": "Workspace API keys for the partner API"
+    },
+    {
+      "name": "auth",
+      "description": "Authentication and session management"
+    },
+    {
+      "name": "billing",
+      "description": "Plans, checkout and subscriptions"
+    },
+    {
+      "name": "brand",
+      "description": "Brand workspace analytics"
+    },
+    {
+      "name": "deal-hunter",
+      "description": "Deal discovery"
+    },
+    {
+      "name": "health",
+      "description": "Liveness and readiness"
+    },
+    {
+      "name": "intelligence",
+      "description": "Market and price intelligence"
+    },
+    {
+      "name": "notifications",
+      "description": "Notification channels"
+    },
+    {
+      "name": "prices",
+      "description": "Price history and aggregation"
+    },
+    {
+      "name": "products",
+      "description": "Canonical products"
+    },
+    {
+      "name": "search",
+      "description": "Product search and suggestions"
+    },
+    {
+      "name": "seller",
+      "description": "Seller workspace"
+    },
+    {
+      "name": "watchlist",
+      "description": "Watchlist and price alerts"
+    }
+  ],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "access-token": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {
+      "RegisterDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "example": "user@example.com"
+          },
+          "username": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 32,
+            "pattern": "/^[a-z0-9_]+$/i",
+            "example": "john_doe",
+            "description": "3-32 chars, alphanumeric + underscores"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "pattern": "/^(?=.*[a-zA-Z])(?=.*\\d)/",
+            "description": "Min 8 chars, must contain letter and number"
+          },
+          "displayName": {
+            "type": "string",
+            "maxLength": 64,
+            "example": "John Doe"
+          }
+        },
+        "required": [
+          "email",
+          "username",
+          "password"
+        ]
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "example": "user@example.com"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "RefreshDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "description": "JWT refresh token"
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
+      },
+      "ResolveReviewItemDto": {
+        "type": "object",
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "ACCEPT",
+              "REJECT"
+            ]
+          },
+          "canonicalProductId": {
+            "type": "string",
+            "description": "The product to attach the listing to. Required to accept an item that proposed none."
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "decision"
+        ]
+      },
+      "RunLiveIngestionDto": {
+        "type": "object",
+        "properties": {
+          "platformSlugs": {
+            "description": "Store slugs to sweep; all enabled stores when omitted.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "/^[a-z0-9-]{1,64}$/"
+            }
+          },
+          "limitPerQuery": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100
+          }
+        }
+      },
+      "RunReconciliationDto": {
+        "type": "object",
+        "properties": {
+          "dryRun": {
+            "type": "boolean",
+            "description": "Only log proposed merges. Defaults to RECONCILIATION_DRY_RUN."
+          },
+          "maxPairs": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10000
+          }
+        }
+      },
+      "RunStoreCoverageSweepDto": {
+        "type": "object",
+        "properties": {
+          "maxProducts": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        }
+      },
+      "AddWatchlistDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 280
+          }
+        },
+        "required": [
+          "productId"
+        ]
+      },
+      "CreateAlertDto": {
+        "type": "object",
+        "properties": {
+          "alertType": {
+            "type": "object"
+          },
+          "thresholdValue": {
+            "type": "number",
+            "description": "A target price, an absolute drop, or a percentage, depending on\n`alertType`. Ignored for RESTOCK, which fires on a stock transition.",
+            "minimum": 0
+          },
+          "repeatable": {
+            "type": "boolean",
+            "description": "Re-arm after firing instead of parking in TRIGGERED."
+          },
+          "cooldownHours": {
+            "type": "number",
+            "description": "Minimum hours between notifications for a repeating alert.",
+            "minimum": 1,
+            "maximum": 720
+          }
+        },
+        "required": [
+          "alertType",
+          "thresholdValue"
+        ]
+      },
+      "CreateOrganizationDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 128
+          },
+          "type": {
+            "type": "object"
+          },
+          "platformId": {
+            "type": "string",
+            "description": "The tracked store that is this seller's own, when we crawl it."
+          }
+        },
+        "required": [
+          "name",
+          "type"
+        ]
+      },
+      "AddMemberDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 255
+          },
+          "role": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "email",
+          "role"
+        ]
+      },
+      "UpsertSellerProductDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sku": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "canonicalProductId": {
+            "type": "string",
+            "nullable": true
+          },
+          "cost": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0
+          },
+          "currentPrice": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0
+          },
+          "targetMarginPct": {
+            "type": "number",
+            "nullable": true,
+            "description": "Percentages of price, not of cost.",
+            "minimum": 0,
+            "maximum": 95
+          },
+          "minMarginPct": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 95
+          },
+          "mapPrice": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "sku",
+          "name"
+        ]
+      },
+      "UpsertAlertRuleDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "object"
+          },
+          "thresholdPct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "sellerProductId": {
+            "type": "string",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "cooldownHours": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 720
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "UpsertBrandWatchDto": {
+        "type": "object",
+        "properties": {
+          "brand": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "categoryId": {
+            "type": "string",
+            "nullable": true
+          },
+          "isOwnBrand": {
+            "type": "boolean"
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "brand"
+        ]
+      },
+      "GenerateReportDto": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "object"
+          }
+        }
+      },
+      "UpsertAffiliateConfigDto": {
+        "type": "object",
+        "properties": {
+          "providerKey": {
+            "type": "string",
+            "description": "Which AffiliateProvider builds the links, e.g. \"amazon\".",
+            "maxLength": 64
+          },
+          "affiliateId": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "trackingParams": {
+            "type": "object",
+            "description": "Extra query parameters added to every outbound link."
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "providerKey",
+          "affiliateId"
+        ]
+      },
+      "CreateCheckoutDto": {
+        "type": "object",
+        "properties": {
+          "planKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "planKey"
+        ]
+      },
+      "CancelSubscriptionDto": {
+        "type": "object",
+        "properties": {
+          "immediately": {
+            "type": "boolean",
+            "description": "Default is cancel-at-period-end; the user keeps what they paid for."
+          }
+        }
+      },
+      "AdminGrantPlanDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "planKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "days": {
+            "type": "number",
+            "description": "Overrides the plan's interval for hand-sold contracts.",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "userId",
+          "planKey"
+        ]
+      },
+      "UpsertChannelDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "object"
+          },
+          "destination": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          }
+        },
+        "required": [
+          "type",
+          "destination"
+        ]
+      },
+      "VerifyChannelDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "object"
+          },
+          "code": {
+            "type": "string",
+            "description": "Empty for Telegram, where the code is sent to the bot rather than typed here.",
+            "minLength": 0,
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "SetChannelActiveDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "object"
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "type",
+          "isActive"
+        ]
+      },
+      "IssueApiKeyDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 128
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "expiresInDays": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 3650
+          }
+        },
+        "required": [
+          "name"
+        ]
+      }
+    }
+  }
+}

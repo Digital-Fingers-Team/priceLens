@@ -71,7 +71,7 @@ export class ReconciliationService {
 
   async reconcile(options: ReconciliationOptions = {}): Promise<ReconciliationReport> {
     const dryRun = options.dryRun ?? this.config.get<boolean>('search.reconciliationDryRun', true);
-    const maxPairs = options.maxPairs ?? this.config.get<number>('search.reconciliationMaxPairs', 200);
+    const maxPairs = options.maxPairs ?? this.config.get<number>('search.reconciliationMaxPairs', 500);
     const threshold = this.config.get<number>('search.reconciliationSimilarityThreshold', 0.82);
     const neighborsPerProduct = this.config.get<number>('search.reconciliationNeighborsPerProduct', 5);
 

@@ -9,6 +9,7 @@ import {
   Req,
   Res,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { UserRole } from '@prisma/client';
@@ -19,6 +20,7 @@ import { AffiliateConfigService } from './affiliate-config.service';
 import { UpsertAffiliateConfigDto } from './dto/affiliate-config.dto';
 import { AffiliateService } from './affiliate.service';
 
+@ApiTags('affiliate')
 @Controller('affiliate')
 export class AffiliateController {
   constructor(

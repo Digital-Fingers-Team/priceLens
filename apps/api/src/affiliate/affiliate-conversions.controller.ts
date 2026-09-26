@@ -1,5 +1,6 @@
 import { timingSafeEqual } from 'crypto';
 import { Body, Controller, Get, Param, Post, Query, UnauthorizedException } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { InjectQueue } from '@nestjs/bull';
 import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bull';
@@ -8,6 +9,7 @@ import { Public, Roles } from '../common/decorators';
 import { AFFILIATE_CONVERSION_QUEUE, RUN_CONVERSION_POLL_JOB } from './affiliate.constants';
 import { ConversionReconciliationService } from './conversion-reconciliation.service';
 
+@ApiTags('affiliate')
 @Controller('affiliate/conversions')
 export class AffiliateConversionsController {
   constructor(

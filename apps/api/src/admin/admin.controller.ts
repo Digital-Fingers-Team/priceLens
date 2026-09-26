@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { CurrentUser, Roles } from '../common/decorators';
 import { AdminService } from './admin.service';
 import type { User } from '@prisma/client';
@@ -12,6 +13,7 @@ import {
   RunStoreCoverageSweepDto,
 } from './dto/admin.dto';
 
+@ApiTags('admin')
 @Controller('admin')
 export class AdminController {
   constructor(

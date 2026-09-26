@@ -20,6 +20,7 @@ const NUMERIC = [
   'PORT',
   'REDIS_PORT',
   'REDIS_DB',
+  'REDIS_QUEUE_DB',
   'SMTP_PORT',
   'THROTTLE_TTL',
   'THROTTLE_LIMIT',

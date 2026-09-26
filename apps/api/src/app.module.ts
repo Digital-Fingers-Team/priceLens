@@ -107,7 +107,7 @@ export const ENV_FILES = resolveEnvFiles();
           host: config.get<string>('redis.host'),
           port: config.get<number>('redis.port'),
           password: config.get<string>('redis.password'),
-          db: 1, // use db 1 for queues, db 0 for cache
+          db: config.get<number>('redis.queueDb', 1),
         },
         defaultJobOptions: {
           removeOnComplete: 100,

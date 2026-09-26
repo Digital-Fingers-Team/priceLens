@@ -5,7 +5,18 @@ module.exports = {
   moduleFileExtensions: ['js', 'json', 'ts'],
   rootDir: '.',
   testRegex: 'test/e2e/.*\\.e2e-spec\\.ts$',
-  transform: { '^.+\\.(t|j)s$': 'ts-jest' },
+  transform: {
+    '^.+\\.(t|j)s$': [
+      'ts-jest',
+      {
+        // As in `nest build` (nest-cli.json): the OpenAPI document needs the
+        // swagger plugin's DTO metadata (test/e2e/openapi.e2e-spec.ts).
+        astTransformers: {
+          before: ['<rootDir>/test/setup/swagger-transformer.js'],
+        },
+      },
+    ],
+  },
   testEnvironment: 'node',
   moduleNameMapper: { '^@/(.*)$': '<rootDir>/src/$1' },
   globalSetup: '<rootDir>/test/setup/global-setup.ts',
