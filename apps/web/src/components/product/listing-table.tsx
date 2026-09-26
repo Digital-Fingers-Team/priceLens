@@ -8,7 +8,7 @@ import {
   getConfidenceLevel,
   getConfidenceColor,
   getConfidenceLabel,
-  isBestDeal,
+  bestDealIds,
 } from '@/lib/utils/price';
 import { cn } from '@/lib/utils/cn';
 
@@ -18,7 +18,7 @@ interface ListingTableProps {
 }
 
 export function ListingTable({ listings, showConfidence = false }: ListingTableProps) {
-  const allPrices = listings.map((l) => l.priceUsd ?? Infinity).filter(Number.isFinite);
+  const bestDeals = bestDealIds(listings);
 
   if (listings.length === 0) {
     return (
@@ -58,7 +58,7 @@ export function ListingTable({ listings, showConfidence = false }: ListingTableP
         </thead>
         <tbody className="divide-y divide-ink-800">
           {listings.map((listing) => {
-            const isBest = listing.priceUsd != null && isBestDeal(listing.priceUsd, allPrices);
+            const isBest = bestDeals.has(listing.id);
             const confidenceLevel = getConfidenceLevel(listing.matchConfidence);
 
             return (
@@ -98,12 +98,17 @@ export function ListingTable({ listings, showConfidence = false }: ListingTableP
                   >
                     {listing.rawTitle}
                   </p>
+                  {listing.color && (
+                    <p className="mt-0.5 text-xs text-ink-400 capitalize">
+                      Color: {listing.color}
+                    </p>
+                  )}
                 </td>
 
                 {/* Price — the store's own, unconverted price (what you'd actually
                     pay there), always paired with its own currency. The "Best
                     Deal" badge above is decided from the FX-normalized priceUsd
-                    (see isBestDeal below), not from this displayed value. */}
+                    (see bestDealIds), not from this displayed value. */}
                 <td className="px-4 py-3.5 text-right">
                   <span className={cn(
                     'font-bold text-base',

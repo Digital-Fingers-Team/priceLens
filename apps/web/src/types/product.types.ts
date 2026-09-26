@@ -68,6 +68,8 @@ export interface SourceListing {
   rawImageUrl: string | null;
   priceUsd: number | null;
   inStock: boolean | null;
+  /** The offer's own color, read from its title (null when it names none). */
+  color: string | null;
   rating: number | null;
   reviewCount: number | null;
   matchStatus: MatchStatus;
