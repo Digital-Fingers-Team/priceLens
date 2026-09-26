@@ -8,6 +8,7 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { ApiExceptionFilter } from './common/filters/api-exception.filter';
 import { AppException } from './common/errors/app.exception';
+import { REQUEST_ID_HEADER, requestIdMiddleware } from './common/request-id.middleware';
 
 /**
  * Everything that shapes request handling -- routes outside the prefix,
@@ -18,6 +19,9 @@ import { AppException } from './common/errors/app.exception';
 export function configureApp(app: NestExpressApplication): void {
   const httpServer: any = app.getHttpAdapter().getInstance();
 
+  // First, so every later step (guards included) sees the same request id.
+  app.use(requestIdMiddleware);
+
   httpServer.get('/', (_req: any, res: any) => {
     res.status(200).json({
       success: true,
@@ -27,15 +31,6 @@ export function configureApp(app: NestExpressApplication): void {
         docs: '/docs',
         health: '/health',
         apiPrefix: process.env.API_PREFIX ?? 'api/v1',
-      },
-    });
-  });
-
-  httpServer.get('/health', (_req: any, res: any) => {
-    res.status(200).json({
-      success: true,
-      data: {
-        status: 'ok',
       },
     });
   });
@@ -88,12 +83,15 @@ export function configureApp(app: NestExpressApplication): void {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
+    allowedHeaders: ['Content-Type', 'Authorization', REQUEST_ID_HEADER],
+    exposedHeaders: [REQUEST_ID_HEADER],
   });
 
   // ─── Global Prefix ────────────────────────────────────────────────────────
   const apiPrefix = process.env.API_PREFIX ?? 'api/v1';
-  app.setGlobalPrefix(apiPrefix);
+  // Health lives at /health and /health/ready (HealthController) so probes
+  // don't depend on the API prefix.
+  app.setGlobalPrefix(apiPrefix, { exclude: ['health', 'health/ready'] });
 
   // ─── Validation ──────────────────────────────────────────────────────────
   app.useGlobalPipes(

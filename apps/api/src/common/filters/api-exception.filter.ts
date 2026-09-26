@@ -1,8 +1,8 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { Request, Response } from 'express';
-import { v4 as uuidv4 } from 'uuid';
 import type { ApiErrorBody, ApiErrorCode, ApiErrorResponse } from '../errors/api-error';
+import { requestIdOf } from '../request-id.middleware';
 
 const STATUS_CODES: Record<number, ApiErrorCode> = {
   [HttpStatus.BAD_REQUEST]: 'BAD_REQUEST',
@@ -42,7 +42,8 @@ export class ApiExceptionFilter implements ExceptionFilter {
     const request = ctx.getRequest<Request>();
 
     const mapped = this.map(exception);
-    const route = `${request.method} ${request.url}`;
+    const requestId = requestIdOf(request);
+    const route = `${request.method} ${request.url} [${requestId}]`;
     if (mapped.status >= 500) {
       this.logger.error(`${route} → ${mapped.status}: ${describe(exception)}`, (exception as Error)?.stack);
     } else {
@@ -53,7 +54,7 @@ export class ApiExceptionFilter implements ExceptionFilter {
       code: mapped.code,
       message: mapped.message,
       ...(mapped.details !== undefined ? { details: mapped.details } : {}),
-      requestId: (request.headers['x-request-id'] as string) ?? uuidv4(),
+      requestId,
       timestamp: new Date().toISOString(),
       path: request.url,
     };

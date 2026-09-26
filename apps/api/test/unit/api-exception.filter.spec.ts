@@ -9,7 +9,7 @@ import { ApiExceptionFilter } from '../../src/common/filters/api-exception.filte
 
 function run(exception: unknown) {
   const res = { statusCode: 0, body: undefined as unknown, status(code: number) { this.statusCode = code; return this; }, json(body: unknown) { this.body = body; return this; } };
-  const req = { method: 'GET', url: '/api/v1/thing', headers: { 'x-request-id': 'req-1' } };
+  const req = { method: 'GET', url: '/api/v1/thing', headers: {}, requestId: 'req-1' };
   const host = { switchToHttp: () => ({ getResponse: () => res, getRequest: () => req }) } as unknown as ArgumentsHost;
   new ApiExceptionFilter().catch(exception, host);
   const body = res.body as { success: boolean; error: Record<string, unknown> };

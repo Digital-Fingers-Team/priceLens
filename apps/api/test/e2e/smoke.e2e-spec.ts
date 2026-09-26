@@ -85,6 +85,52 @@ describe('Smoke (e2e)', () => {
     expect(res.body).toEqual({ success: true, data: { status: 'ok' } });
   });
 
+  it('GET /health/ready checks Postgres and both Redis connections (B-05)', async () => {
+    const res = await request(app.getHttpServer()).get('/health/ready').expect(200);
+    expect(res.body.data.status).toBe('ok');
+    for (const name of ['database', 'cache', 'queue']) {
+      expect(res.body.data.checks[name]).toEqual({ status: 'ok', latencyMs: expect.any(Number) });
+    }
+  });
+
+  it('GET /health/ready answers 503 with the failing dependency when one is down', async () => {
+    const prismaForCheck = app.get(PrismaService);
+    const spy = jest.spyOn(prismaForCheck, '$queryRaw').mockRejectedValueOnce(new Error('connection refused'));
+    try {
+      const res = await request(app.getHttpServer()).get('/health/ready').expect(503);
+      expect(res.body.error.code).toBe('SERVICE_UNAVAILABLE');
+      expect(res.body.error.details.checks.database).toMatchObject({ status: 'down', error: 'connection refused' });
+      expect(res.body.error.details.checks.cache.status).toBe('ok');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  describe('request ids (B-06)', () => {
+    it('echoes a valid client id in the header and in the error body', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/products/not-a-uuid/listings')
+        .set('X-Request-ID', 'client-abc.123')
+        .expect(400);
+      expect(res.headers['x-request-id']).toBe('client-abc.123');
+      expect(res.body.error.requestId).toBe('client-abc.123');
+    });
+
+    it('replaces an unsafe client id, and uses the same id in header and body', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/auth/me')
+        .set('X-Request-ID', 'id with spaces] GET /admin 200')
+        .expect(401);
+      expect(res.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/);
+      expect(res.body.error.requestId).toBe(res.headers['x-request-id']);
+    });
+
+    it('sets an id on successful responses too', async () => {
+      const res = await request(app.getHttpServer()).get('/health').expect(200);
+      expect(res.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/);
+    });
+  });
+
   describe('matching pipeline run', () => {
     beforeAll(async () => {
       const report = await app

@@ -24,6 +24,7 @@ import { DealHunterModule } from './deal-hunter/deal-hunter.module';
 import { SellerModule } from './seller/seller.module';
 import { BrandModule } from './brand/brand.module';
 import { PublicApiModule } from './public-api/public-api.module';
+import { HealthModule } from './health/health.module';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
 import redisConfig from './config/redis.config';
@@ -138,6 +139,7 @@ export const ENV_FILES = resolveEnvFiles();
     SellerModule,
     BrandModule,
     PublicApiModule,
+    HealthModule,
   ],
   providers: [
     // ThrottlerModule only supplies configuration — without the guard actually

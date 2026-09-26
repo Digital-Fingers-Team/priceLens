@@ -9,7 +9,7 @@ import {
 import { Observable } from 'rxjs';
 import { tap, catchError } from 'rxjs/operators';
 import { throwError } from 'rxjs';
-import { v4 as uuidv4 } from 'uuid';
+import { requestIdOf } from '../request-id.middleware';
 
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
@@ -18,8 +18,7 @@ export class LoggingInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const req = context.switchToHttp().getRequest();
     const { method, url, ip } = req;
-    const requestId = (req.headers['x-request-id'] as string) ?? uuidv4();
-    req.requestId = requestId;
+    const requestId = requestIdOf(req);
 
     const startTime = Date.now();
 
