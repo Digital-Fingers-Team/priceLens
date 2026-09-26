@@ -1,3 +1,5 @@
+const path = require('path');
+
 /**
  * Security headers for every page (S-08). The API sets its own (helmet).
  *
@@ -44,6 +46,9 @@ function securityHeaders() {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // The monorepo root. Without it Next 15 guesses from whichever lockfile it
+  // finds first, and the server has an unrelated one in the home directory.
+  outputFileTracingRoot: path.join(__dirname, '../..'),
   reactStrictMode: true,
   poweredByHeader: false,
   async headers() {
