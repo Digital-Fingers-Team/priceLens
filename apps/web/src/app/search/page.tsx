@@ -5,6 +5,8 @@ import { useSearch } from '@/lib/hooks/use-search';
 import { parseSearchParams, searchHref, withChanges } from '@/lib/search-url';
 import { SearchBar } from '@/components/search/search-bar';
 import { SearchFilters } from '@/components/search/search-filters';
+import { SortSelect } from '@/components/search/sort-select';
+import { Button } from '@/components/ui/button';
 import { ProductList } from '@/components/product/product-list';
 import { buttonClassName } from '@/components/ui/button-styles';
 import { cn } from '@/lib/utils/cn';
@@ -55,8 +57,8 @@ export default function SearchPage() {
       />
 
       {/* Query summary */}
-      {(filters.q || data) && (
-        <div className="flex items-center gap-2 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
           {filters.q ? (
             <>
               <span className="text-ink-500">Results for</span>
@@ -68,13 +70,11 @@ export default function SearchPage() {
           {data && !isLoading && (
             <span className="text-ink-500">
               — {data.total.toLocaleString()} product{data.total !== 1 ? 's' : ''}
-              {data.processingTimeMs > 0 && (
-                <span> in {data.processingTimeMs}ms</span>
-              )}
             </span>
           )}
         </div>
-      )}
+        <SortSelect value={filters} onChange={navigate} />
+      </div>
 
       {/* Stacks below lg. The sidebar is w-full/shrink-0 by design, so leaving
           this a row on phones let it claim the entire width and push the
@@ -86,8 +86,11 @@ export default function SearchPage() {
         {/* Results */}
         <div className="flex-1 min-w-0 space-y-6">
           {isError ? (
-            <div className="text-center py-16">
-              <p className="text-ink-500">Search failed. Please try again.</p>
+            <div className="text-center py-16 space-y-4">
+              <p className="text-ink-300">We couldn&apos;t load results. Check your connection and try again.</p>
+              <Button variant="outline" onClick={() => refetch()}>
+                Try again
+              </Button>
             </div>
           ) : (
             <>

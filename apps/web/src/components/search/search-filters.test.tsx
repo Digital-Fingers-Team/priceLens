@@ -21,15 +21,23 @@ describe('SearchFilters', () => {
     fireEvent.click(screen.getByRole('button', { name: /Filters/ }));
 
     fireEvent.change(screen.getByLabelText('Max price'), { target: { value: '500' } });
-    fireEvent.change(screen.getByLabelText('Sort by'), { target: { value: 'minPriceUsd' } });
+    fireEvent.change(screen.getByLabelText('Tier'), { target: { value: 'PREMIUM' } });
     expect(onApply).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
     expect(onApply).toHaveBeenCalledWith(
-      expect.objectContaining({ brand: 'LG', maxPrice: 500, sortBy: 'minPriceUsd' }),
+      expect.objectContaining({ brand: 'LG', maxPrice: 500, tier: 'PREMIUM' }),
     );
     // Folds back into the button.
     expect(screen.queryByRole('button', { name: 'Apply' })).toBeNull();
+  });
+
+  it('has no sort or raw category-id fields (sort lives on the results bar)', () => {
+    render(<SearchFilters applied={applied} onApply={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /Filters/ }));
+    expect(screen.queryByLabelText('Sort by')).toBeNull();
+    expect(screen.queryByLabelText('Direction')).toBeNull();
+    expect(screen.queryByLabelText('Category ID')).toBeNull();
   });
 
   it('closing without applying leaves the results alone', () => {

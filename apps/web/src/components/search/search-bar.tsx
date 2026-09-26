@@ -118,7 +118,7 @@ export function SearchBar({
               'placeholder:text-ink-500 transition-all duration-150',
               'focus:outline-none focus:border-signal/60 focus:ring-2 focus:ring-signal/15',
               'border-ink-600',
-              isHero ? 'h-14 pl-12 pr-14 text-base' : 'h-10 pl-10 pr-10 text-sm',
+              isHero ? 'h-14 pl-12 pr-24 text-base' : 'h-10 pl-10 pr-20 text-sm',
             )}
           />
 
@@ -131,9 +131,9 @@ export function SearchBar({
                 inputRef.current?.focus();
               }}
               className={cn(
-                'absolute text-ink-500 hover:text-ink-300 transition-colors',
+                'absolute p-2 text-ink-500 hover:text-ink-300 transition-colors',
                 'focus-visible:outline-none focus-visible:text-ink-200',
-                isHero ? 'right-14' : 'right-10',
+                isHero ? 'right-12' : 'right-9',
               )}
             >
               <X className={isHero ? 'w-5 h-5' : 'w-4 h-4'} />
@@ -144,14 +144,15 @@ export function SearchBar({
             type="submit"
             aria-label="Search"
             className={cn(
-              'absolute right-2 flex items-center justify-center rounded-lg',
+              'absolute flex items-center justify-center rounded-lg',
               'bg-signal text-ink-950 font-semibold',
               'hover:bg-signal-dim transition-colors',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/50',
-              isHero ? 'h-10 w-10' : 'h-6 w-6',
+              // 32 px inside a 40 px box (was 24 px): easier to hit on a phone.
+              isHero ? 'right-2 h-10 w-10' : 'right-1 h-8 w-8',
             )}
           >
-            <Search className={isHero ? 'w-4 h-4' : 'w-3 h-3'} />
+            <Search className={isHero ? 'w-4 h-4' : 'w-3.5 h-3.5'} />
           </button>
         </div>
       </form>

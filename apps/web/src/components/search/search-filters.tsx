@@ -3,7 +3,6 @@ import { useEffect, useId, useState } from 'react';
 import { Check, RotateCcw, SlidersHorizontal, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { SORT_OPTIONS } from '@/config/constants';
 import { useSearchStore } from '@/lib/store/search.store';
 import type { SearchFilters as SearchFiltersType } from '@/types/search.types';
 
@@ -18,10 +17,9 @@ const tierOptions: Array<{ label: string; value: SearchFiltersType['tier'] }> = 
 const selectClassName =
   'w-full h-10 rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ink-100 focus:border-signal/60 focus:outline-none focus:ring-1 focus:ring-signal/30 transition-colors';
 
-type FilterFields = Pick<
-  SearchFiltersType,
-  'brand' | 'categoryId' | 'tier' | 'minPrice' | 'maxPrice' | 'sortBy' | 'sortDir'
->;
+// Sort is not here: it sits on the results bar (SortSelect). categoryId stays
+// so Reset clears one that arrived by URL, but has no field (audit 06, U-09).
+type FilterFields = Pick<SearchFiltersType, 'brand' | 'categoryId' | 'tier' | 'minPrice' | 'maxPrice'>;
 
 const EMPTY_FILTERS: FilterFields = {
   brand: undefined,
@@ -29,13 +27,11 @@ const EMPTY_FILTERS: FilterFields = {
   tier: undefined,
   minPrice: undefined,
   maxPrice: undefined,
-  sortBy: 'relevance',
-  sortDir: 'desc',
 };
 
 function pickFilterFields(filters: SearchFiltersType): FilterFields {
-  const { brand, categoryId, tier, minPrice, maxPrice, sortBy, sortDir } = filters;
-  return { brand, categoryId, tier, minPrice, maxPrice, sortBy, sortDir };
+  const { brand, categoryId, tier, minPrice, maxPrice } = filters;
+  return { brand, categoryId, tier, minPrice, maxPrice };
 }
 
 function countActive(filters: FilterFields): number {
@@ -45,7 +41,6 @@ function countActive(filters: FilterFields): number {
     !!filters.tier,
     filters.minPrice != null,
     filters.maxPrice != null,
-    (filters.sortBy ?? 'relevance') !== 'relevance' || (filters.sortDir ?? 'desc') !== 'desc',
   ].filter(Boolean).length;
 }
 
@@ -139,12 +134,6 @@ export function SearchFilters({ applied, onApply }: SearchFiltersProps) {
           placeholder="Apple, Sony, Dell..."
         />
 
-        <Input
-          label="Category ID"
-          value={filters.categoryId ?? ''}
-          onChange={(e) => setFilter('categoryId', e.target.value || undefined)}
-          placeholder="electronics, laptops..."
-        />
 
         <div className="grid grid-cols-2 gap-3">
           <Input
@@ -181,41 +170,6 @@ export function SearchFilters({ applied, onApply }: SearchFiltersProps) {
               </option>
             ))}
           </select>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <label htmlFor={`${id}-sort-by`} className="text-sm font-medium text-ink-200">Sort by</label>
-            <select
-              id={`${id}-sort-by`}
-              className={selectClassName}
-              value={filters.sortBy ?? 'relevance'}
-              onChange={(e) =>
-                setFilter('sortBy', e.target.value as SearchFiltersType['sortBy'])
-              }
-            >
-              {SORT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-1.5">
-            <label htmlFor={`${id}-sort-dir`} className="text-sm font-medium text-ink-200">Direction</label>
-            <select
-              id={`${id}-sort-dir`}
-              className={selectClassName}
-              value={filters.sortDir ?? 'desc'}
-              onChange={(e) =>
-                setFilter('sortDir', e.target.value as SearchFiltersType['sortDir'])
-              }
-            >
-              <option value="asc">Ascending</option>
-              <option value="desc">Descending</option>
-            </select>
-          </div>
         </div>
       </div>
 
