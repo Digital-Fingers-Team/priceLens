@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Check, RotateCcw, SlidersHorizontal, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,18 +55,24 @@ function countActive(filters: FilterFields): number {
  * button. Edits go to a local draft until then, so typing a price does not
  * fire a search per keystroke, and Cancel really does leave results as they were.
  */
-export function SearchFilters() {
-  const applied = useSearchStore((s) => s.filters);
-  const setFilters = useSearchStore((s) => s.setFilters);
+interface SearchFiltersProps {
+  /** The filters currently in the URL. */
+  applied: SearchFiltersType;
+  /** Called on Apply with the draft; the page writes it to the URL. */
+  onApply: (filters: FilterFields) => void;
+}
+
+export function SearchFilters({ applied, onApply }: SearchFiltersProps) {
   const open = useSearchStore((s) => s.isFilterPanelOpen);
   const toggleOpen = useSearchStore((s) => s.toggleFilterPanel);
 
+  const id = useId();
   const [filters, setDraft] = useState<FilterFields>(() => pickFilterFields(applied));
   const setFilter = <K extends keyof FilterFields>(key: K, value: FilterFields[K]) =>
     setDraft((draft) => ({ ...draft, [key]: value }));
 
-  // Re-seed the draft from what is applied each time the form opens (the URL
-  // or a new search may have changed it while it was closed).
+  // Re-seed the draft from what is applied each time the form opens (back/
+  // forward or a new search may have changed the URL while it was closed).
   useEffect(() => {
     if (open) setDraft(pickFilterFields(applied));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -76,7 +82,7 @@ export function SearchFilters() {
   const draftIsEmpty = countActive(filters) === 0;
 
   const apply = () => {
-    setFilters(filters);
+    onApply(filters);
     toggleOpen();
   };
 
@@ -162,8 +168,9 @@ export function SearchFilters() {
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-sm font-medium text-ink-200">Tier</label>
+          <label htmlFor={`${id}-tier`} className="text-sm font-medium text-ink-200">Tier</label>
           <select
+            id={`${id}-tier`}
             className={selectClassName}
             value={filters.tier ?? ''}
             onChange={(e) => setFilter('tier', (e.target.value || undefined) as SearchFiltersType['tier'])}
@@ -178,8 +185,9 @@ export function SearchFilters() {
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-ink-200">Sort by</label>
+            <label htmlFor={`${id}-sort-by`} className="text-sm font-medium text-ink-200">Sort by</label>
             <select
+              id={`${id}-sort-by`}
               className={selectClassName}
               value={filters.sortBy ?? 'relevance'}
               onChange={(e) =>
@@ -195,8 +203,9 @@ export function SearchFilters() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-ink-200">Direction</label>
+            <label htmlFor={`${id}-sort-dir`} className="text-sm font-medium text-ink-200">Direction</label>
             <select
+              id={`${id}-sort-dir`}
               className={selectClassName}
               value={filters.sortDir ?? 'desc'}
               onChange={(e) =>

@@ -1,61 +1,49 @@
 'use client';
-import { useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useSearch } from '@/lib/hooks/use-search';
-import { useSearchStore } from '@/lib/store/search.store';
+import { parseSearchParams, searchHref, withChanges } from '@/lib/search-url';
 import { SearchBar } from '@/components/search/search-bar';
 import { SearchFilters } from '@/components/search/search-filters';
 import { ProductList } from '@/components/product/product-list';
-import { Button } from '@/components/ui/button';
+import { buttonClassName } from '@/components/ui/button-styles';
+import { cn } from '@/lib/utils/cn';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import type { SearchFilters as SearchFiltersType } from '@/types/search.types';
+
+/** Up to five page numbers, centred on the current page where possible. */
+function pageWindow(page: number, totalPages: number): number[] {
+  const size = Math.min(5, totalPages);
+  const first = Math.min(Math.max(1, page - 2), totalPages - size + 1);
+  return Array.from({ length: size }, (_, i) => first + i);
+}
 
 export default function SearchPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { filters, setFilters, setFilter } = useSearchStore();
-  const isFirstRender = useRef(true);
-
-  // Sync URL params → store on initial load
-  useEffect(() => {
-    if (!isFirstRender.current) return;
-    isFirstRender.current = false;
-
-    const q = searchParams.get('q') ?? '';
-    const page = Number(searchParams.get('page') ?? 1);
-    const brand = searchParams.get('brand') ?? undefined;
-    const minPrice = searchParams.get('minPrice') ? Number(searchParams.get('minPrice')) : undefined;
-    const maxPrice = searchParams.get('maxPrice') ? Number(searchParams.get('maxPrice')) : undefined;
-
-    setFilters({ q, page, brand, minPrice, maxPrice });
-  }, [searchParams, setFilters]);
-
-  // Sync store → URL whenever filters change
-  useEffect(() => {
-    if (isFirstRender.current) return;
-    const params = new URLSearchParams();
-    if (filters.q) params.set('q', filters.q);
-    if (filters.page && filters.page > 1) params.set('page', String(filters.page));
-    if (filters.brand) params.set('brand', filters.brand);
-    if (filters.minPrice) params.set('minPrice', String(filters.minPrice));
-    if (filters.maxPrice) params.set('maxPrice', String(filters.maxPrice));
-    router.replace(`/search?${params.toString()}`, { scroll: false });
-  }, [filters, router]);
+  // The URL is the state (FE-03): no copy in a store to drift from it.
+  const filters = parseSearchParams(searchParams);
 
   const { data, isLoading, isFetching, isError, refetch } = useSearch(filters);
 
+  function navigate(changes: Partial<SearchFiltersType>) {
+    router.push(searchHref(withChanges(filters, changes)), { scroll: false });
+  }
+
   function handleSearch(q: string) {
     const trimmed = q.trim();
-    if (trimmed === filters.q.trim()) {
-      // Same query resubmitted — filters won't change, so nothing would
+    if (trimmed === filters.q) {
+      // Same query resubmitted -- the URL would not change, so nothing would
       // normally trigger a new request. Force a fresh read from the DB.
       refetch();
       return;
     }
-    setFilters({ q: trimmed, page: 1 });
+    navigate({ q: trimmed });
   }
 
   const page = filters.page ?? 1;
   const totalPages = data ? Math.ceil(data.total / (filters.limit ?? 20)) : 0;
+  const pageHref = (p: number) => searchHref({ ...filters, page: p });
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
@@ -72,7 +60,7 @@ export default function SearchPage() {
           {filters.q ? (
             <>
               <span className="text-ink-500">Results for</span>
-              <span className="font-semibold text-ink-100">&quot;{filters.q}&quot;</span>
+              <span dir="auto" className="font-semibold text-ink-100">&quot;{filters.q}&quot;</span>
             </>
           ) : (
             <span className="font-semibold text-ink-100">All products</span>
@@ -93,7 +81,7 @@ export default function SearchPage() {
           results grid off the side of the screen. */}
       <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 items-stretch lg:items-start">
         {/* Sidebar filters */}
-        <SearchFilters />
+        <SearchFilters applied={filters} onApply={navigate} />
 
         {/* Results */}
         <div className="flex-1 min-w-0 space-y-6">
@@ -111,56 +99,63 @@ export default function SearchPage() {
                 />
               </div>
 
-              {/* Pagination */}
+              {/* Pagination: real links, so a page can be opened in a new tab
+                  and back/forward walks through the pages. */}
               {totalPages > 1 && (
-                <div className="flex items-center justify-between pt-4 border-t border-ink-800">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    leftIcon={<ChevronLeft className="w-4 h-4" />}
-                    disabled={page <= 1}
-                    onClick={() => setFilter('page', page - 1)}
-                  >
-                    Previous
-                  </Button>
+                <nav aria-label="Pagination" className="flex items-center justify-between pt-4 border-t border-ink-800">
+                  <PageLink href={pageHref(page - 1)} disabled={page <= 1}>
+                    <ChevronLeft className="w-4 h-4" /> Previous
+                  </PageLink>
 
                   <div className="flex items-center gap-1">
-                    {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                      const p = i + 1;
-                      return (
-                        <button
-                          key={p}
-                          onClick={() => setFilter('page', p)}
-                          className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
-                            p === page
-                              ? 'bg-signal text-ink-950'
-                              : 'text-ink-400 hover:bg-ink-800'
-                          }`}
-                        >
-                          {p}
-                        </button>
-                      );
-                    })}
-                    {totalPages > 5 && (
-                      <span className="text-ink-600 px-1">…</span>
-                    )}
+                    {pageWindow(page, totalPages).map((p) => (
+                      <Link
+                        key={p}
+                        href={pageHref(p)}
+                        aria-current={p === page ? 'page' : undefined}
+                        className={cn(
+                          'w-8 h-8 inline-flex items-center justify-center rounded-lg text-sm font-medium transition-colors',
+                          p === page ? 'bg-signal text-ink-950' : 'text-ink-400 hover:bg-ink-800',
+                        )}
+                      >
+                        {p}
+                      </Link>
+                    ))}
                   </div>
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    rightIcon={<ChevronRight className="w-4 h-4" />}
-                    disabled={page >= totalPages}
-                    onClick={() => setFilter('page', page + 1)}
-                  >
-                    Next
-                  </Button>
-                </div>
+                  <PageLink href={pageHref(page + 1)} disabled={page >= totalPages}>
+                    Next <ChevronRight className="w-4 h-4" />
+                  </PageLink>
+                </nav>
               )}
             </>
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+function PageLink({
+  href,
+  disabled,
+  children,
+}: {
+  href: string;
+  disabled: boolean;
+  children: React.ReactNode;
+}) {
+  const className = buttonClassName({ variant: 'outline', size: 'sm' });
+  if (disabled) {
+    return (
+      <span aria-disabled="true" className={cn(className, 'opacity-40 cursor-not-allowed')}>
+        {children}
+      </span>
+    );
+  }
+  return (
+    <Link href={href} className={className}>
+      {children}
+    </Link>
   );
 }

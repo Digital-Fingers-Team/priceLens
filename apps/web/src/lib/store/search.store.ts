@@ -1,44 +1,17 @@
 'use client';
 import { create } from 'zustand';
-import type { SearchFilters } from '@/types/search.types';
 
+/**
+ * UI-only state for the search page. The filters themselves live in the URL
+ * (lib/search-url.ts), which is what makes back/forward and shared links work.
+ */
 interface SearchState {
-  filters: SearchFilters;
   isFilterPanelOpen: boolean;
-  setFilter: <K extends keyof SearchFilters>(key: K, value: SearchFilters[K]) => void;
-  setFilters: (filters: Partial<SearchFilters>) => void;
-  resetFilters: () => void;
   toggleFilterPanel: () => void;
 }
 
-const DEFAULT_FILTERS: SearchFilters = {
-  q: '',
-  page: 1,
-  limit: 20,
-  sortBy: 'relevance',
-  sortDir: 'desc',
-};
-
 export const useSearchStore = create<SearchState>((set) => ({
-  filters: DEFAULT_FILTERS,
   isFilterPanelOpen: false,
-
-  setFilter: (key, value) =>
-    set((state) => ({
-      filters: {
-        ...state.filters,
-        [key]: value,
-        ...(key !== 'page' ? { page: 1 } : {}),
-      },
-    })),
-
-  setFilters: (filters) =>
-    set((state) => ({
-      filters: { ...state.filters, ...filters, page: filters.page ?? 1 },
-    })),
-
-  resetFilters: () => set({ filters: DEFAULT_FILTERS }),
-
   toggleFilterPanel: () =>
     set((state) => ({ isFilterPanelOpen: !state.isFilterPanelOpen })),
 }));

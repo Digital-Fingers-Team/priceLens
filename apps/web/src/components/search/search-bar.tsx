@@ -26,6 +26,14 @@ export function SearchBar({
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Back/forward on /search changes the query in the URL without remounting
+  // this component; keep the box showing what the results are for.
+  const [syncedValue, setSyncedValue] = useState(initialValue);
+  if (initialValue !== syncedValue) {
+    setSyncedValue(initialValue);
+    setQuery(initialValue);
+  }
+
   const debouncedQuery = useDebounce(query, 220);
   const { data: suggestions = [], isFetching } = useSuggest(debouncedQuery);
 
@@ -78,7 +86,9 @@ export function SearchBar({
 
   return (
     <div ref={containerRef} className={cn('relative', className)}>
-      <form onSubmit={handleSubmit}>
+      {/* action + name: a submit before the bundle hydrates (slow phone) is a
+          plain GET to /search?q=... instead of reloading this page (FE-04). */}
+      <form action="/search" role="search" onSubmit={handleSubmit}>
         <div className="relative flex items-center">
           <Search
             className={cn(
@@ -90,6 +100,9 @@ export function SearchBar({
           <input
             ref={inputRef}
             type="search"
+            name="q"
+            aria-label="Search products"
+            dir="auto"
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -112,6 +125,7 @@ export function SearchBar({
           {query && (
             <button
               type="button"
+              aria-label="Clear search"
               onClick={() => {
                 setQuery('');
                 inputRef.current?.focus();
@@ -167,7 +181,7 @@ export function SearchBar({
                   >
                     <Search className="w-3.5 h-3.5 text-ink-500 shrink-0" />
                     <div>
-                      <p className="font-medium">{s.title}</p>
+                      <p className="font-medium" dir="auto">{s.title}</p>
                       {s.brand && <p className="text-xs text-ink-500 mt-0.5">{s.brand}</p>}
                     </div>
                   </button>
