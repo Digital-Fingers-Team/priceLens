@@ -178,6 +178,16 @@ export class OrganizationsService {
       );
     }
 
+    // The upsert below would otherwise let an ADMIN re-add the owner with a
+    // lower role and take their workspace from them (S-07).
+    const existing = await this.prisma.organizationMember.findUnique({
+      where: { orgId_userId: { orgId, userId: user.id } },
+      select: { role: true },
+    });
+    if (existing?.role === OrgRole.OWNER) {
+      throw new BadRequestException("The owner's role cannot be changed; transfer ownership instead");
+    }
+
     const member = await this.prisma.organizationMember.upsert({
       where: { orgId_userId: { orgId, userId: user.id } },
       create: { orgId, userId: user.id, role },

@@ -40,10 +40,11 @@ const FORBIDDEN_KEYS = ['passwordHash', 'keyHash', 'verifyToken', 'ipHash'];
 const ISSUES_REFRESH_TOKEN = ['POST /api/v1/auth/register', 'POST /api/v1/auth/login', 'POST /api/v1/auth/refresh'];
 const MISSING_ID = '00000000-0000-4000-8000-000000000000';
 
-function listing(externalId: string, title: string, price: number): RetailerListing {
+function listing(externalId: string, title: string, price: number, store = 'https://www.noon.com'): RetailerListing {
   return {
     externalId,
-    externalUrl: `https://example.test/${externalId}`,
+    // On the store's own domain: the redirect refuses anything else (S-09).
+    externalUrl: `${store}/p/${externalId}`,
     title,
     priceUsd: price,
     currency: 'EGP',
@@ -160,7 +161,7 @@ describe('Every endpoint (e2e)', () => {
         ]),
       )
       .overrideProvider(JumiaConnector)
-      .useValue(fakeConnector('jumia', [listing('endpoints-jumia-phone', 'Apple iPhone 15 (128 GB) - Black', 41499)]))
+      .useValue(fakeConnector('jumia', [listing('endpoints-jumia-phone', 'Apple iPhone 15 (128 GB) - Black', 41499, 'https://www.jumia.com.eg')]))
       .compile();
 
     app = moduleRef.createNestApplication<NestExpressApplication>({ rawBody: true });
@@ -474,8 +475,17 @@ describe('Every endpoint (e2e)', () => {
 
   it('affiliate', async () => {
     const res = await call('GET', '/api/v1/affiliate/go/{listingId}', 302, { params: { listingId } });
-    expect(res.headers.location).toContain('example.test');
+    expect(res.headers.location).toContain('www.noon.com/p/endpoints-noon-phone');
     await call('GET', '/api/v1/affiliate/go/{listingId}', 404, { params: { listingId: MISSING_ID } });
+
+    // A scraped URL off the store's domain is never followed (S-09).
+    const original = (await prisma.sourceListing.findUniqueOrThrow({ where: { id: listingId } })).externalUrl;
+    for (const hostile of ['https://evil.example/login', 'javascript:alert(document.cookie)']) {
+      await prisma.sourceListing.update({ where: { id: listingId }, data: { externalUrl: hostile } });
+      const refused = await call('GET', '/api/v1/affiliate/go/{listingId}', 404, { params: { listingId } });
+      expect(refused.headers.location).toBeUndefined();
+    }
+    await prisma.sourceListing.update({ where: { id: listingId }, data: { externalUrl: original } });
 
     await call('GET', '/api/v1/affiliate/configs', 200, { token: admin.token });
     await call('GET', '/api/v1/affiliate/configs', 403, { token: free.token });
@@ -524,6 +534,56 @@ describe('Every endpoint (e2e)', () => {
     await call('POST', '/api/v1/admin/reconcile', 201, { ...auth, body: { dryRun: true } });
     await call('POST', '/api/v1/admin/store-coverage-sweep', 201, { ...auth, body: { maxProducts: 5 } });
     await call('POST', '/api/v1/admin/store-coverage-sweep', 403, { token: free.token, body: {} });
+    expectNoProblems();
+  });
+
+  it('another user cannot read or change what is not theirs (S-07, S-19)', async () => {
+    const victim = { token: pro.token };
+    const intruder = { token: free.token };
+
+    // Alerts: someone else's id behaves like a missing one, and nothing changes.
+    await call('POST', '/api/v1/watchlist', 201, { ...victim, body: { productId } });
+    const alert = await call('POST', '/api/v1/watchlist/{productId}/alerts', 201, {
+      ...victim,
+      params: { productId },
+      body: { alertType: 'PRICE_TARGET', thresholdValue: 30000 },
+    });
+    const alertId = alert.body.data?.id ?? MISSING_ID;
+    await call('POST', '/api/v1/watchlist/alerts/{alertId}/reactivate', 404, { ...intruder, params: { alertId } });
+    await call('DELETE', '/api/v1/watchlist/alerts/{alertId}', 404, { ...intruder, params: { alertId } });
+    expect(await prisma.priceAlert.count({ where: { id: alertId } })).toBe(1);
+
+    // Notifications: marking someone else's as read is a silent no-op.
+    const notification = await prisma.notification.create({
+      data: { userId: pro.id, type: 'price_alert.triggered', title: 'Price drop', body: 'Cheaper now' },
+    });
+    await call('POST', '/api/v1/notifications/{id}/read', 201, { ...intruder, params: { id: notification.id } });
+    expect((await prisma.notification.findUniqueOrThrow({ where: { id: notification.id } })).readAt).toBeNull();
+
+    // Workspaces: a non-member cannot touch members, and an ADMIN cannot demote the owner.
+    const owner = await prisma.organizationMember.findFirstOrThrow({ where: { userId: pro.id, role: 'OWNER' } });
+    const params = { orgId: owner.orgId };
+    await call('DELETE', '/api/v1/seller/workspaces/{orgId}/members/{memberId}', 404, {
+      ...intruder,
+      params: { ...params, memberId: owner.id },
+    });
+    const admin = await call('POST', '/api/v1/seller/workspaces/{orgId}/members', 201, {
+      ...victim,
+      params,
+      body: { email: free.email, role: 'ADMIN' },
+    });
+    await call('POST', '/api/v1/seller/workspaces/{orgId}/members', 400, {
+      ...intruder,
+      params,
+      body: { email: pro.email, role: 'MEMBER' },
+    });
+    expect((await prisma.organizationMember.findUniqueOrThrow({ where: { id: owner.id } })).role).toBe('OWNER');
+    await call('DELETE', '/api/v1/seller/workspaces/{orgId}/members/{memberId}', 200, {
+      ...victim,
+      params: { ...params, memberId: admin.body.data?.id ?? MISSING_ID },
+    });
+
+    await call('DELETE', '/api/v1/watchlist/{productId}', 200, { ...victim, params: { productId } });
     expectNoProblems();
   });
 

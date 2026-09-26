@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../database/prisma.service';
 import { AffiliateConfigService } from './affiliate-config.service';
 import { AffiliateProviderRegistry } from './providers/affiliate-provider.registry';
+import { isStoreUrl } from './store-url';
 
 export interface CreateRedirectInput {
   sourceListingId: string;
@@ -32,9 +33,18 @@ export class AffiliateService {
   async createRedirect(input: CreateRedirectInput): Promise<string> {
     const listing = await this.prisma.sourceListing.findUnique({
       where: { id: input.sourceListingId },
+      include: { platform: { select: { slug: true, baseUrl: true } } },
     });
     if (!listing) {
       throw new NotFoundException(`Listing with id "${input.sourceListingId}" not found`);
+    }
+
+    // The URL was scraped from the store's HTML. Only send people to that
+    // store: anything else would make this route an open redirect under our
+    // domain, or run a javascript: URL (S-09).
+    if (!isStoreUrl(listing.externalUrl, [listing.platform.baseUrl, this.connectorBaseUrl(listing.platform.slug)])) {
+      this.logger.warn(`Refusing redirect for listing ${listing.id}: URL is not on ${listing.platform.slug}'s domain`);
+      throw new NotFoundException('This store link is not available');
     }
 
     const config = await this.affiliateConfigService.getActiveConfig(listing.platformId);
@@ -71,6 +81,21 @@ export class AffiliateService {
     });
 
     return affiliateUrl;
+  }
+
+  /** The storefront each connector actually scrapes (retailers config). */
+  private connectorBaseUrl(platformSlug: string): string | undefined {
+    const bases: Record<string, string | undefined> = {
+      amazon: this.configService.get<string>('retailers.amazonBaseUrl'),
+      alibaba: this.configService.get<string>('retailers.alibabaBaseUrl'),
+      aliexpress: this.configService.get<string>('retailers.aliexpressBaseUrl'),
+      noon: this.configService.get<string>('retailers.noonBaseUrl'),
+      jumia: this.configService.get<string>('retailers.jumiaBaseUrl'),
+      carrefour: this.configService.get<string>('retailers.carrefourBaseUrl'),
+      '2b': this.configService.get<string>('retailers.twoBBaseUrl'),
+      elaraby: this.configService.get<string>('retailers.elarabyBaseUrl'),
+    };
+    return bases[platformSlug];
   }
 
   private hashIp(ip: string): string {

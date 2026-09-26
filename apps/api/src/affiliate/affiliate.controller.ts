@@ -87,11 +87,11 @@ export class AffiliateController {
     }
   }
 
+  /**
+   * Express resolves req.ip through `trust proxy` (one hop, app.setup.ts). The
+   * left-most X-Forwarded-For is whatever the client wrote there (S-13).
+   */
   private extractIp(req: Request): string {
-    const forwardedFor = req.headers['x-forwarded-for'];
-    if (typeof forwardedFor === 'string' && forwardedFor.length > 0) {
-      return forwardedFor.split(',')[0].trim();
-    }
     return req.ip ?? req.socket.remoteAddress ?? 'unknown';
   }
 }
