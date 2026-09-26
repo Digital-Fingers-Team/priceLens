@@ -99,6 +99,15 @@ apiClient.interceptors.response.use(
         original.headers.Authorization = `Bearer ${accessToken}`;
         return apiClient(original);
       } catch (refreshError) {
+        // Another tab may have rotated the shared refresh token first; the
+        // API then rejects ours. Use what that tab stored instead of logging
+        // this tab (and, through shared storage, every tab) out.
+        const latest = getStoredTokens();
+        if (latest.refresh && latest.refresh !== refresh && latest.access) {
+          processQueue(null, latest.access);
+          original.headers.Authorization = `Bearer ${latest.access}`;
+          return apiClient(original);
+        }
         processQueue(refreshError, null);
         clearStoredTokens();
         // Redirect to login — works in client components

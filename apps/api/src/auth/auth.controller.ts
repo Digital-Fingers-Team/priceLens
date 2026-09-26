@@ -17,6 +17,7 @@ import { CurrentUser } from '../common/decorators/index';
 import { Public } from '../common/decorators/index';
 import { User } from '@prisma/client';
 import { PublicUser, toPublicUser } from './interfaces/auth.interfaces';
+import { AUTH_SESSION_ID } from './strategies/jwt.strategy';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -54,6 +55,8 @@ export class AuthController {
   @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
+  // Tighter than the global 100/min: each call does a token verify and a rotation (S-20).
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @ApiOperation({ summary: 'Refresh access token using a refresh token' })
   async refresh(@Body() dto: RefreshDto) {
     return this.authService.refreshTokens(dto.refreshToken);
@@ -63,8 +66,8 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Revoke current session' })
-  async logout(@Body() dto: RefreshDto) {
-    await this.authService.logout(dto.refreshToken);
+  async logout(@CurrentUser() user: User, @Body() dto: RefreshDto, @Request() req: any) {
+    await this.authService.logout(user.id, dto.refreshToken, req[AUTH_SESSION_ID]);
   }
 
   @Delete('sessions')
