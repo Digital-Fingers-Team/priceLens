@@ -14,6 +14,7 @@ browser profiles live (`.browser-profiles`, a persistent volume in production).
 | `probe-dom.ts` | A store changed its markup: dumps the page's HTML around a selector so the connector can be rebuilt. |
 | `probe-cookies.ts` | Prices come back in the wrong currency or region: shows which cookies carry currency or locale. |
 | `probe-turnstile.ts` | A Cloudflare Turnstile challenge blocks a store: checks whether clicking it gets through. |
+| `repair-variant-mixes.ts` | Products mix RAM/storage variants (audit 00 F-17). Dry-run report by default; `--apply` splits them and writes a rollback file to `backups/`; `--rollback <file>` undoes it. Apply only after the phase 02 matcher is deployed. |
 
 Usage lines are at the top of each file, e.g. `npx ts-node scripts/ops/diagnose-stores.ts noon "iphone 15"`.
 
