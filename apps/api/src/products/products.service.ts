@@ -7,6 +7,8 @@ import { PrismaService } from '../database/prisma.service';
 import { OfferPolicy, liveOfferSql, liveOfferWhere, liveOffers, toPrice } from '../prices/offer-rules';
 import { HistoryRow, buildPriceHistory, recordedPriceStats } from '../prices/price-history';
 import { IngestionQueue } from '../workers/ingestion-queue.service';
+import { normalizedTextSql, searchPhrase, searchTermGroups } from './search-text';
+import { normalizeArabic } from '../matching/text/arabic';
 
 type SortBy = 'relevance' | 'minPriceUsd' | 'maxPriceUsd' | 'listingCount' | 'updatedAt';
 type SortDir = 'asc' | 'desc';
@@ -126,9 +128,10 @@ export class ProductsService {
     const rawPage = clampPageNumber(page);
     const offset = (rawPage - 1) * safeLimit;
 
-    const whereClause = this.buildSearchWhereSql(normalizedQuery, brand, categoryId, tier);
+    const termGroups = searchTermGroups(normalizedQuery);
+    const whereClause = this.buildSearchWhereSql(termGroups, brand, categoryId, tier);
     const havingClause = this.buildHavingSql(minPrice, maxPrice);
-    const relevanceSql = this.buildRelevanceScoreSql(normalizedQuery);
+    const relevanceSql = this.buildRelevanceScoreSql(termGroups, normalizedQuery);
     const orderBySql = this.buildOrderBySql(sortBy, sortDir, relevanceSql, normalizedQuery);
 
     // Sort/filter/paginate at the DB level first — only the current page's
@@ -206,7 +209,7 @@ export class ProductsService {
   }
 
   private buildSearchWhereSql(
-    normalizedQuery: string,
+    termGroups: string[][],
     brand?: string,
     categoryId?: string,
     tier?: string,
@@ -214,17 +217,24 @@ export class ProductsService {
     // Only live offers count: a product's price filter, price sort and
     // listing count use the same offers its card and page show (L-15).
     const conditions: Prisma.Sql[] = [liveOfferSql('sl', this.offerPolicy())];
+    const title = normalizedTextSql(Prisma.sql`cp.title`);
 
-    for (const term of normalizedQuery.split(/\s+/).filter(Boolean)) {
-      const pattern = `%${term}%`;
-      conditions.push(Prisma.sql`(
-        cp.title ILIKE ${pattern} OR
-        cp.brand ILIKE ${pattern} OR
-        cp.model ILIKE ${pattern} OR
-        cp.slug ILIKE ${pattern} OR
-        EXISTS (SELECT 1 FROM unnest(string_to_array(lower(c.name), ' ')) tok WHERE tok = ${term}) OR
-        EXISTS (SELECT 1 FROM unnest(c.search_terms) st WHERE st ILIKE ${pattern})
-      )`);
+    // Every term must match; a term matches through any of its alternatives
+    // (the Arabic-normalized word or an English spelling of it).
+    for (const alternatives of termGroups) {
+      const matches = alternatives.map((term) => {
+        const pattern = `%${term}%`;
+        return Prisma.sql`(
+          ${title} LIKE ${pattern} OR
+          cp.normalized_title LIKE ${pattern} OR
+          cp.brand ILIKE ${pattern} OR
+          cp.model ILIKE ${pattern} OR
+          cp.slug ILIKE ${pattern} OR
+          EXISTS (SELECT 1 FROM unnest(string_to_array(lower(c.name), ' ')) tok WHERE tok = ${term}) OR
+          EXISTS (SELECT 1 FROM unnest(c.search_terms) st WHERE st ILIKE ${pattern})
+        )`;
+      });
+      conditions.push(Prisma.sql`(${Prisma.join(matches, ' OR ')})`);
     }
 
     if (brand) {
@@ -290,6 +300,8 @@ export class ProductsService {
   private static readonly ACCESSORY_KEYWORDS = [
     'case', 'cover', 'protector', 'skin', 'pod', 'bumper', 'sleeve', 'pouch',
     'stand', 'mount', 'strap', 'charger', 'cable', 'tempered glass', 'screen guard',
+    // A console search should show the console before its gamepads.
+    'controller', 'gamepad',
   ];
 
   /**
@@ -299,19 +311,61 @@ export class ProductsService {
    * Title matches are weighted far above category/search-term matches so that
    * loosely-related category matches sink instead of dominating page one.
    */
-  private buildRelevanceScoreSql(normalizedQuery: string): Prisma.Sql {
-    const terms = normalizedQuery.split(/\s+/).filter(Boolean);
-    if (terms.length === 0) {
+  private buildRelevanceScoreSql(termGroups: string[][], normalizedQuery: string): Prisma.Sql {
+    if (termGroups.length === 0) {
       return Prisma.sql`0`;
     }
+    const title = normalizedTextSql(Prisma.sql`cp.title`);
 
-    const termScores = terms.map((term) => {
-      const contains = `%${term}%`;
-      const startsWith = `${term}%`;
-      return Prisma.sql`(
+    // A term scores through its best alternative, so an Arabic word and its
+    // English spelling never count twice.
+    const termScores = termGroups.map((alternatives) =>
+      Prisma.sql`GREATEST(${Prisma.join(
+        alternatives.map((term) => this.termScoreSql(term, title)),
+        ', ',
+      )})`,
+    );
+
+    // The full-phrase bonus checks both the query as typed (normalized) and
+    // its English-spelled form.
+    const phrases = Array.from(
+      new Set([termGroups.map((alternatives) => alternatives[0]).join(' '), searchPhrase(termGroups)]),
+    );
+    const fullPhraseBonus = Prisma.sql`GREATEST(${Prisma.join(
+      phrases.map(
+        (phrase) => Prisma.sql`(
+          CASE
+            WHEN ${title} LIKE ${phrase} THEN 50
+            WHEN ${title} LIKE ${`${phrase}%`} THEN 20
+            WHEN ${title} LIKE ${`%${phrase}%`} THEN 8
+            ELSE 0
+          END
+        )`,
+      ),
+      ', ',
+    )})`;
+
+    const englishQuery = `${normalizedQuery} ${searchPhrase(termGroups)}`;
+    const queryAsksForAccessory = ProductsService.ACCESSORY_KEYWORDS.some((keyword) =>
+      englishQuery.includes(keyword),
+    );
+    const accessoryPenalty = queryAsksForAccessory
+      ? Prisma.sql`0`
+      : Prisma.sql`(CASE WHEN ${Prisma.join(
+          ProductsService.ACCESSORY_KEYWORDS.map((keyword) => Prisma.sql`cp.title ILIKE ${`%${keyword}%`}`),
+          ' OR ',
+        )} THEN -20 ELSE 0 END)`;
+
+    return Prisma.sql`(${fullPhraseBonus} + ${accessoryPenalty} + ${Prisma.join(termScores, ' + ')})`;
+  }
+
+  private termScoreSql(term: string, title: Prisma.Sql): Prisma.Sql {
+    const contains = `%${term}%`;
+    const startsWith = `${term}%`;
+    return Prisma.sql`(
         CASE
-          WHEN cp.title ILIKE ${startsWith} THEN 12
-          WHEN cp.title ILIKE ${contains} THEN 6
+          WHEN ${title} LIKE ${startsWith} OR cp.normalized_title LIKE ${startsWith} THEN 12
+          WHEN ${title} LIKE ${contains} OR cp.normalized_title LIKE ${contains} THEN 6
           ELSE 0
         END +
         CASE
@@ -329,28 +383,6 @@ export class ProductsService {
           ELSE 0
         END
       )`;
-    });
-
-    const fullPhraseBonus = Prisma.sql`(
-      CASE
-        WHEN cp.title ILIKE ${normalizedQuery} THEN 50
-        WHEN cp.title ILIKE ${`${normalizedQuery}%`} THEN 20
-        WHEN cp.title ILIKE ${`%${normalizedQuery}%`} THEN 8
-        ELSE 0
-      END
-    )`;
-
-    const queryAsksForAccessory = ProductsService.ACCESSORY_KEYWORDS.some((keyword) =>
-      normalizedQuery.includes(keyword),
-    );
-    const accessoryPenalty = queryAsksForAccessory
-      ? Prisma.sql`0`
-      : Prisma.sql`(CASE WHEN ${Prisma.join(
-          ProductsService.ACCESSORY_KEYWORDS.map((keyword) => Prisma.sql`cp.title ILIKE ${`%${keyword}%`}`),
-          ' OR ',
-        )} THEN -20 ELSE 0 END)`;
-
-    return Prisma.sql`(${fullPhraseBonus} + ${accessoryPenalty} + ${Prisma.join(termScores, ' + ')})`;
   }
 
   /** Per-query cooldown so repeat searches (pagination, sorting, retyping) don't re-scrape. */
@@ -414,6 +446,7 @@ export class ProductsService {
   async suggest(q: string, limit = 6) {
     const query = q.trim().toLowerCase();
     if (query.length < 2) return [];
+    const termGroups = searchTermGroups(query);
 
     const products = await this.prisma.canonicalProduct.findMany({
       where: {
@@ -431,14 +464,17 @@ export class ProductsService {
         // Category name is matched as whole words only (not "haystack.includes"),
         // otherwise a query like "phone" substring-matches the "Headphones"
         // category and floods phone suggestions with earbuds/headphones.
-        const haystack = [product.title, product.brand ?? '', product.model ?? '', product.slug]
-          .join(' ')
-          .toLowerCase();
+        // Same term rules as search: Arabic normalized, each term matched
+        // through any of its spellings.
+        const haystack = normalizeArabic(
+          [product.title, product.brand ?? '', product.model ?? '', product.slug].join(' ').toLowerCase(),
+        );
         const categoryTokens = product.category.name.toLowerCase().split(/\s+/);
-        const queryTerms = query.split(/\s+/).filter(Boolean);
         return (
-          queryTerms.length > 0 &&
-          queryTerms.every((term) => haystack.includes(term) || categoryTokens.includes(term))
+          termGroups.length > 0 &&
+          termGroups.every((alternatives) =>
+            alternatives.some((term) => haystack.includes(term) || categoryTokens.includes(term)),
+          )
         );
       })
       .sort((a, b) => {

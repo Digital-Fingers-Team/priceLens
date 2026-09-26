@@ -172,6 +172,11 @@ const TERM_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = ARABIC_TERMS.map
 
 const HAS_ARABIC = /[؀-ۿ]/;
 
+/** Dictionary entries written as more than one word ("اي فون", "برو ماكس"), longest first. */
+export const MULTI_WORD_ARABIC_TERMS: readonly string[] = ARABIC_TERMS.map(([arabic]) => arabic)
+  .filter((arabic) => arabic.includes(' '))
+  .sort((a, b) => b.length - a.length);
+
 /**
  * The title as the matcher reads it: Arabic normalized, and Arabic words with
  * a fixed English spelling replaced by it, so "سامسونج جالاكسي A57 رام ١٢
