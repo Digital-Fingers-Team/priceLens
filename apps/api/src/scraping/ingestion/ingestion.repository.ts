@@ -225,6 +225,16 @@ export class IngestionRepository {
 
   // ─── Writes ───────────────────────────────────────────────────────────
 
+  /** The store reports this listing sold out. Returns how many stored rows changed. */
+  async markOutOfStock(platformId: string, externalId: string): Promise<number> {
+    const now = new Date();
+    const { count } = await this.prisma.sourceListing.updateMany({
+      where: { platformId, externalId },
+      data: { inStock: false, lastSeenAt: now, lastScrapedAt: now },
+    });
+    return count;
+  }
+
   /**
    * Marks an earlier-accepted (or pending) copy of this listing REJECTED.
    * Returns how many rows changed: 0 when it was never stored.
@@ -241,12 +251,27 @@ export class IngestionRepository {
     return count;
   }
 
+  /**
+   * Creates a product under a free slug. Two jobs can pick the same free
+   * slug at once; the loser's insert hits the unique index and retries with
+   * the next suffix instead of losing the listing (audit 02, L-19).
+   */
   async createCanonicalProduct(
     data: Omit<Prisma.CanonicalProductUncheckedCreateInput, 'slug'> & { baseSlug: string },
   ): Promise<CanonicalProduct> {
     const { baseSlug, ...rest } = data;
-    const slug = await this.ensureUniqueSlug(baseSlug);
-    return this.prisma.canonicalProduct.create({ data: { ...rest, slug } });
+    for (let attempt = 0; ; attempt += 1) {
+      const slug = await this.ensureUniqueSlug(baseSlug);
+      try {
+        return await this.prisma.canonicalProduct.create({ data: { ...rest, slug } });
+      } catch (error) {
+        const slugTaken =
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === 'P2002' &&
+          String((error.meta as { target?: unknown } | undefined)?.target ?? '').includes('slug');
+        if (!slugTaken || attempt >= 4) throw error;
+      }
+    }
   }
 
   private async ensureUniqueSlug(baseSlug: string): Promise<string> {
@@ -276,8 +301,13 @@ export class IngestionRepository {
   }
 
   /**
-   * Appends a price point unless the listing's latest one has the same price.
-   * Returns whether a row was written.
+   * Appends a price point unless the listing's latest one has the same price
+   * and stock state. Returns whether a row was written.
+   *
+   * Read and write happen in one transaction behind a per-listing advisory
+   * lock: two jobs that scrape the same listing at once (up to 12 ingestion
+   * jobs run concurrently, A-10) would otherwise both see the old price and
+   * both append the new one (audit 02, L-19).
    */
   async appendPriceHistoryIfChanged(entry: {
     sourceListingId: string;
@@ -287,17 +317,20 @@ export class IngestionRepository {
     originalPrice: string | null;
     inStock: boolean;
   }): Promise<boolean> {
-    const lastEntry = await this.prisma.priceHistory.findFirst({
-      where: { sourceListingId: entry.sourceListingId },
-      orderBy: { recordedAt: 'desc' },
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`price-history:${entry.sourceListingId}`}))`;
+      const lastEntry = await tx.priceHistory.findFirst({
+        where: { sourceListingId: entry.sourceListingId },
+        orderBy: [{ recordedAt: 'desc' }, { id: 'desc' }],
+      });
+
+      if (lastEntry && Number(lastEntry.priceUsd) === Number(entry.priceUsd) && lastEntry.inStock === entry.inStock) {
+        return false;
+      }
+
+      await tx.priceHistory.create({ data: entry });
+      return true;
     });
-
-    if (lastEntry && Number(lastEntry.priceUsd) === Number(entry.priceUsd)) {
-      return false;
-    }
-
-    await this.prisma.priceHistory.create({ data: entry });
-    return true;
   }
 
   async recordMatchDecision(data: Prisma.MatchDecisionUncheckedCreateInput): Promise<void> {

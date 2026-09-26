@@ -118,6 +118,7 @@ export class StoreCoverageService {
 
         for (const listing of listings) {
           if (!hasUsablePrice(listing.priceUsd)) {
+            await this.processor.recordUnpriced(platform, listing);
             continue;
           }
 

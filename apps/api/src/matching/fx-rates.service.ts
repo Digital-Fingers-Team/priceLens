@@ -47,19 +47,23 @@ export class FxRatesService {
     return this.baseCurrency;
   }
 
-  /** Convert `amount` in `fromCurrency` into the base currency (EGP). */
-  async convert(amount: number, fromCurrency: string): Promise<number> {
+  /**
+   * Convert `amount` in `fromCurrency` into the base currency (EGP). Null
+   * when no rate is known for the currency: a guessed rate would store an
+   * invented price (audit 02, L-18).
+   */
+  async convert(amount: number, fromCurrency: string): Promise<number | null> {
     const currency = (fromCurrency || this.baseCurrency).trim().toUpperCase();
     if (currency === this.baseCurrency) {
       return amount;
     }
 
     const rate = await this.getRateToBase(currency);
-    return amount * rate;
+    return rate == null ? null : amount * rate;
   }
 
-  /** Units of the base currency (EGP) equal to 1 unit of `currency`. */
-  async getRateToBase(currency: string): Promise<number> {
+  /** Units of the base currency (EGP) equal to 1 unit of `currency`, or null when unknown. */
+  async getRateToBase(currency: string): Promise<number | null> {
     const code = currency.trim().toUpperCase();
     if (code === this.baseCurrency) return 1;
 
@@ -74,15 +78,12 @@ export class FxRatesService {
       this.logger.warn(`FX table missing rate for "${code}" or base "${this.baseCurrency}" — using fallback table`);
     }
 
-    return FALLBACK_RATES_TO_EGP[code] ?? this.fallbackViaEgpRatio(code);
-  }
-
-  /** Last-resort: derive from the static table's EGP ratios, or assume parity if totally unknown. */
-  private fallbackViaEgpRatio(code: string): number {
-    const known = FALLBACK_RATES_TO_EGP[code];
-    if (known) return known;
-    this.logger.warn(`No FX rate known for currency "${code}" (live and fallback both missed) — treating as 1:1 with base currency, comparisons may be inaccurate`);
-    return 1;
+    const fallback = FALLBACK_RATES_TO_EGP[code];
+    if (fallback) return fallback;
+    // It used to assume 1:1 here, which stored e.g. 100 CNY as 100 EGP --
+    // a fraction of the real price -- and made it the best deal.
+    this.logger.warn(`No FX rate known for currency "${code}" (live and fallback both missed); listing not priced`);
+    return null;
   }
 
   private async getRateTable(): Promise<RateTable | null> {

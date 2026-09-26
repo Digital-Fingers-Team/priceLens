@@ -14,10 +14,12 @@ import {
   checkMarketOutlier,
   detectJunkListing,
   findCanonicalMatch,
+  listingKeys,
   normalizeListing,
   toBasePrices,
 } from '../../matching/pipeline';
 import type { RetailerListing } from '../interfaces/retailer-listing.interface';
+import { KeyedMutex } from '../../common/keyed-mutex';
 import { IngestionRepository } from './ingestion.repository';
 import { buildRawAttributes, inferTier, toDbDecimal, toJson, toSlug } from './listing-mapping';
 
@@ -41,6 +43,12 @@ export interface ProcessedListing {
 export class ListingProcessor {
   private readonly logger = new Logger(ListingProcessor.name);
   private readonly tools: MatchingTools;
+  /**
+   * Serializes matching + persisting per product family (category, brand,
+   * model). Two jobs that scrape the same new product at once would
+   * otherwise both find no match and both create it (audit 02, L-19).
+   */
+  private readonly familyLock = new KeyedMutex();
 
   constructor(
     private readonly repository: IngestionRepository,
@@ -72,6 +80,10 @@ export class ListingProcessor {
     const { price, advertisedPrice } = await toBasePrices(listing, (amount, currency) =>
       this.fxRates.convert(amount, currency),
     );
+    if (listing.priceUsd != null && price == null) {
+      await this.reject(platform, listing, `no exchange rate for ${listing.currency}`);
+      return null;
+    }
 
     // Step 5: category sanity.
     if (price != null) {
@@ -86,6 +98,22 @@ export class ListingProcessor {
       }
     }
 
+    const keys = listingKeys(input);
+    const family = [category.id, keys.brand ?? '', keys.model ?? input.normalized.normalized].join('|');
+    return this.familyLock.run(family, () =>
+      this.matchAndPersist(platform, category, listing, sourceSlug, input, price, advertisedPrice),
+    );
+  }
+
+  private async matchAndPersist(
+    platform: Platform,
+    category: Category,
+    listing: RetailerListing,
+    sourceSlug: string,
+    input: NormalizedListing<RetailerListing>,
+    price: number | null,
+    advertisedPrice: number | null,
+  ): Promise<ProcessedListing | null> {
     // Steps 6-9: the product it belongs to, if any.
     const match = await findCanonicalMatch(
       input,
@@ -163,6 +191,19 @@ export class ListingProcessor {
       priceHistoryCreated,
       canonicalProductId: product.id,
     };
+  }
+
+  /**
+   * Step 1 dropped this listing for having no usable price. When the store
+   * says it is sold out, the stored copy (if any) must learn that, or its
+   * last price keeps being shown as available (audit 02, L-11). A priceless
+   * listing with no stock signal is left alone: that is a scrape error more
+   * often than not, and the offer age window retires it if it persists.
+   */
+  async recordUnpriced(platform: Platform, listing: RetailerListing): Promise<void> {
+    if (listing.inStock !== false) return;
+    const count = await this.repository.markOutOfStock(platform.id, listing.externalId);
+    if (count) this.logger.log(`"${listing.title}" on ${platform.slug} is sold out`);
   }
 
   /**

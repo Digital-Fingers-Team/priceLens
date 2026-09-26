@@ -254,6 +254,7 @@ export class LiveIngestionService {
               this.logger.warn(
                 `Skipping listing "${listing.title}" from ${connector.slug} — no usable price (likely a scrape error, not a real product)`,
               );
+              await this.processor.recordUnpriced(platform, listing);
               continue;
             }
 
@@ -351,6 +352,7 @@ export class LiveIngestionService {
 
           for (const listing of listings) {
             if (!hasUsablePrice(listing.priceUsd)) {
+              await this.processor.recordUnpriced(platform, listing);
               continue;
             }
 

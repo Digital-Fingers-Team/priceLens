@@ -38,3 +38,5 @@ export { rankCandidates, decideMatch, capacityGb } from './steps/09-rank-and-dec
 export { checkMarketOutlier } from './steps/10-market-outlier';
 export type { PricedOffer } from './steps/10-market-outlier';
 export { findCanonicalMatch } from './find-canonical-match';
+export { listingKeys } from './steps/listing-keys';
+export type { ListingKeys } from './steps/listing-keys';
