@@ -4,7 +4,8 @@ import { MatchStatus, Prisma, ProductTier } from '@prisma/client';
 import type { CanonicalProduct, SourceListing } from '@prisma/client';
 import type { CurrentPricesResponse, PriceHistoryResponse } from '@pricelens/contracts';
 import { PrismaService } from '../database/prisma.service';
-import { filterMarketOutliers } from '../intelligence/price-statistics';
+import { OfferPolicy, liveOfferSql, liveOfferWhere, liveOffers, toPrice } from '../prices/offer-rules';
+import { HistoryRow, buildPriceHistory, recordedPriceStats } from '../prices/price-history';
 import { IngestionQueue } from '../workers/ingestion-queue.service';
 
 type SortBy = 'relevance' | 'minPriceUsd' | 'maxPriceUsd' | 'listingCount' | 'updatedAt';
@@ -81,6 +82,12 @@ export class ProductsService {
   /** Every product should be comparable across at least this many priced stores. */
   private readonly minStoresPerProduct: number;
 
+  /** How old an offer may be and still count as a current price (D-13). */
+  private readonly offerMaxAgeDays: number;
+
+  /** Day boundary for price charts. */
+  private readonly marketTimeZone: string;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
@@ -88,6 +95,12 @@ export class ProductsService {
   ) {
     this.baseCurrency = this.config.get<string>('pricing.fxBaseCurrency', 'EGP');
     this.minStoresPerProduct = this.config.get<number>('retailers.minStoresPerProduct', 7);
+    this.offerMaxAgeDays = this.config.get<number>('pricing.offerMaxAgeDays', 7);
+    this.marketTimeZone = this.config.get<string>('pricing.marketTimeZone', 'Africa/Cairo');
+  }
+
+  private offerPolicy(): OfferPolicy {
+    return { maxAgeDays: this.offerMaxAgeDays };
   }
 
   async searchProducts(options: SearchProductsOptions) {
@@ -198,10 +211,9 @@ export class ProductsService {
     categoryId?: string,
     tier?: string,
   ): Prisma.Sql {
-    const conditions: Prisma.Sql[] = [
-      Prisma.sql`sl.price_usd IS NOT NULL`,
-      Prisma.sql`sl.match_status NOT IN ('REJECTED', 'MANUAL_REJECT')`,
-    ];
+    // Only live offers count: a product's price filter, price sort and
+    // listing count use the same offers its card and page show (L-15).
+    const conditions: Prisma.Sql[] = [liveOfferSql('sl', this.offerPolicy())];
 
     for (const term of normalizedQuery.split(/\s+/).filter(Boolean)) {
       const pattern = `%${term}%`;
@@ -475,16 +487,14 @@ export class ProductsService {
   async getListings(productId: string, page = 1, limit = 50) {
     limit = clampPageSize(limit, 50, MAX_PAGE_SIZE);
     page = clampPageNumber(page);
-    // Out-of-stock listings come back with no price; exclude them so callers only
-    // see stores the product can actually be bought from.
-    // Filtered in memory rather than paged in SQL: whether a price is an
-    // outlier depends on the product's other listings, which a page does not
-    // contain. A product has tens of listings, not thousands.
+    // Only live offers (see offer-rules). Filtered in memory rather than
+    // paged in SQL: dedupe and the outlier check depend on the product's
+    // other listings, which a page does not contain. A product has tens of
+    // listings, not thousands.
     const all = await this.prisma.sourceListing.findMany({
       where: {
         canonicalProductId: productId,
-        priceUsd: { not: null },
-        NOT: { inStock: false },
+        ...liveOfferWhere(this.offerPolicy()),
       },
       include: { platform: true },
       orderBy: [{ priceUsd: 'asc' }, { lastSeenAt: 'desc' }],
@@ -539,138 +549,74 @@ export class ProductsService {
     };
   }
 
+  /**
+   * Recorded-price statistics (L-13): the lowest and highest price the
+   * product's live-matched listings were ever recorded at, and over the last
+   * 365 days. They used to be the current min/max under an "All-time" label.
+   */
   async getPriceStats(productId: string) {
-    const product = await this.prisma.canonicalProduct.findUnique({
-      where: { id: productId },
-      include: {
-        sourceListings: {
-          include: { platform: true },
-        },
-      },
-    });
-
-    if (!product) {
-      throw new NotFoundException(`Product with id "${productId}" not found`);
-    }
-
-    const stats = this.getProductStats(product);
-    const prices = this.visibleListings(product.sourceListings ?? [])
-      .map((listing) => this.toNumber(listing.priceUsd))
-      .filter((value): value is number => value != null);
-
-    const avg = prices.length ? prices.reduce((sum, price) => sum + price, 0) / prices.length : null;
-
-    return {
-      allTime: {
-        min: stats.minPriceUsd,
-        max: stats.maxPriceUsd,
-        avg,
-        dataPoints: prices.length,
-      },
-      week52: {
-        low: stats.minPriceUsd,
-        high: stats.maxPriceUsd,
-      },
-    };
+    await this.requireProduct(productId);
+    const rows = await this.historyRows(productId);
+    return recordedPriceStats(rows);
   }
 
+  /**
+   * The daily best-price chart and its summary (L-14): history of the
+   * listings currently matched to the product (not rejected ones, not ones
+   * since moved to another product), forward-filled per listing, in market
+   * days.
+   */
   async getPriceHistory(productId: string, days = 90): Promise<PriceHistoryResponse> {
-    const product = await this.prisma.canonicalProduct.findUnique({
-      where: { id: productId },
-    });
-
-    if (!product) {
-      throw new NotFoundException(`Product with id "${productId}" not found`);
-    }
-
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - Math.max(days, 1));
-
-    const history = await this.prisma.priceHistory.findMany({
-      where: {
-        canonicalProductId: productId,
-        recordedAt: { gte: startDate },
-      },
-      include: {
-        sourceListing: {
-          include: { platform: true },
-        },
-      },
-      orderBy: { recordedAt: 'asc' },
-    });
-
-    const chartMap = new Map<string, number[]>();
-    for (const entry of history) {
-      const key = entry.recordedAt.toISOString().slice(0, 10);
-      const value = this.toNumber(entry.priceUsd);
-      if (value == null) continue;
-      const existing = chartMap.get(key) ?? [];
-      existing.push(value);
-      chartMap.set(key, existing);
-    }
-
-    const chart = Array.from(chartMap.entries()).map(([date, values]) => {
-      const min = Math.min(...values);
-      const max = Math.max(...values);
-      const avg = values.reduce((sum, price) => sum + price, 0) / values.length;
-      return {
-        date,
-        min,
-        max,
-        avg,
-        count: values.length,
-      };
-    });
-
-    const prices = history
-      .map((entry) => this.toNumber(entry.priceUsd))
-      .filter((value): value is number => value != null);
-    const avgPrice = prices.length ? prices.reduce((sum, price) => sum + price, 0) / prices.length : null;
-
-    const platformMap = new Map<string, { name: string; min: number; max: number; total: number; count: number }>();
-    for (const entry of history) {
-      const value = this.toNumber(entry.priceUsd);
-      if (value == null) continue;
-      const platformId = entry.sourceListing.platformId;
-      const current = platformMap.get(platformId);
-      if (!current) {
-        platformMap.set(platformId, {
-          name: entry.sourceListing.platform.name,
-          min: value,
-          max: value,
-          total: value,
-          count: 1,
-        });
-      } else {
-        current.min = Math.min(current.min, value);
-        current.max = Math.max(current.max, value);
-        current.total += value;
-        current.count += 1;
-      }
-    }
+    const product = await this.requireProduct(productId);
+    const to = new Date();
+    const from = new Date(to.getTime() - Math.max(days, 1) * 86_400_000);
+    const view = buildPriceHistory(await this.historyRows(productId), { from, to, timeZone: this.marketTimeZone });
 
     return {
       productId,
       productTitle: product.title,
       days,
       granularity: 'day',
-      chart,
-      summary: {
-        allTimeMin: prices.length ? Math.min(...prices) : null,
-        allTimeMax: prices.length ? Math.max(...prices) : null,
-        periodMin: prices.length ? Math.min(...prices) : null,
-        periodMax: prices.length ? Math.max(...prices) : null,
-        avgPrice,
-        dataPoints: prices.length,
-      },
-      platformBreakdown: Array.from(platformMap.entries()).map(([platformId, value]) => ({
-        platformId,
-        name: value.name,
-        minPrice: value.min,
-        maxPrice: value.max,
-        avgPrice: value.total / value.count,
-      })),
+      ...view,
     };
+  }
+
+  private async requireProduct(productId: string): Promise<CanonicalProduct> {
+    const product = await this.prisma.canonicalProduct.findUnique({ where: { id: productId } });
+    if (!product) {
+      throw new NotFoundException(`Product with id "${productId}" not found`);
+    }
+    return product;
+  }
+
+  /** Every recorded price of the listings matching accepted onto this product (stale ones included: history is history). */
+  private async historyRows(productId: string): Promise<HistoryRow[]> {
+    const history = await this.prisma.priceHistory.findMany({
+      where: {
+        priceUsd: { gt: 0 },
+        sourceListing: {
+          canonicalProductId: productId,
+          matchStatus: { in: [MatchStatus.ACCEPTED, MatchStatus.MANUAL_ACCEPT] },
+        },
+      },
+      select: {
+        sourceListingId: true,
+        recordedAt: true,
+        priceUsd: true,
+        inStock: true,
+        sourceListing: { select: { platformId: true, lastSeenAt: true, platform: { select: { name: true } } } },
+      },
+      orderBy: { recordedAt: 'asc' },
+    });
+    return history.map((entry) => ({
+      sourceListingId: entry.sourceListingId,
+      platformId: entry.sourceListing.platformId,
+      platformName: entry.sourceListing.platform.name,
+      recordedAt: entry.recordedAt,
+      price: Number(entry.priceUsd),
+      inStock: entry.inStock,
+      lastSeenAt: entry.sourceListing.lastSeenAt,
+    }));
   }
 
   private mapSearchHit(product: ProductWithRelations) {
@@ -733,25 +679,15 @@ export class ProductsService {
   }
 
   /**
-   * A store only counts when it actually has a price for the product. Retailers
-   * return out-of-stock items with no price; those aren't a real price source, so
-   * they're excluded from the store count everywhere it's shown.
-   */
-  private hasUsablePrice(listing: { priceUsd: unknown; inStock?: boolean | null }): boolean {
-    const price = this.toNumber(listing.priceUsd);
-    return price != null && price > 0 && listing.inStock !== false;
-  }
-
-  /**
-   * The listings a shopper should see: priced, in stock, not rejected by
-   * matching, and not a price outlier against the product's other listings.
+   * The listings a shopper should see: live offers (priced, in stock or
+   * stock unknown, not rejected, seen within the offer window), one per
+   * store and title, and not a price outlier against the product's other
+   * stores. The rule lives in prices/offer-rules.ts so the search SQL,
+   * intelligence and alerts use the same one.
    *
    * The outlier step is what keeps "Best Deal" honest. It is the lowest price
    * on the page, so a spare part or a fake that slips through matching at a
-   * tenth of the real price becomes the headline number. Rejected listings are
-   * filtered first so they cannot drag the median the outlier check uses, and
-   * the median is the market's (one price per store), so one store with many
-   * listings cannot decide what normal is.
+   * tenth of the real price becomes the headline number.
    */
   private visibleListings<
     T extends {
@@ -760,29 +696,10 @@ export class ProductsService {
       matchStatus?: MatchStatus;
       platformId?: string;
       rawTitle?: string;
+      lastSeenAt?: Date;
     },
   >(listings: T[]): T[] {
-    // The same offer listed several times by one store (Alibaba repeats a
-    // supplier's listing under different ids) is one offer, not several rows.
-    const seen = new Set<string>();
-    const usable = listings.filter((listing) => {
-      if (
-        !this.hasUsablePrice(listing) ||
-        listing.matchStatus === MatchStatus.REJECTED ||
-        listing.matchStatus === MatchStatus.MANUAL_REJECT
-      ) {
-        return false;
-      }
-      const key = `${listing.platformId ?? ''}|${this.toNumber(listing.priceUsd)}|${listing.rawTitle?.trim().toLowerCase() ?? ''}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-    return filterMarketOutliers(
-      usable,
-      (listing) => this.toNumber(listing.priceUsd) ?? NaN,
-      (listing) => listing.platformId ?? '?',
-    ).kept;
+    return liveOffers(listings, this.offerPolicy());
   }
 
   /** A product with three listings from one retailer is still sold at one store. */
@@ -822,6 +739,9 @@ export class ProductsService {
       price: displayPrice,
       currency: displayCurrency,
       inStock: listing.inStock,
+      // The offer's own color, read from its title at ingestion (D-6: every
+      // color of a model shares the product; phase 06 filters offers by it).
+      color: this.offerColor(listing.extractedAttributes),
       rating: listing.rating,
       reviewCount: listing.reviewCount,
       matchStatus: listing.matchStatus,
@@ -830,6 +750,11 @@ export class ProductsService {
       lastSeenAt: listing.lastSeenAt.toISOString(),
       lastScrapedAt: listing.lastScrapedAt?.toISOString() ?? null,
     };
+  }
+
+  private offerColor(extracted: unknown): string | null {
+    const color = (extracted as Record<string, unknown> | null)?.color;
+    return typeof color === 'string' && color.trim() ? color.trim() : null;
   }
 
   private mapCurrentPriceListing(
@@ -913,9 +838,6 @@ export class ProductsService {
   }
 
   private toNumber(value: unknown): number | null {
-    if (value == null) return null;
-    if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
+    return toPrice(value);
   }
 }

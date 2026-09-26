@@ -1,13 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { MatchStatus, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
+import { OfferPolicy, liveOfferWhere } from '../prices/offer-rules';
 import { PriceIntelligenceService } from '../intelligence/price-intelligence.service';
 import { computeDealScore } from '../intelligence/deal-score';
 import { computeHistoryStats } from '../intelligence/price-statistics';
 import { ParsedQuery, SpecConstraint, parseQuery } from './constraint-parser';
-
-const ACCEPTED_MATCHES: MatchStatus[] = [MatchStatus.ACCEPTED, MatchStatus.MANUAL_ACCEPT];
 
 /** How many candidates to score. Scoring costs a query each, so it is capped. */
 const MAX_CANDIDATES = 40;
@@ -60,6 +59,7 @@ export interface DealHunterResult {
 export class DealHunterService {
   private readonly logger = new Logger(DealHunterService.name);
   private readonly currency: string;
+  private readonly offerPolicy: OfferPolicy;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -67,6 +67,7 @@ export class DealHunterService {
     config: ConfigService,
   ) {
     this.currency = config.get<string>('pricing.fxBaseCurrency', 'EGP');
+    this.offerPolicy = { maxAgeDays: config.get<number>('pricing.offerMaxAgeDays', 7) };
   }
 
   async hunt(rawQuery: string, limit = 10): Promise<DealHunterResult> {
@@ -131,7 +132,7 @@ export class DealHunterService {
   private async findCandidates(parsed: ParsedQuery) {
     const where: Prisma.CanonicalProductWhereInput = {
       sourceListings: {
-        some: { priceUsd: { not: null }, matchStatus: { in: ACCEPTED_MATCHES } },
+        some: liveOfferWhere(this.offerPolicy),
       },
     };
 
@@ -171,7 +172,8 @@ export class DealHunterService {
         attributes: true,
         category: { select: { name: true } },
         sourceListings: {
-          where: { priceUsd: { not: null }, matchStatus: { in: ACCEPTED_MATCHES } },
+          // Live offers only: the same rule as the product page (offer-rules).
+          where: liveOfferWhere(this.offerPolicy),
           select: { priceUsd: true, inStock: true, platformId: true },
           orderBy: { priceUsd: 'asc' },
         },

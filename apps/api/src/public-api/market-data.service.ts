@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { CompetitorEventType, MatchStatus } from '@prisma/client';
+import { CompetitorEventType } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
+import { OfferPolicy, liveOfferWhere } from '../prices/offer-rules';
 import { PriceIntelligenceService } from '../intelligence/price-intelligence.service';
 import {
   computeHistoryStats,
@@ -69,6 +70,7 @@ export interface ProductMarketResponse {
 @Injectable()
 export class MarketDataService {
   private readonly currency: string;
+  private readonly offerPolicy: OfferPolicy;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -76,6 +78,7 @@ export class MarketDataService {
     config: ConfigService,
   ) {
     this.currency = config.get<string>('pricing.fxBaseCurrency', 'EGP');
+    this.offerPolicy = { maxAgeDays: config.get<number>('pricing.offerMaxAgeDays', 7) };
   }
 
   /**
@@ -159,8 +162,8 @@ export class MarketDataService {
     const listings = await this.prisma.sourceListing.findMany({
       where: {
         canonicalProductId: product.id,
-        priceUsd: { not: null },
-        matchStatus: { in: [MatchStatus.ACCEPTED, MatchStatus.MANUAL_ACCEPT] },
+        // Live offers only: the same rule as the product page (offer-rules).
+        ...liveOfferWhere(this.offerPolicy),
       },
       select: {
         platformId: true,
@@ -262,7 +265,7 @@ export class MarketDataService {
         ...(filters.brand ? { brand: { equals: filters.brand, mode: 'insensitive' } } : {}),
         ...(filters.categorySlug ? { category: { slug: filters.categorySlug } } : {}),
         sourceListings: {
-          some: { priceUsd: { not: null }, matchStatus: { in: [MatchStatus.ACCEPTED, MatchStatus.MANUAL_ACCEPT] } },
+          some: liveOfferWhere(this.offerPolicy),
         },
       },
       select: {

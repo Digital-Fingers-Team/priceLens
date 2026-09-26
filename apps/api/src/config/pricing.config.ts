@@ -17,4 +17,10 @@ export default registerAs('pricing', () => ({
   // purpose: FX rates move slowly and ingestion can persist hundreds of
   // listings per run, so this avoids a network round trip per listing.
   fxRatesCacheTtlMs: Number(process.env.FX_RATES_CACHE_TTL_MS ?? `${12 * 60 * 60 * 1000}`),
+  // An offer not seen by any scrape for this many days is not a current
+  // price: it is left out of best prices, statistics, search price
+  // filters/sorting and alerts (prices/offer-rules.ts, owner decision D-13).
+  offerMaxAgeDays: Number(process.env.OFFER_MAX_AGE_DAYS ?? '7'),
+  // The day boundary for daily price charts: the market the prices are in.
+  marketTimeZone: process.env.MARKET_TIME_ZONE ?? 'Africa/Cairo',
 }));

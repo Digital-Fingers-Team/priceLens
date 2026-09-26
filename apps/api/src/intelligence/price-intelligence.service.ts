@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { MatchStatus, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { EntitlementsService } from '../billing/entitlements.service';
 import {
@@ -16,9 +16,9 @@ import {
   forwardFillDailySeries,
 } from './price-statistics';
 import { DealScoreResult, computeDealScore } from './deal-score';
+import { OfferPolicy, liveOfferWhere, liveOffers } from '../prices/offer-rules';
+import { dayKey } from '../prices/price-history';
 
-/** Listings we will show a price from. Matches the rest of the app's rule. */
-const ACCEPTED_MATCHES: MatchStatus[] = [MatchStatus.ACCEPTED, MatchStatus.MANUAL_ACCEPT];
 
 export interface CurrentMarket {
   best: number | null;
@@ -48,6 +48,8 @@ export interface ProductIntelligence {
 export class PriceIntelligenceService {
   private readonly logger = new Logger(PriceIntelligenceService.name);
   private readonly currency: string;
+  private readonly offerPolicy: OfferPolicy;
+  private readonly marketTimeZone: string;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -58,6 +60,8 @@ export class PriceIntelligenceService {
     // deployment) under the legacy column name `price_usd`. Reporting the
     // real currency here is what stops the UI mislabelling every figure.
     this.currency = config.get<string>('pricing.fxBaseCurrency', 'EGP');
+    this.offerPolicy = { maxAgeDays: config.get<number>('pricing.offerMaxAgeDays', 7) };
+    this.marketTimeZone = config.get<string>('pricing.marketTimeZone', 'Africa/Cairo');
   }
 
   /**
@@ -133,16 +137,19 @@ export class PriceIntelligenceService {
     const rows = await this.prisma.$queryRaw<
       Array<{
         source_listing_id: string;
-        day: Date;
+        day: string;
         price: Prisma.Decimal;
         in_stock: boolean;
         last_seen_at: Date;
       }>
     >`
+      -- The listings matched onto the product now: not rejected junk, not
+      -- listings since moved to another product (audit 02, L-14).
       WITH listings AS (
-        SELECT DISTINCT source_listing_id
-        FROM price_history
-        WHERE canonical_product_id = ${productId}::text
+        SELECT sl.id AS source_listing_id
+        FROM source_listings sl
+        WHERE sl.canonical_product_id = ${productId}::text
+          AND sl.match_status IN ('ACCEPTED', 'MANUAL_ACCEPT')
       ),
       -- How recently each listing was actually observed. A listing that has
       -- stopped being scraped must stop contributing to the daily price, or
@@ -170,12 +177,13 @@ export class PriceIntelligenceService {
       within AS (
         SELECT ph.source_listing_id, ph.recorded_at, ph.price_usd, ph.in_stock
         FROM price_history ph
-        WHERE ph.canonical_product_id = ${productId}::text
-          AND ph.recorded_at >= ${since}
+        JOIN listings l ON l.source_listing_id = ph.source_listing_id
+        WHERE ph.recorded_at >= ${since}
           AND ph.price_usd > 0
       )
       SELECT c.source_listing_id,
-             date_trunc('day', c.recorded_at)::date AS day,
+             -- Market days, not UTC days: recorded_at holds UTC.
+             ((c.recorded_at AT TIME ZONE 'UTC') AT TIME ZONE ${this.marketTimeZone})::date::text AS day,
              c.price_usd                            AS price,
              c.in_stock,
              s.last_seen_at
@@ -188,46 +196,53 @@ export class PriceIntelligenceService {
 
     const changes: PriceChangePoint[] = rows.map((row) => ({
       sourceListingId: row.source_listing_id,
-      date: row.day.toISOString().slice(0, 10),
+      date: row.day,
       price: Number(row.price),
       inStock: row.in_stock,
     }));
 
     const lastSeenByListing = new Map<string, string>();
     for (const row of rows) {
-      lastSeenByListing.set(row.source_listing_id, row.last_seen_at.toISOString().slice(0, 10));
+      lastSeenByListing.set(row.source_listing_id, dayKey(row.last_seen_at, this.marketTimeZone));
     }
 
     // Never start the series before the window, even if a carried-forward row
     // is older; and never project past today.
-    const windowStart = since.toISOString().slice(0, 10);
+    const windowStart = dayKey(since, this.marketTimeZone);
     const firstObserved = changes[0].date;
     const from = firstObserved > windowStart ? firstObserved : windowStart;
 
     return forwardFillDailySeries(changes, {
       from,
-      to: new Date().toISOString().slice(0, 10),
+      to: dayKey(new Date(), this.marketTimeZone),
       lastSeenByListing,
     });
   }
 
-  /** Live prices across every store carrying the product. */
+  /**
+   * Live prices across every store carrying the product: the same live
+   * offers the product page shows (offer-rules), so the panel's "best" is
+   * the page's best price (audit 02, L-16).
+   */
   async getCurrentMarket(productId: string): Promise<CurrentMarket> {
-    const listings = await this.prisma.sourceListing.findMany({
+    const candidates = await this.prisma.sourceListing.findMany({
       where: {
         canonicalProductId: productId,
-        priceUsd: { not: null },
-        matchStatus: { in: ACCEPTED_MATCHES },
+        ...liveOfferWhere(this.offerPolicy),
       },
       select: {
         priceUsd: true,
         inStock: true,
         externalUrl: true,
         platformId: true,
+        rawTitle: true,
+        lastSeenAt: true,
+        matchStatus: true,
         platform: { select: { name: true } },
       },
-      orderBy: { priceUsd: 'asc' },
+      orderBy: [{ priceUsd: 'asc' }, { id: 'asc' }],
     });
+    const listings = liveOffers(candidates, this.offerPolicy);
 
     if (listings.length === 0) {
       return {
@@ -261,7 +276,7 @@ export class PriceIntelligenceService {
       // Distinct stores, not listings: one store with three variants listed
       // is still one store's worth of market coverage.
       storeCount: new Set(listings.map((listing) => listing.platformId)).size,
-      inStock: cheapest.inStock,
+      inStock: listings.some((listing) => listing.inStock === true) ? true : listings.every((listing) => listing.inStock === false) ? false : null,
       currency: this.currency,
       bestStore: {
         platformId: cheapest.platformId,
@@ -278,8 +293,7 @@ export class PriceIntelligenceService {
       by: ['platformId'],
       where: {
         canonicalProductId: productId,
-        priceUsd: { not: null },
-        matchStatus: { in: ACCEPTED_MATCHES },
+        ...liveOfferWhere(this.offerPolicy),
       },
       _min: { priceUsd: true },
     });
@@ -314,10 +328,8 @@ export class PriceIntelligenceService {
       where: {
         canonicalProductId: productId,
         advertisedPrice: { not: null },
-        priceUsd: { not: null },
-        matchStatus: { in: ACCEPTED_MATCHES },
-        // A stale "was" price is not evidence of a current sale.
-        lastSeenAt: { gte: new Date(Date.now() - 7 * 86_400_000) },
+        // A stale or sold-out "was" price is not evidence of a current sale.
+        ...liveOfferWhere(this.offerPolicy),
       },
       orderBy: { priceUsd: 'asc' },
       select: { advertisedPrice: true },
