@@ -15,7 +15,8 @@ import { UserRole } from '@prisma/client';
 import type { Request, Response } from 'express';
 import { Public, Roles } from '../common/decorators';
 import { TokenPayload } from '../auth/interfaces/auth.interfaces';
-import { AffiliateConfigService, UpsertAffiliateConfigInput } from './affiliate-config.service';
+import { AffiliateConfigService } from './affiliate-config.service';
+import { UpsertAffiliateConfigDto } from './dto/affiliate-config.dto';
 import { AffiliateService } from './affiliate.service';
 
 @Controller('affiliate')
@@ -63,7 +64,7 @@ export class AffiliateController {
   @Put('configs/:platformId')
   upsertConfig(
     @Param('platformId', ParseUUIDPipe) platformId: string,
-    @Body() body: UpsertAffiliateConfigInput,
+    @Body() body: UpsertAffiliateConfigDto,
   ) {
     return this.affiliateConfigService.upsert(platformId, body);
   }

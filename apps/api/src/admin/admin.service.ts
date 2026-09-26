@@ -4,6 +4,7 @@ import { PrismaService } from '../database/prisma.service';
 
 const MAX_PAGE_SIZE = 100;
 
+/** A moderator's decision on one review-queue item (validated by ResolveReviewItemDto). */
 export interface ResolveReviewItemInput {
   decision: 'ACCEPT' | 'REJECT';
   canonicalProductId?: string;
