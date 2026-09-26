@@ -1,7 +1,6 @@
 // apps/api/src/matching/semantic.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../database/prisma.service';
 
 @Injectable()
 export class SemanticService {
@@ -11,10 +10,7 @@ export class SemanticService {
   private readonly openRouterMatchModel: string;
   private readonly openRouterFallbackEnabled: boolean;
 
-  constructor(
-    private readonly config: ConfigService,
-    private readonly prisma: PrismaService,
-  ) {
+  constructor(private readonly config: ConfigService) {
     this.openRouterApiKey = this.config.get<string>('search.openRouterApiKey', '');
     this.openRouterBaseUrl = this.config.get<string>('search.openRouterBaseUrl', 'https://openrouter.ai/api/v1');
     this.openRouterMatchModel = this.config.get<string>('search.openRouterMatchModel', 'google/gemini-2.5-flash');
@@ -92,50 +88,5 @@ Respond with ONLY this JSON object and nothing else: {"same": true or false}`;
       this.logger.warn(`OpenRouter match-judgement call failed: ${(err as Error).message}`);
       return null;
     }
-  }
-
-  /**
-   * Compute cosine similarity between two embedding vectors, normalized to [0,1].
-   */
-  cosineSimilarity(a: number[], b: number[]): number {
-    if (a.length !== b.length) return 0;
-    let dot = 0, normA = 0, normB = 0;
-    for (let i = 0; i < a.length; i++) {
-      dot += a[i] * b[i];
-      normA += a[i] * a[i];
-      normB += b[i] * b[i];
-    }
-    if (normA === 0 || normB === 0) return 0;
-    const cosine = dot / (Math.sqrt(normA) * Math.sqrt(normB));
-    return (cosine + 1) / 2;
-  }
-
-  /**
-   * Fetch the stored embedding of a canonical product. Raw query because Prisma
-   * doesn't natively support the pgvector column type.
-   */
-  async getCanonicalEmbedding(productId: string): Promise<number[] | null> {
-    const result = await this.prisma.$queryRaw<Array<{ embedding: string }>>`
-      SELECT title_embedding::text as embedding
-      FROM canonical_products
-      WHERE id = ${productId}
-      AND title_embedding IS NOT NULL
-    `;
-
-    if (result.length === 0 || !result[0].embedding) return null;
-    return JSON.parse(result[0].embedding) as number[];
-  }
-
-  /**
-   * Store a computed embedding for a canonical product so future ingestion
-   * passes don't need to re-embed every existing candidate's title.
-   */
-  async storeCanonicalEmbedding(productId: string, embedding: number[]): Promise<void> {
-    const vectorStr = `[${embedding.join(',')}]`;
-    await this.prisma.$executeRaw`
-      UPDATE canonical_products
-      SET title_embedding = ${vectorStr}::vector
-      WHERE id = ${productId}
-    `;
   }
 }

@@ -99,12 +99,17 @@ Severity: P0 broken/unsafe · P1 real user/business harm · P2 polish.
 - Fix: do the same term matching in SQL, with `LIMIT`.
 
 **B-11 — OpenAPI is incomplete and untested.**
-- No DTO property schemas: the Swagger CLI plugin is not enabled. Tags exist for 8 of 17 controllers, and nothing checks the document matches the routes.
+- The `@nestjs/swagger` CLI plugin is enabled in `nest-cli.json`, so `nest build` adds DTO schemas. But:
+  - comment introspection is off, so the field docs written in the DTOs never reach the document;
+  - tags exist for 8 of 17 controllers;
+  - the Stripe webhook shows up as a normal endpoint;
+  - nothing builds the document outside a running dev server, and nothing checks it matches the routes.
 - Fix:
-  - Enable the `@nestjs/swagger` CLI plugin (already installed) with comment introspection.
-  - Tag every controller, and set `@ApiExcludeController` on the Stripe webhook.
-  - `pnpm openapi` writes `docs/openapi.json`.
-  - A test checks that every registered route is in the document and that the committed file is current.
+  - Turn on `introspectComments` and tag every controller.
+  - Exclude the Stripe webhook with `@ApiExcludeController`.
+  - Build the document in one shared function (main.ts and tests).
+  - Commit it as `docs/openapi.json`.
+  - A test, run with the same plugin as a ts-jest transformer, checks that every registered route is in the document and that the committed file is current.
 
 **B-12 — Most endpoints have no integration test.**
 - Existing API tests cover auth, alerts, ingestion concurrency, raw queries, variant repair and smoke flows.
@@ -171,7 +176,16 @@ Severity: P0 broken/unsafe · P1 real user/business harm · P2 polish.
 
 ## Query plans
 
-Recorded in the Fix log below (B-10, and the hot paths: search, product page, price history).
+Benchmark database: `pricelens_bench` on the dev Postgres, migrated to 43ff342 and seeded with the medium profile (5,000 products, 37,500 listings, 2.1 M price-history rows). Measured with `EXPLAIN (ANALYZE, BUFFERS)`, JIT off; the script is `bench.sql` in the work folder.
+
+| Query | Before GiST | After GiST | Plan after |
+|---|---|---|---|
+| Reconciliation neighbours (k=5, threshold 0.5, 500 pairs), `reconciliation.service.ts:181` | **46,688 ms** | **11,557 ms** | Index Scan using `canonical_products_title_trgm_gist_idx`, 2.3 ms × 5,000 loops |
+| Ingestion candidate pool (top 200 in a 680-product category), `ingestion.repository.ts:176` | 5.8 ms | 5.5 ms | category index + top-N heapsort; the category is small, so the planner rightly skips the GiST index |
+| Price history, one product, 90 days (chart) | 3.4 ms cold | 0.2 ms warm | Bitmap Index Scan on `price_history_product_recorded_price_idx` |
+
+- Reconciliation is 4× faster. What is left is the per-row `category_id` filter: the GiST scan walks titles nearest first and discards other categories' rows. A composite `(category_id, normalized_title)` GiST index would need the `btree_gist` extension. 11.6 s for an hourly job is acceptable at this size, so phase 08 revisits it with production row counts.
+- Search and suggest filter on an expression over `concat_ws(title, brand, model, slug)`, so no trigram index can serve their `LIKE`. At 5,000 products they answer in tens of milliseconds. An expression index is phase 08 work once production volumes justify it.
 
 ## Fix log
 

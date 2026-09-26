@@ -241,6 +241,14 @@ model CanonicalProduct {
   @@index([gtin])
   @@index([normalizedTitle])
   @@index([lastCoverageAttemptAt])
+  // Declared so `prisma migrate diff` stops proposing to drop them (B-09);
+  // created by migrations 20260605000000 and 20260926100000. Search matches
+  // titles with LIKE through the GIN index; reconciliation orders neighbours
+  // by trigram distance (<->), which only a GiST index can serve (B-22).
+  // The HNSW index on title_embedding cannot be expressed here (Unsupported
+  // column); the schema drift test allows exactly that one.
+  @@index([normalizedTitle(ops: raw("gin_trgm_ops"))], map: "canonical_products_title_trgm_idx", type: Gin)
+  @@index([normalizedTitle(ops: raw("gist_trgm_ops"))], map: "canonical_products_title_trgm_gist_idx", type: Gist)
   @@map("canonical_products")
 }
 
@@ -306,6 +314,7 @@ model SourceListing {
   @@index([matchStatus])
   @@index([normalizedTitle])
   @@index([extractedGtin])
+  @@index([rawTitle(ops: raw("gin_trgm_ops"))], map: "source_listings_raw_title_trgm_idx", type: Gin)
   @@map("source_listings")
 }
 
@@ -316,7 +325,9 @@ model PriceHistory {
   canonicalProductId String   @map("canonical_product_id")
   sourceListingId    String   @map("source_listing_id")
   priceUsd           Decimal  @map("price_usd") @db.Decimal(12, 2)
-  currency           String   @default("USD") @db.VarChar(3)
+  // Every write sets it to the base currency; the default only matters if one
+  // ever forgets, and then it must not silently mean dollars (L-23, B-15).
+  currency           String   @default("EGP") @db.VarChar(3)
   originalPrice      Decimal? @map("original_price") @db.Decimal(12, 2)
   inStock            Boolean  @default(true) @map("in_stock")
   recordedAt         DateTime @default(now()) @map("recorded_at")
@@ -326,6 +337,9 @@ model PriceHistory {
 
   @@index([canonicalProductId, recordedAt])
   @@index([sourceListingId, recordedAt])
+  @@index([canonicalProductId, recordedAt, priceUsd], map: "price_history_product_recorded_price_idx")
+  @@index([sourceListingId, recordedAt, priceUsd], map: "price_history_listing_recorded_price_idx")
+  @@index([recordedAt], map: "price_history_recorded_at_brin_idx", type: Brin)
   @@map("price_history")
 }
 
