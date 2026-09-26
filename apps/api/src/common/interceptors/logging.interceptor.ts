@@ -10,6 +10,7 @@ import { Observable } from 'rxjs';
 import { tap, catchError } from 'rxjs/operators';
 import { throwError } from 'rxjs';
 import { requestIdOf } from '../request-id.middleware';
+import { redactUrl } from '../redact-url';
 
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
@@ -17,7 +18,8 @@ export class LoggingInterceptor implements NestInterceptor {
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const req = context.switchToHttp().getRequest();
-    const { method, url, ip } = req;
+    const { method, ip } = req;
+    const url = redactUrl(req.url);
     const requestId = requestIdOf(req);
 
     const startTime = Date.now();

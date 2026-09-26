@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import type { Request, Response } from 'express';
 import type { ApiErrorBody, ApiErrorCode, ApiErrorResponse } from '../errors/api-error';
 import { requestIdOf } from '../request-id.middleware';
+import { redactUrl } from '../redact-url';
 
 const STATUS_CODES: Record<number, ApiErrorCode> = {
   [HttpStatus.BAD_REQUEST]: 'BAD_REQUEST',
@@ -43,7 +44,7 @@ export class ApiExceptionFilter implements ExceptionFilter {
 
     const mapped = this.map(exception);
     const requestId = requestIdOf(request);
-    const route = `${request.method} ${request.url} [${requestId}]`;
+    const route = `${request.method} ${redactUrl(request.url)} [${requestId}]`;
     if (mapped.status >= 500) {
       this.logger.error(`${route} → ${mapped.status}: ${describe(exception)}`, (exception as Error)?.stack);
     } else {
