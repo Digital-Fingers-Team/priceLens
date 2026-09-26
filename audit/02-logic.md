@@ -1,7 +1,7 @@
 # Audit 02 — Business logic correctness
 
 Date: 2026-09-26 · Branch `feat/price-intelligence-platform` · Started from `phase-01-done` (`f3f7dab`)
-Status: **IN PROGRESS**.
+Status: **DONE**. Tag `phase-02-done`. (Steps 1-6 by a phase agent; steps 7-11 finished directly after it was stopped to save tokens.)
 
 ## How this was run
 
@@ -146,3 +146,85 @@ Each step is its own commit; the full api gate (and the web gate when the web ch
 9. Search normalization and ranking tests (L-15, L-24).
 10. Repair tool (L-04).
 11. Docs (L-21), ARCHITECTURE, this audit completed.
+
+## Status by finding
+
+| Finding | Status | Commit |
+|---|---|---|
+| L-01 RAM/storage extraction | Fixed | `1b8f86c` |
+| L-02 unknown variant compatible with any | Fixed | `1b8f86c` |
+| L-03 candidate pool and ties depend on row order | Fixed | `1b8f86c` |
+| L-04 mixed products already in production | Fixed (tool); running it in prod: **Needs decision** (D-12) | `603539f` |
+| L-05 golden set, precision/recall | Fixed | `694a70c`, `1b8f86c` |
+| L-06 reconciliation/judge contradict D-6 | Fixed | `1b8f86c` |
+| L-07 pack/size/bundle/year/accessory-kind guards | Fixed | `1b8f86c` |
+| L-08 Arabic normalization (matching) | Fixed | `1b8f86c` |
+| L-09 color extraction, offer color | Fixed (api `71f7ff3`, web `8fb4538`) | |
+| L-10 stale offers as current prices | Fixed; window is D-13 | `71f7ff3` |
+| L-11 sold-out listings keep price | Fixed | `2e64f81` |
+| L-12 duplicate offers | Fixed | `71f7ff3` |
+| L-13 all-time / 52-week stats | Fixed | `71f7ff3` |
+| L-14 price history chart | Fixed | `71f7ff3` |
+| L-15 search: live offers, Arabic queries | Fixed | `71f7ff3`, `0640050` |
+| L-16 intelligence best price | Fixed | `71f7ff3` |
+| L-17 alerts | Fixed | `2d6c8de` |
+| L-18 unknown currency 1:1 | Fixed | `2e64f81` |
+| L-19 concurrency | Fixed | `2e64f81` |
+| L-20 web Best Deal | Fixed | `8fb4538` |
+| L-21 pipeline documentation | Fixed: `docs/matching-pipeline.md` | docs commit |
+| L-22 per-color GTINs | **Needs decision** (D-14) | |
+| L-23 `price_history.currency` default | Deferred → phase 03 | |
+| L-24 search relevance tests | Fixed | `0640050` |
+
+## After
+
+| Check | phase-01-done | phase-02-done |
+|---|---|---|
+| Golden set forward (109 listings) | precision 0.5234 / recall 0.5333, 5 mixed products | **precision 1.0000 / recall 0.9333**, 0 mixed |
+| Golden set reversed | 0.4758 / 0.5619, 6 mixed | **1.0000 / 0.9333**, 0 mixed (order no longer matters) |
+| Holdout (24, never tuned on) | 1.0000 / 0.1250 | **1.0000 / 0.6250** |
+| Production A57 titles (unit test) | one product, 8GB + 12GB | planner splits 6 × 12GB kept / 5 × 8GB moved |
+| Search ranking, 20 real queries (7 Arabic) | not tested | 20/20 (two failed first: a PS5 controller outranked the console → "controller"/"gamepad" added to accessory words) |
+| api unit / integration / e2e | 343 / 16 / 12 | see final gate |
+
+Final gate: see the phase-02 tag commit message.
+
+## Summary
+
+- F-17 is fixed at the root. RAM and storage are read in every format stores use (Arabic included). A listing with an unknown variant can no longer join a product of a different variant. Candidate choice and tie-breaks no longer depend on database row order.
+- Matching precision on the golden set went from 0.52 to 1.00, and recall from 0.53 to 0.93. The golden set runs in CI.
+- One definition of a live offer (fresh, in stock, deduplicated, no outliers) now drives the product page, search, the intelligence panel and alerts. "Best Deal", all-time/52-week stats, the price chart and alerts are now mathematically honest.
+- Alerts fire exactly once, against the right baseline.
+- Unknown currencies are rejected instead of priced 1:1. Concurrent jobs can't duplicate products or price points.
+- Colors stay combined (D-6), and every offer now carries its color for the phase 06 filter.
+- Search understands Arabic spellings, Arabic digits and Arabic brand names, backed by 20 real-query ranking tests.
+- A repair tool (dry-run, apply, rollback) can split existing mixed products once the fixed matcher is deployed.
+
+## Remaining items
+
+- L-22 (D-14) and running the repair in production (D-12) wait for the owner.
+- L-23 is deferred to phase 03.
+
+## Handoff → other phases
+
+- **03 Backend**
+  - L-23: the `price_history.currency` default is `USD`.
+  - Backfill `canonical_products.normalized_title` with the phase 02 normalizer, so products stored earlier (Arabic titles) match English queries through it. Until then they match through their raw title only.
+  - `suggest()` loads every product into memory on each keystroke (also relevant to 08).
+- **06 UX**
+  - Color filter on the product page, using `color` on each offer (D-6).
+- **08 Optimization**
+  - The Arabic-aware search adds `translate`/`regexp_replace` over titles; measure it with the 0.5-0.7 s p50 baseline from phase 01. A functional index on the normalized expression, or a stored column, is the likely fix.
+- **10 DevOps**
+  - The per-family matching lock is in-process. The workers split (D-9) must keep a single consumer per family, or move the lock to Postgres advisory locks.
+
+## Decisions for Baraa
+
+- **D-11 — Production numbers.** The session's safety policy refused even read-only production queries, so this audit has no count of affected products. **Recommendation:** after deploying, run the repair tool's dry run (D-12); it reports every mixed product without changing anything.
+- **D-12 — Repair existing mixed products in production.** Only after the phase 02 matcher is deployed; otherwise live ingestion re-merges them. **Recommendation:** after the D-10 deploy, from `~/pricelens/apps/api` inside the API container, run:
+  - `npx ts-node scripts/ops/repair-variant-mixes.ts` (dry run: review the list)
+  - `npx ts-node scripts/ops/repair-variant-mixes.ts --apply` (writes a rollback file to `backups/`)
+  - If needed: `npx ts-node scripts/ops/repair-variant-mixes.ts --rollback <file>`
+- **D-13 — "Stale" offer window: 7 days (`OFFER_MAX_AGE_DAYS`).** An offer not seen by a scrape for 7 days stops counting as a current price, so it can no longer be "Best Deal" or trigger alerts. The risk: not every product is re-scraped regularly. Coverage sweeps only expand under-covered products, and many products are refreshed only when someone searches for them. A rarely searched product can therefore show **no offers** after 7 days. I could not measure how many (D-11).
+  - **Recommendation:** deploy with 7. The day after, count products with zero live offers (a read-only query). If it's a meaningful share, raise the window to 14 through the env var (no code change), and have phase 10 schedule a refresh for products whose newest offer is older than 5 days.
+- **D-14 — Per-color GTINs.** Some stores publish a GTIN per color, and the identifier guard keeps different GTINs apart, so those colors stay separate products, contrary to D-6. Relaxing the guard risks merging different SKUs with near-identical titles (seen with Elaraby remotes). **Recommendation:** leave as is for now. Revisit with data after the color filter ships (phase 06): a product family with only color-differing GTINs could then be merged on purpose.

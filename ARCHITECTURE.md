@@ -142,7 +142,7 @@ flowchart TB
 
 Guarantees and known gaps:
 
-- **Behavior is pinned** by `test/e2e/matching-characterization.e2e-spec.ts`: about 60 listings through the real pipeline and database, snapshotting where each one lands. A refactor must leave the snapshot unchanged; a deliberate matching change updates it, and the diff is the review. Each step also has unit tests (`test/unit/matching-pipeline.spec.ts`).
+- **Behavior is pinned** by `test/e2e/matching-characterization.e2e-spec.ts`: about 60 listings through the real pipeline and database, snapshotting where each one lands. A refactor must leave the snapshot unchanged; a deliberate matching change updates it, and the diff is the review. Each step also has unit tests (`test/unit/matching-pipeline.spec.ts`). Every step's input, output, assumptions and failure modes: [docs/matching-pipeline.md](docs/matching-pipeline.md).
 - **Ties:** candidates come from an unordered query (`findMany`, 200 per category) and the ranking sort is stable, so equal scores go to whichever row Postgres returns first. This bites when a title's RAM can't be read (F-17, phase 02).
 - **Duplicate reconciliation** (`ReconciliationService`, hourly) re-checks stored products with its *own* guard list, which differs from step 8 (it treats color as a conflict, and skips the product-type and chip guards). Phase 02 aligns them.
 
