@@ -28,3 +28,10 @@ LCP < 2.5s on mid-range mobile 4G · INP < 200ms · CLS < 0.1 · home route JS �
 
 ## Definition of done
 Before/after table for every metric. Budgets met or gaps explained. No regressions in tests or matching precision. `audit/08-optimization.md` written.
+
+## Carried over (recorded 2026-09-26)
+- **D-16 (approved):** drop `canonical_products.title_embedding` and its HNSW index with a migration, after confirming in prod that nothing reads it.
+- Product pages have never been cached: prod answers `cache-control: no-store`, and the route builds as `ƒ`, so `revalidate = 300` has no effect. Make them ISR (e.g. `generateStaticParams` returning `[]`) plus on-demand revalidation when ingestion changes a price (A-13).
+- `/products/[slug]` first-load JS is 271 kB: load Recharts lazily. Recharts 2.x is deprecated upstream.
+- **D-20 (owner: keep CSP as is for now):** revisit CSP nonces together with the caching decision.
+- **D-15 (owner: "not yet"):** the normalized-title backfill in prod. Ask again after measuring search quality.

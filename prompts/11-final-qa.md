@@ -15,3 +15,7 @@ Act as a skeptical QA lead who didn't write any of this. Trust nothing marked "F
 - Blockers (P0/P1) with location.
 - Metrics snapshot (performance, matching precision/recall, test counts).
 - Consolidated "Decisions for Baraa" from all phases, deduplicated, each with a recommendation.
+
+## Carried over (recorded 2026-09-26)
+- **D-14 (left as is):** per-color GTINs keep some colors as separate products. Revisit with data now that the color filter exists (phase 06).
+- Re-check every "Decisions for Baraa" item in audit/00–10 and list anything still open for the owner.

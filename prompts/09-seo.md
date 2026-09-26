@@ -27,3 +27,7 @@ Open Graph + Twitter cards; dynamic OG images (next/og) for product pages with b
 
 ## Definition of done
 Every indexable page has unique metadata, canonical, valid structured data. Sitemap and robots correct. Crawl the local site (e.g. a crawler script) with zero broken links. `audit/09-seo.md` written.
+
+## Carried over (recorded 2026-09-26)
+- `sitemap.ts` lists `/watchlist`, a private per-user page with nothing to index. Remove it (`/collections` is already gone).
+- Unknown products are real 404s since phase 05; check that search engines drop the old soft-404 URLs.
