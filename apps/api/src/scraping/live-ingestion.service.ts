@@ -7,6 +7,7 @@ import { ConnectorRegistry } from './connectors/connector.registry';
 import type { RetailerConnector } from './interfaces/retailer-connector.interface';
 import { IngestionRepository } from './ingestion/ingestion.repository';
 import { ListingProcessor } from './ingestion/listing-processor.service';
+import { StoreCallGuard, StoreUnavailableError } from './ingestion/store-call-guard';
 import { buildProductQuery, buildQueriesForCategory, pickCategoryForQuery } from './ingestion/search-queries';
 
 export interface LiveIngestionOptions {
@@ -24,6 +25,10 @@ export interface IngestionSummary {
   canonicalProductsCreated: number;
   canonicalProductsMatched: number;
   priceHistoryEntries: number;
+  /** Queries that failed even after a retry; the run moved on to the next one. */
+  queriesFailed: number;
+  /** Listings that failed to process; the run moved on to the next one. */
+  listingsFailed: number;
 }
 
 export interface IngestionReport {
@@ -50,6 +55,7 @@ export class LiveIngestionService {
     private readonly connectors: ConnectorRegistry,
     private readonly normalizer: NormalizerService,
     private readonly configService: ConfigService,
+    private readonly storeCalls: StoreCallGuard,
   ) {}
 
   async runLiveIngestion(options: LiveIngestionOptions = {}): Promise<IngestionReport> {
@@ -84,6 +90,7 @@ export class LiveIngestionService {
             categoryQueries,
             { categoryCount: categories.length },
             touchedProductIds,
+            { emptyIsFailure: true },
           ),
         );
       } catch (error) {
@@ -147,6 +154,7 @@ export class LiveIngestionService {
             [{ category, queries: [trimmedQuery] }],
             {},
             touchedProductIds,
+            { emptyIsFailure: false },
           ),
         );
       } catch (error) {
@@ -205,6 +213,10 @@ export class LiveIngestionService {
       skipped.push({ slug: platform.slug, reason: 'connector_disabled' });
       return null;
     }
+    if (this.storeCalls.isPaused(platform.slug)) {
+      skipped.push({ slug: platform.slug, reason: 'circuit_open' });
+      return null;
+    }
     return connector;
   }
 
@@ -215,6 +227,7 @@ export class LiveIngestionService {
     categoryQueries: Array<{ category: Category; queries: string[] }>,
     extraPayload: Record<string, unknown> = {},
     touchedProductIds?: Set<string>,
+    searchOptions: { emptyIsFailure: boolean } = { emptyIsFailure: false },
   ): Promise<IngestionSummary> {
     const jobId = await this.repository.startJob(platform.id, {
       connector: connector.slug,
@@ -232,6 +245,8 @@ export class LiveIngestionService {
       canonicalProductsCreated: 0,
       canonicalProductsMatched: 0,
       priceHistoryEntries: 0,
+      queriesFailed: 0,
+      listingsFailed: 0,
     };
 
     const seenExternalIds = new Set<string>();
@@ -241,7 +256,18 @@ export class LiveIngestionService {
         for (const query of queries) {
           summary.queriesRun += 1;
 
-          const listings = await connector.searchListings(query, limitPerQuery);
+          // One failed query no longer ends the store's whole run (B-07): it
+          // is retried once, then skipped. Only a paused store (circuit
+          // open) stops the run, by throwing out of the loop.
+          let listings;
+          try {
+            listings = await this.storeCalls.search(connector, query, limitPerQuery, searchOptions);
+          } catch (error) {
+            if (error instanceof StoreUnavailableError) throw error;
+            summary.queriesFailed += 1;
+            this.logger.warn(`${connector.slug} query "${query}" failed: ${(error as Error).message}`);
+            continue;
+          }
 
           for (const listing of listings) {
             if (seenExternalIds.has(listing.externalId)) {
@@ -260,7 +286,15 @@ export class LiveIngestionService {
 
             summary.listingsDiscovered += 1;
 
-            const result = await this.processor.process(platform, category, listing, connector.slug);
+            let result;
+            try {
+              result = await this.processor.process(platform, category, listing, connector.slug);
+            } catch (error) {
+              // One bad listing (a constraint, a malformed field) must not end the run.
+              summary.listingsFailed += 1;
+              this.logger.error(`Processing ${connector.slug} listing ${listing.externalId} failed`, error as Error);
+              continue;
+            }
             if (!result) {
               continue;
             }
@@ -342,12 +376,12 @@ export class LiveIngestionService {
           continue;
         }
         const connector = this.connectors.get(platform.slug);
-        if (!connector) {
+        if (!connector || this.storeCalls.isPaused(platform.slug)) {
           continue;
         }
 
         try {
-          const listings = await connector.searchListings(query, limitPerQuery);
+          const listings = await this.storeCalls.search(connector, query, limitPerQuery);
           const summary = summaryBySlug.get(platform.slug);
 
           for (const listing of listings) {

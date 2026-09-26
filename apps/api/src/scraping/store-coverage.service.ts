@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { NormalizerService } from '../matching/normalizer.service';
 import { hasUsablePrice } from '../matching/pipeline';
 import { ConnectorRegistry } from './connectors/connector.registry';
-import { ConnectorCircuitBreaker } from './ingestion/connector-circuit-breaker';
+import { StoreCallGuard } from './ingestion/store-call-guard';
 import { IngestionRepository } from './ingestion/ingestion.repository';
 import { ListingProcessor } from './ingestion/listing-processor.service';
 import { buildProductQuery } from './ingestion/search-queries';
@@ -20,17 +20,13 @@ export class StoreCoverageService {
   /** Guards against two scheduled coverage sweeps overlapping. */
   private coverageSweepInFlight = false;
 
-  private readonly breaker = new ConnectorCircuitBreaker(() => ({
-    threshold: Math.max(1, this.configService.get<number>('retailers.connectorFailureThreshold', 5)),
-    cooldownMinutes: Math.max(1, this.configService.get<number>('retailers.connectorCooldownMinutes', 30)),
-  }));
-
   constructor(
     private readonly repository: IngestionRepository,
     private readonly processor: ListingProcessor,
     private readonly connectors: ConnectorRegistry,
     private readonly normalizer: NormalizerService,
     private readonly configService: ConfigService,
+    private readonly storeCalls: StoreCallGuard,
   ) {}
 
   /**
@@ -96,24 +92,15 @@ export class StoreCoverageService {
       if (!connector) {
         continue;
       }
-      if (this.breaker.isInCooldown(platform.slug)) {
+      if (this.storeCalls.isPaused(platform.slug)) {
         continue;
       }
 
       try {
-        const listings = await connector.searchListings(query, limitPerQuery);
-        // A connector that returns nothing at all is the signal we can act on:
-        // the blocked paths (CAPTCHA wall, bot shell, changed markup) log and
-        // return an empty array rather than throwing, so counting only
-        // exceptions would never trip the breaker on exactly the stores that
-        // are costing the most and returning the least. Any non-empty result
-        // means the connector is working, even if nothing merges onto this
-        // product -- a store simply not carrying an item is not a failure.
-        if (listings.length === 0) {
-          this.breaker.recordFailure(platform.slug, 'returned no listings');
-        } else {
-          this.breaker.recordSuccess(platform.slug);
-        }
+        // An empty answer is neutral here (a store may simply not carry the
+        // product); blocked stores are caught by the category sweep, whose
+        // broad queries always get results from a working store.
+        const listings = await this.storeCalls.search(connector, query, limitPerQuery);
         let coveredByThisStore = false;
 
         for (const listing of listings) {
@@ -135,7 +122,6 @@ export class StoreCoverageService {
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        this.breaker.recordFailure(platform.slug, message);
         this.logger.warn(`Store expansion for "${query}" on ${platform.slug} failed: ${message}`);
       }
     }

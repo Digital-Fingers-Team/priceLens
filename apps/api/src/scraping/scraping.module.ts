@@ -9,6 +9,7 @@ import {
 } from './connectors/connector.registry';
 import { IngestionRepository } from './ingestion/ingestion.repository';
 import { ListingProcessor } from './ingestion/listing-processor.service';
+import { StoreCallGuard } from './ingestion/store-call-guard';
 import { LiveIngestionService } from './live-ingestion.service';
 import { StoreCoverageService } from './store-coverage.service';
 
@@ -29,6 +30,7 @@ import { StoreCoverageService } from './store-coverage.service';
     ConnectorRegistry,
     IngestionRepository,
     ListingProcessor,
+    StoreCallGuard,
     LiveIngestionService,
     StoreCoverageService,
   ],

@@ -68,6 +68,10 @@ export default registerAs('retailers', () => ({
   // being retried for every product in the batch.
   connectorFailureThreshold: parseInt(process.env.CONNECTOR_FAILURE_THRESHOLD ?? '5', 10),
   connectorCooldownMinutes: parseInt(process.env.CONNECTOR_COOLDOWN_MINUTES ?? '30', 10),
+  // Minimum gap between two searches sent to the same store, and the wait
+  // before the one retry of a search that threw (StoreCallGuard, B-07).
+  storeMinRequestIntervalMs: parseInt(process.env.STORE_MIN_REQUEST_INTERVAL_MS ?? '2000', 10),
+  storeRetryDelayMs: parseInt(process.env.STORE_RETRY_DELAY_MS ?? '3000', 10),
   amazonEnabled: process.env.AMAZON_ENABLED !== 'false',
   // Egypt storefront -- amazon.com doesn't carry OPPO phones (and most of the
   // catalog this app cares about) at all; confirmed live that amazon.eg does,
