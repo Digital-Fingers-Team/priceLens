@@ -5,34 +5,32 @@ import { cn } from '@/lib/utils/cn';
 // boundary.
 
 export type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline';
-export type Size    = 'xs' | 'sm' | 'md' | 'lg';
+export type Size = 'sm' | 'md' | 'lg';
+
+// Controls share heights: sm 32, md 40, lg 48 (inputs and selects too).
+export const controlHeight: Record<Size, string> = {
+  sm: 'h-8',
+  md: 'h-10',
+  lg: 'h-12',
+};
 
 const variantStyles: Record<Variant, string> = {
-  primary:
-    'bg-signal text-ink-950 font-semibold hover:bg-signal-dim active:scale-[0.98] shadow-[0_0_20px_rgba(0,255,136,0.15)]',
-  secondary:
-    'bg-ink-700 text-ink-100 hover:bg-ink-600 border border-ink-600',
-  ghost:
-    'bg-transparent text-ink-300 hover:bg-ink-800 hover:text-ink-100',
-  danger:
-    'bg-danger/10 text-danger border border-danger/30 hover:bg-danger/20',
-  outline:
-    'bg-transparent border border-ink-600 text-ink-200 hover:border-signal/50 hover:text-signal',
+  primary: 'bg-brand text-brand-fg hover:bg-brand-hover active:bg-brand-hover',
+  secondary: 'border border-border bg-surface text-fg hover:bg-surface-2 active:bg-surface-2',
+  ghost: 'text-muted hover:bg-surface-2 hover:text-fg active:bg-surface-2',
+  outline: 'border border-border-strong text-fg hover:border-brand hover:text-brand active:bg-surface-2',
+  danger: 'border border-danger/40 bg-danger-soft text-danger hover:border-danger active:bg-danger-soft',
 };
 
 const sizeStyles: Record<Size, string> = {
-  xs: 'h-7  px-2.5 text-xs  gap-1.5',
-  sm: 'h-8  px-3   text-sm  gap-2',
-  md: 'h-10 px-4   text-sm  gap-2',
-  lg: 'h-12 px-6   text-base gap-2.5',
+  sm: 'px-3 gap-2',
+  md: 'px-4 gap-2',
+  lg: 'px-6 gap-2 text-sm',
 };
 
-const baseStyles = [
-  'inline-flex items-center justify-center rounded-lg font-medium',
-  'transition-all duration-150 focus-visible:outline-none',
-  'focus-visible:ring-2 focus-visible:ring-signal/50 focus-visible:ring-offset-2',
-  'focus-visible:ring-offset-ink-950 disabled:opacity-40 disabled:cursor-not-allowed',
-];
+// Mono uppercase labels on buttons (the owner's reference card).
+const baseStyles =
+  'inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded font-mono text-xs font-medium uppercase tracking-wider transition-colors disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50';
 
 /**
  * Button styling for elements that are not buttons -- chiefly a `<Link>` that
@@ -44,5 +42,15 @@ export function buttonClassName({
   size = 'md',
   className,
 }: { variant?: Variant; size?: Size; className?: string } = {}) {
-  return cn(...baseStyles, variantStyles[variant], sizeStyles[size], className);
+  return cn(baseStyles, controlHeight[size], variantStyles[variant], sizeStyles[size], className);
+}
+
+/** Square icon-only button of the same heights. */
+export function iconButtonClassName({
+  variant = 'ghost',
+  size = 'md',
+  className,
+}: { variant?: Variant; size?: Size; className?: string } = {}) {
+  const square: Record<Size, string> = { sm: 'w-8', md: 'w-10', lg: 'w-12' };
+  return cn(baseStyles, controlHeight[size], square[size], variantStyles[variant], 'px-0', className);
 }

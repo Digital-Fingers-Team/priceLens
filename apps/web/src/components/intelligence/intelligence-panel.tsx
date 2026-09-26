@@ -1,14 +1,15 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
-import { Activity } from 'lucide-react';
-import { useProductIntelligence } from '@/lib/hooks/use-intelligence';
-import { useEntitlements } from '@/lib/hooks/use-billing';
-import { useAuthStore } from '@/lib/store/auth.store';
-import { Skeleton } from '@/components/ui/skeleton';
 import { UpgradePrompt } from '@/components/billing/upgrade-prompt';
-import { FEATURES } from '@/types/billing.types';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ErrorState } from '@/components/ui/state';
+import { useEntitlements } from '@/lib/hooks/use-billing';
+import { useProductIntelligence } from '@/lib/hooks/use-intelligence';
+import { usePathname } from '@/lib/i18n/navigation';
+import { useI18n } from '@/lib/i18n/provider';
+import { useAuthStore } from '@/lib/store/auth.store';
 import { loginHref } from '@/lib/utils/next-path';
+import { FEATURES } from '@/types/billing.types';
 import { BuyVerdictCard } from './buy-verdict-card';
 import { DealScoreCard } from './deal-score-card';
 import { DiscountCheckCard } from './discount-check-card';
@@ -22,103 +23,70 @@ import { DiscountCheckCard } from './discount-check-card';
  * fake-discount check are the paid surfaces.
  */
 export function IntelligencePanel({ productId }: { productId: string }) {
+  const { t, tf } = useI18n();
   const pathname = usePathname();
   const isAuthenticated = useAuthStore((s) => Boolean(s.user));
   const { hasFeature, isLoading: entitlementsLoading } = useEntitlements();
-  const { data, isLoading, isError, error } = useProductIntelligence(
-    isAuthenticated ? productId : undefined,
+  const { data, isLoading, isError } = useProductIntelligence(isAuthenticated ? productId : undefined);
+
+  const heading = (
+    <h2 id="intel-heading" className="text-lg font-semibold text-fg">
+      {t.intel.heading}
+    </h2>
   );
 
+  let body: React.ReactNode;
   if (!isAuthenticated) {
-    return (
-      <section aria-labelledby="intel-heading" className="space-y-3">
-        <Heading />
-        <UpgradePrompt
-          title="Sign in to see whether now is a good time to buy"
-          description="PriceLens compares this price against the history we have recorded ourselves and tells you whether to buy or wait. Free with an account."
-          action={{ href: loginHref(pathname ?? '/'), label: 'Sign in' }}
-        />
-      </section>
-    );
-  }
-
-  if (isLoading || entitlementsLoading) {
-    return (
-      <section aria-labelledby="intel-heading" className="space-y-3">
-        <Heading />
-        <Skeleton className="h-40 w-full rounded-xl" />
-        <Skeleton className="h-64 w-full rounded-xl" />
-      </section>
-    );
-  }
-
-  if (isError || !data) {
-    return (
-      <section aria-labelledby="intel-heading" className="space-y-3">
-        <Heading />
-        <div className="rounded-xl border border-red-500/25 bg-red-500/5 p-5">
-          <p className="text-sm font-medium text-red-300">Could not load buying intelligence</p>
-          <p className="mt-1 text-sm text-ink-400">
-            {(error as Error)?.message ?? 'Please try again in a moment.'}
-          </p>
-        </div>
-      </section>
-    );
-  }
-
-  const canSeeDiscountCheck = hasFeature(FEATURES.FAKE_SALE_DETECTION);
-  const canSeeAdvancedScore = hasFeature(FEATURES.ADVANCED_DEAL_SCORE);
-
-  return (
-    <section aria-labelledby="intel-heading" className="space-y-3">
-      <Heading />
-
-      <BuyVerdictCard
-        verdict={data.verdict}
-        market={data.market}
-        history={data.history}
-        currency={data.currency}
-        windowDays={data.window.days}
+    body = (
+      <UpgradePrompt
+        title={t.intel.signInTitle}
+        description={t.intel.signInBody}
+        action={{ href: loginHref(pathname), label: t.common.signIn }}
       />
-
-      {/* Truthful about the clamp rather than silently showing a short chart. */}
-      {data.window.truncated && (
-        <UpgradePrompt
-          compact
-          title={`Showing ${data.window.days} days of history — Plus sees the full record`}
+    );
+  } else if (isLoading || entitlementsLoading) {
+    body = (
+      <>
+        <Skeleton className="h-40 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </>
+    );
+  } else if (isError || !data) {
+    body = <ErrorState title={t.intel.loadFailed} description={t.intel.loadFailedBody} className="rounded border border-border" />;
+  } else {
+    const canSeeDiscountCheck = hasFeature(FEATURES.FAKE_SALE_DETECTION);
+    const canSeeAdvancedScore = hasFeature(FEATURES.ADVANCED_DEAL_SCORE);
+    body = (
+      <>
+        <BuyVerdictCard
+          verdict={data.verdict}
+          market={data.market}
+          history={data.history}
+          currency={data.currency}
+          windowDays={data.window.days}
         />
-      )}
+        {/* Truthful about the clamp rather than silently showing a short chart. */}
+        {data.window.truncated && <UpgradePrompt compact title={tf(t.intel.windowTruncated, { days: data.window.days })} />}
+        {canSeeDiscountCheck ? (
+          <DiscountCheckCard check={data.discountCheck} currency={data.currency} />
+        ) : (
+          data.discountCheck.verdict === 'SUSPICIOUS' && (
+            <UpgradePrompt title={t.intel.discountTeaserTitle} description={t.intel.discountTeaserBody} />
+          )
+        )}
+        {canSeeAdvancedScore ? (
+          <DealScoreCard dealScore={data.dealScore} />
+        ) : (
+          <UpgradePrompt title={t.intel.scoreTeaserTitle} description={t.intel.scoreTeaserBody} />
+        )}
+      </>
+    );
+  }
 
-      {canSeeDiscountCheck ? (
-        <DiscountCheckCard check={data.discountCheck} currency={data.currency} />
-      ) : (
-        data.discountCheck.verdict === 'SUSPICIOUS' && (
-          <UpgradePrompt
-            title="This store's advertised discount does not match what we recorded"
-            description="Plus checks every advertised “was” price against the prices we actually observed, so you can tell a real sale from a marked-up one."
-          />
-        )
-      )}
-
-      {canSeeAdvancedScore ? (
-        <DealScoreCard dealScore={data.dealScore} />
-      ) : (
-        <UpgradePrompt
-          title="Advanced deal score"
-          description="Scores this price against its own history, every other store carrying it, the depth of the discount and how much of the market we can see — with the full breakdown."
-        />
-      )}
-    </section>
-  );
-}
-
-function Heading() {
   return (
-    <div className="flex items-center gap-2">
-      <Activity className="h-4 w-4 text-signal" aria-hidden />
-      <h2 id="intel-heading" className="text-sm font-semibold uppercase tracking-wider text-ink-400">
-        Buying intelligence
-      </h2>
-    </div>
+    <section aria-labelledby="intel-heading" className="flex flex-col gap-4">
+      {heading}
+      {body}
+    </section>
   );
 }

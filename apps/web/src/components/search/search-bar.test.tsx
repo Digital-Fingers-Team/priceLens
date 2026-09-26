@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, screen } from '@testing-library/react';
+import { renderWithI18n as render } from '@/test/i18n';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SearchBar } from './search-bar';
 

@@ -5,7 +5,8 @@ import type { AxiosError } from 'axios';
 import { notificationsApi } from '@/lib/api/notifications.api';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { useUiStore } from '@/lib/store/ui.store';
-import { getApiErrorMessage } from '@/lib/utils/api-error';
+import { useI18n } from '@/lib/i18n/provider';
+import { useApiErrorMessage } from '@/lib/hooks/use-api-error';
 import type { NotificationChannelType } from '@/types/billing.types';
 
 const notificationKeys = {
@@ -75,6 +76,8 @@ export function useNotificationChannels() {
 export function useUpsertChannel() {
   const queryClient = useQueryClient();
   const addToast = useUiStore((s) => s.addToast);
+  const { t } = useI18n();
+  const apiError = useApiErrorMessage();
 
   return useMutation({
     mutationFn: ({ type, destination }: { type: NotificationChannelType; destination: string }) =>
@@ -84,7 +87,7 @@ export function useUpsertChannel() {
       addToast(data.instructions, 'info');
     },
     onError: (err: AxiosError) => {
-      addToast(getApiErrorMessage(err, 'Could not save that channel'), 'error');
+      addToast(apiError(err, t.toast.channelSaveFailed), 'error');
     },
   });
 }
@@ -92,16 +95,18 @@ export function useUpsertChannel() {
 export function useVerifyChannel() {
   const queryClient = useQueryClient();
   const addToast = useUiStore((s) => s.addToast);
+  const { t } = useI18n();
+  const apiError = useApiErrorMessage();
 
   return useMutation({
     mutationFn: ({ type, code }: { type: NotificationChannelType; code?: string }) =>
       notificationsApi.verifyChannel(type, code),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: notificationKeys.channels });
-      addToast('Channel verified. Alerts will be delivered here.', 'success');
+      addToast(t.toast.channelVerified, 'success');
     },
     onError: (err: AxiosError) => {
-      addToast(getApiErrorMessage(err, 'Verification failed'), 'error');
+      addToast(apiError(err, t.toast.verifyFailed), 'error');
     },
   });
 }
@@ -109,6 +114,8 @@ export function useVerifyChannel() {
 export function useSetChannelActive() {
   const queryClient = useQueryClient();
   const addToast = useUiStore((s) => s.addToast);
+  const { t } = useI18n();
+  const apiError = useApiErrorMessage();
 
   return useMutation({
     mutationFn: ({ type, isActive }: { type: NotificationChannelType; isActive: boolean }) =>
@@ -117,7 +124,7 @@ export function useSetChannelActive() {
       queryClient.invalidateQueries({ queryKey: notificationKeys.channels });
     },
     onError: (err: AxiosError) => {
-      addToast(getApiErrorMessage(err, 'Could not update that channel'), 'error');
+      addToast(apiError(err, t.toast.channelUpdateFailed), 'error');
     },
   });
 }

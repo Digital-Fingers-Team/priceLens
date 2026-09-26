@@ -1,78 +1,38 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { Bell, Lock, X } from 'lucide-react';
+import { Bell, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { useUiStore } from '@/lib/store/ui.store';
-import { useCreateAlert } from '@/lib/hooks/use-watchlist';
 import { useEntitlements } from '@/lib/hooks/use-billing';
+import { useCreateAlert } from '@/lib/hooks/use-watchlist';
+import { Link } from '@/lib/i18n/navigation';
+import { useI18n } from '@/lib/i18n/provider';
+import { useUiStore } from '@/lib/store/ui.store';
 import { cn } from '@/lib/utils/cn';
 import type { AlertType } from '@/types/billing.types';
 
 interface AlertTypeMeta {
   value: AlertType;
-  label: string;
-  hint: string;
-  /** Label for the threshold field; null when the type takes no threshold. */
+  /** What the threshold is measured in; null when the type takes none. */
   unit: 'currency' | 'percent' | null;
   defaultValue: string;
 }
 
 const ALERT_TYPES: AlertTypeMeta[] = [
-  {
-    value: 'PRICE_TARGET',
-    label: 'Reaches my price',
-    hint: 'Tell me when it hits a number I choose.',
-    unit: 'currency',
-    defaultValue: '',
-  },
-  {
-    value: 'PRICE_DROP_PERCENT',
-    label: 'Drops by a percentage',
-    hint: 'Measured against the price when you set the alert.',
-    unit: 'percent',
-    defaultValue: '10',
-  },
-  {
-    value: 'PRICE_DROP_ABSOLUTE',
-    label: 'Drops by an amount',
-    hint: 'Measured against the price when you set the alert.',
-    unit: 'currency',
-    defaultValue: '',
-  },
-  {
-    value: 'LOWEST_EVER',
-    label: 'Hits its lowest ever',
-    hint: 'Fires only when it matches or beats every price we have recorded.',
-    unit: null,
-    defaultValue: '0',
-  },
-  {
-    value: 'MAJOR_DISCOUNT',
-    label: 'Falls well below its usual price',
-    hint: 'Compared against what it actually sold for, not an advertised discount.',
-    unit: 'percent',
-    defaultValue: '15',
-  },
-  {
-    value: 'RESTOCK',
-    label: 'Comes back in stock',
-    hint: 'Fires on the transition from out of stock to available.',
-    unit: null,
-    defaultValue: '0',
-  },
-  {
-    value: 'PRICE_INCREASE',
-    label: 'Goes up',
-    hint: 'Useful if you are waiting and want to know the window is closing.',
-    unit: 'percent',
-    defaultValue: '10',
-  },
+  { value: 'PRICE_TARGET', unit: 'currency', defaultValue: '' },
+  { value: 'PRICE_DROP_PERCENT', unit: 'percent', defaultValue: '10' },
+  { value: 'PRICE_DROP_ABSOLUTE', unit: 'currency', defaultValue: '' },
+  { value: 'LOWEST_EVER', unit: null, defaultValue: '0' },
+  { value: 'MAJOR_DISCOUNT', unit: 'percent', defaultValue: '15' },
+  { value: 'RESTOCK', unit: null, defaultValue: '0' },
+  { value: 'PRICE_INCREASE', unit: 'percent', defaultValue: '10' },
 ];
 
 export function AlertModal() {
+  const { t, tf } = useI18n();
   const productId = useUiStore((s) => s.alertProductId);
   const closeAlertModal = useUiStore((s) => s.closeAlertModal);
   const { mutate: createAlert, isPending } = useCreateAlert();
@@ -102,152 +62,112 @@ export function AlertModal() {
   const thresholdRequired = selected.unit !== null;
   const parsedThreshold = Number(thresholdValue);
   const thresholdValid =
-    !thresholdRequired || (Number.isFinite(parsedThreshold) && parsedThreshold > 0 &&
-      (selected.unit !== 'percent' || parsedThreshold <= 95));
-
-  if (!productId) return null;
+    !thresholdRequired ||
+    (Number.isFinite(parsedThreshold) && parsedThreshold > 0 && (selected.unit !== 'percent' || parsedThreshold <= 95));
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="alert-modal-title"
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 px-4 py-6 sm:items-center"
+    <Dialog
+      open={Boolean(productId)}
+      onClose={closeAlertModal}
+      variant="sheet"
+      title={t.alerts.modalTitle}
+      description={t.alerts.modalLede}
+      footer={
+        <>
+          <Button variant="ghost" onClick={closeAlertModal}>
+            {t.common.cancel}
+          </Button>
+          <Button
+            leftIcon={<Bell className="h-4 w-4" aria-hidden />}
+            loading={isPending}
+            disabled={atLimit || !thresholdValid}
+            onClick={() =>
+              productId &&
+              createAlert(
+                { productId, alertType: type, thresholdValue: thresholdRequired ? parsedThreshold : 0, repeatable },
+                { onSuccess: closeAlertModal },
+              )
+            }
+          >
+            {t.alerts.save}
+          </Button>
+        </>
+      }
     >
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-ink-700 bg-ink-950 shadow-2xl">
-        <div className="sticky top-0 flex items-center justify-between border-b border-ink-800 bg-ink-950 px-5 py-4">
-          <div>
-            <h2 id="alert-modal-title" className="text-lg font-semibold text-ink-50">
-              Set an alert
-            </h2>
-            <p className="text-sm text-ink-500">We will tell you the moment it happens.</p>
-          </div>
-          <button onClick={closeAlertModal} aria-label="Close" className="text-ink-500 hover:text-ink-200">
-            <X className="h-5 w-5" aria-hidden />
-          </button>
-        </div>
-
-        <div className="space-y-4 px-5 py-5">
-          {atLimit && (
-            <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2.5 text-xs text-amber-200">
-              You are using all {alertLimit} of your active alerts.{' '}
-              <Link href="/pricing" className="font-medium underline">
-                Upgrade for more
-              </Link>
-              , or delete one you no longer need.
-            </div>
-          )}
-
-          <fieldset className="grid gap-2">
-            <legend className="sr-only">Alert type</legend>
-            {ALERT_TYPES.map((item) => {
-              const locked = !allowedTypes.includes(item.value);
-              return (
-                <button
-                  key={item.value}
-                  type="button"
-                  onClick={() => {
-                    if (locked) return;
-                    setType(item.value);
-                    setThresholdValue(item.defaultValue);
-                  }}
-                  aria-pressed={type === item.value}
-                  disabled={locked}
-                  className={cn(
-                    'rounded-xl border px-4 py-3 text-left transition-colors',
-                    locked
-                      ? 'cursor-not-allowed border-ink-800 bg-ink-900/40 opacity-60'
-                      : type === item.value
-                        ? 'border-signal/40 bg-signal/10'
-                        : 'border-ink-700 bg-ink-900 hover:border-ink-500',
-                  )}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className={cn('font-medium', locked ? 'text-ink-500' : 'text-ink-100')}>
-                      {item.label}
-                    </span>
-                    {locked && <Lock className="h-3.5 w-3.5 shrink-0 text-ink-600" aria-hidden />}
-                  </div>
-                  <p className="mt-1 text-xs text-ink-500">{item.hint}</p>
-                </button>
-              );
-            })}
-          </fieldset>
-
-          {allowedTypes.length < ALERT_TYPES.length && (
-            <Link
-              href="/pricing"
-              className="block rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-xs text-amber-200 hover:bg-amber-500/10"
-            >
-              Plus unlocks lowest-ever, restock, major-discount and price-increase alerts.
+      <div className="flex flex-col gap-4">
+        {atLimit && (
+          <p className="rounded border border-warning/40 bg-warning-soft px-3 py-2 text-xs text-fg">
+            {tf(t.alerts.atLimit, { limit: alertLimit ?? 0 })}{' '}
+            <Link href="/pricing" className="font-medium text-brand underline">
+              {t.alerts.upgradeForMore}
             </Link>
-          )}
+          </p>
+        )}
 
-          {thresholdRequired && (
-            <div className="space-y-2">
-              <label htmlFor="alert-threshold" className="text-sm font-medium text-ink-200">
-                {selected.unit === 'percent' ? 'Percentage' : `Amount (${currency})`}
-              </label>
-              <Input
-                id="alert-threshold"
-                type="number"
-                min="0"
-                max={selected.unit === 'percent' ? '95' : undefined}
-                step={selected.unit === 'percent' ? '1' : '0.01'}
-                value={thresholdValue}
-                onChange={(event) => setThresholdValue(event.target.value)}
-                placeholder={selected.unit === 'percent' ? 'e.g. 15' : 'e.g. 12000'}
-              />
-              <p className="text-xs text-ink-500">
-                {selected.value === 'PRICE_TARGET'
-                  ? `Example: enter 12000 to be told when it reaches 12,000 ${currency}.`
-                  : selected.unit === 'percent'
-                    ? 'Between 1 and 95.'
-                    : `In ${currency}.`}
-              </p>
-            </div>
-          )}
+        <fieldset className="grid gap-2">
+          <legend className="sr-only">{t.alerts.typeLegend}</legend>
+          {ALERT_TYPES.map((item) => {
+            const locked = !allowedTypes.includes(item.value);
+            const copy = t.alerts.types[item.value];
+            return (
+              <button
+                key={item.value}
+                type="button"
+                onClick={() => {
+                  setType(item.value);
+                  setThresholdValue(item.defaultValue);
+                }}
+                aria-pressed={type === item.value}
+                disabled={locked}
+                className={cn(
+                  'flex flex-col gap-1 rounded border px-4 py-3 text-start transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                  type === item.value ? 'border-brand bg-brand-soft/60' : 'border-border hover:border-border-strong',
+                )}
+              >
+                <span className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-fg">{copy.label}</span>
+                  {locked && <Lock className="h-4 w-4 shrink-0 text-muted" aria-label={t.alerts.locked} />}
+                </span>
+                <span className="text-xs text-muted">{copy.hint}</span>
+              </button>
+            );
+          })}
+        </fieldset>
 
-          <label className="flex items-start gap-2.5 rounded-lg border border-ink-800 bg-ink-900/50 px-3 py-2.5">
-            <input
-              type="checkbox"
-              checked={repeatable}
-              onChange={(event) => setRepeatable(event.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-ink-600 bg-ink-800"
-            />
-            <span className="text-xs text-ink-400">
-              <span className="font-medium text-ink-200">Keep watching after it fires</span>
-              <br />
-              Otherwise the alert stops after the first time. Repeat alerts wait at least a day between
-              notifications.
-            </span>
-          </label>
+        {allowedTypes.length < ALERT_TYPES.length && (
+          <Link href="/pricing" className="text-xs text-brand hover:underline">
+            {t.alerts.plusUnlocks}
+          </Link>
+        )}
 
-          <div className="flex items-center justify-end gap-3 pt-1">
-            <Button variant="ghost" onClick={closeAlertModal}>
-              Cancel
-            </Button>
-            <Button
-              leftIcon={<Bell className="h-4 w-4" />}
-              loading={isPending}
-              disabled={atLimit || !thresholdValid}
-              onClick={() =>
-                createAlert(
-                  {
-                    productId,
-                    alertType: type,
-                    thresholdValue: thresholdRequired ? parsedThreshold : 0,
-                    repeatable,
-                  },
-                  { onSuccess: closeAlertModal },
-                )
-              }
-            >
-              Save alert
-            </Button>
-          </div>
-        </div>
+        {thresholdRequired && (
+          <Input
+            label={selected.unit === 'percent' ? t.alerts.percentage : tf(t.alerts.amount, { currency })}
+            type="number"
+            inputMode="decimal"
+            dir="ltr"
+            min="0"
+            max={selected.unit === 'percent' ? '95' : undefined}
+            step={selected.unit === 'percent' ? '1' : '0.01'}
+            value={thresholdValue}
+            onChange={(event) => setThresholdValue(event.target.value)}
+            hint={
+              selected.value === 'PRICE_TARGET'
+                ? tf(t.alerts.targetHint, { currency })
+                : selected.unit === 'percent'
+                  ? t.alerts.percentHint
+                  : tf(t.alerts.amountHint, { currency })
+            }
+          />
+        )}
+
+        <Checkbox
+          checked={repeatable}
+          onChange={(event) => setRepeatable(event.target.checked)}
+          label={t.alerts.repeatLabel}
+          description={t.alerts.repeatHint}
+        />
       </div>
-    </div>
+    </Dialog>
   );
 }

@@ -1,74 +1,77 @@
 'use client';
-import { useState } from 'react';
-import { Copy, Share2, MessageCircleMore, Link as LinkIcon } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Copy, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { buttonClassName } from '@/components/ui/button-styles';
+import { useI18n } from '@/lib/i18n/provider';
 import { useUiStore } from '@/lib/store/ui.store';
 
 interface ShareActionsProps {
   title: string;
-  url: string;
+  /** Site path of the page (made absolute here: a copied "/products/x" was useless). */
+  path: string;
   summary: string;
 }
 
-export function ShareActions({ title, url, summary }: ShareActionsProps) {
+export function ShareActions({ title, path, summary }: ShareActionsProps) {
+  const { t, href } = useI18n();
   const addToast = useUiStore((s) => s.addToast);
   const [copied, setCopied] = useState(false);
 
+  // The browser's own origin: right on every host the site is served from.
+  // Known after mount; until then the share links carry the path only.
+  const [origin, setOrigin] = useState('');
+  useEffect(() => setOrigin(window.location.origin), []);
+  const url = () => new URL(href(path), origin || window.location.origin).toString();
+  const shareUrl = origin ? url() : '';
+
   async function copyLink() {
-    await navigator.clipboard.writeText(url);
+    await navigator.clipboard.writeText(url());
     setCopied(true);
-    addToast('Link copied', 'success');
+    addToast(t.toast.linkCopied, 'success');
     window.setTimeout(() => setCopied(false), 1800);
   }
 
   async function shareNative() {
     if (navigator.share) {
-      await navigator.share({ title, text: summary, url });
+      await navigator.share({ title, text: summary, url: url() });
       return;
     }
     await copyLink();
   }
 
-  const shareText = encodeURIComponent(`${summary}\n${url}`);
-
   return (
-    <div className="rounded-xl border border-ink-700 bg-ink-900 p-4 space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h3 className="font-semibold text-ink-100">Share this deal</h3>
-          <p className="text-xs text-ink-500 mt-1">Send the price, not just the product.</p>
-        </div>
-        <Share2 className="w-4 h-4 text-signal" />
+    <section aria-labelledby="share-heading" className="flex flex-col gap-3 border-t border-border pt-8">
+      <div className="flex flex-col gap-1">
+        <h2 id="share-heading" className="text-base font-semibold text-fg">
+          {t.share.title}
+        </h2>
+        <p className="text-sm text-muted">{t.share.lede}</p>
       </div>
-
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" leftIcon={<Copy className="w-4 h-4" />} onClick={copyLink}>
-          {copied ? 'Copied' : 'Copy link'}
+        <Button variant="primary" size="sm" leftIcon={<Share2 className="h-4 w-4" aria-hidden />} onClick={shareNative}>
+          {t.share.share}
         </Button>
-        <Button variant="primary" size="sm" leftIcon={<Share2 className="w-4 h-4" />} onClick={shareNative}>
-          Share
+        <Button variant="secondary" size="sm" leftIcon={<Copy className="h-4 w-4" aria-hidden />} onClick={copyLink}>
+          {copied ? t.share.copied : t.share.copyLink}
         </Button>
         <a
-          href={`https://wa.me/?text=${shareText}`}
+          href={`https://wa.me/?text=${encodeURIComponent(`${summary}\n${shareUrl}`)}`}
           target="_blank"
-          rel="noreferrer"
-          className="inline-flex"
+          rel="noopener noreferrer"
+          className={buttonClassName({ variant: 'ghost', size: 'sm' })}
         >
-          <Button variant="ghost" size="sm" leftIcon={<MessageCircleMore className="w-4 h-4" />}>
-            WhatsApp
-          </Button>
+          WhatsApp
         </a>
         <a
-          href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`}
+          href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`}
           target="_blank"
-          rel="noreferrer"
-          className="inline-flex"
+          rel="noopener noreferrer"
+          className={buttonClassName({ variant: 'ghost', size: 'sm' })}
         >
-          <Button variant="ghost" size="sm" leftIcon={<LinkIcon className="w-4 h-4" />}>
-            Social
-          </Button>
+          Facebook
         </a>
       </div>
-    </div>
+    </section>
   );
 }

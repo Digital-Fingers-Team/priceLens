@@ -38,7 +38,7 @@ export function useResolveQueueItem() {
       queryClient.invalidateQueries({ queryKey: ['review-queue'] });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.dashboardStats() });
       addToast(
-        body.decision === 'ACCEPT' ? 'Match accepted ✓' : 'Match rejected ✗',
+        body.decision === 'ACCEPT' ? 'Match accepted' : 'Match rejected',
         body.decision === 'ACCEPT' ? 'success' : 'info',
       );
     },

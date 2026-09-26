@@ -9,10 +9,10 @@ export function getConfidenceLevel(
 
 export function getConfidenceColor(level: ReturnType<typeof getConfidenceLevel>): string {
   switch (level) {
-    case 'high':    return 'text-emerald-400';
-    case 'medium':  return 'text-amber-400';
-    case 'low':     return 'text-red-400';
-    default:        return 'text-ink-400';
+    case 'high':    return 'text-success';
+    case 'medium':  return 'text-warning';
+    case 'low':     return 'text-danger';
+    default:        return 'text-muted';
   }
 }
 

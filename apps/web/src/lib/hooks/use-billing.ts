@@ -5,7 +5,8 @@ import type { AxiosError } from 'axios';
 import { billingApi } from '@/lib/api/billing.api';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { useUiStore } from '@/lib/store/ui.store';
-import { getApiErrorMessage } from '@/lib/utils/api-error';
+import { useI18n } from '@/lib/i18n/provider';
+import { useApiErrorMessage } from '@/lib/hooks/use-api-error';
 import type { Entitlements } from '@/types/billing.types';
 
 const billingKeys = {
@@ -69,6 +70,8 @@ export function useEntitlements() {
 
 export function useCheckout() {
   const addToast = useUiStore((s) => s.addToast);
+  const { t } = useI18n();
+  const apiError = useApiErrorMessage();
 
   return useMutation({
     mutationFn: (planKey: string) => billingApi.createCheckout(planKey),
@@ -77,13 +80,15 @@ export function useCheckout() {
       window.location.href = data.url;
     },
     onError: (err: AxiosError) => {
-      addToast(getApiErrorMessage(err, 'Could not start checkout'), 'error');
+      addToast(apiError(err, t.toast.checkoutFailed), 'error');
     },
   });
 }
 
 export function useBillingPortal() {
   const addToast = useUiStore((s) => s.addToast);
+  const { t } = useI18n();
+  const apiError = useApiErrorMessage();
 
   return useMutation({
     mutationFn: () => billingApi.openPortal(),
@@ -91,7 +96,7 @@ export function useBillingPortal() {
       window.location.href = data.url;
     },
     onError: (err: AxiosError) => {
-      addToast(getApiErrorMessage(err, 'Could not open the billing portal'), 'error');
+      addToast(apiError(err, t.toast.portalFailed), 'error');
     },
   });
 }
@@ -99,6 +104,8 @@ export function useBillingPortal() {
 export function useCancelSubscription() {
   const queryClient = useQueryClient();
   const addToast = useUiStore((s) => s.addToast);
+  const { t } = useI18n();
+  const apiError = useApiErrorMessage();
 
   return useMutation({
     mutationFn: (immediately?: boolean) => billingApi.cancel(immediately),
@@ -106,13 +113,13 @@ export function useCancelSubscription() {
       queryClient.invalidateQueries({ queryKey: billingKeys.me });
       addToast(
         data.cancelAtPeriodEnd
-          ? 'Your plan will not renew. You keep access until the end of the period.'
-          : 'Your plan has been cancelled.',
+          ? t.toast.planWillNotRenew
+          : t.toast.planCancelled,
         'success',
       );
     },
     onError: (err: AxiosError) => {
-      addToast(getApiErrorMessage(err, 'Could not cancel'), 'error');
+      addToast(apiError(err, t.toast.cancelFailed), 'error');
     },
   });
 }

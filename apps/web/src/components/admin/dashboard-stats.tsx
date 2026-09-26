@@ -19,15 +19,15 @@ function StatCard({
   color?: string;
 }) {
   return (
-    <div className="rounded-xl border border-ink-700 bg-ink-900 p-5">
+    <div className="rounded border border-border bg-surface p-5">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider">{label}</p>
-          <p className={`text-3xl font-black mt-2 ${color ?? 'text-ink-50'}`}>{value}</p>
-          {sub && <p className="text-xs text-ink-500 mt-1">{sub}</p>}
+          <p className="label-mono text-muted">{label}</p>
+          <p className={`text-2xl font-semibold mt-2 ${color ?? 'text-fg'}`}>{value}</p>
+          {sub && <p className="text-xs text-muted mt-1">{sub}</p>}
         </div>
-        <div className="w-10 h-10 rounded-xl bg-ink-800 flex items-center justify-center">
-          <Icon className="w-5 h-5 text-ink-400" />
+        <div className="w-10 h-10 rounded bg-surface-2 flex items-center justify-center">
+          <Icon className="w-5 h-5 text-muted" />
         </div>
       </div>
     </div>
@@ -41,7 +41,7 @@ export function DashboardStats() {
     return (
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-32 rounded-xl" />
+          <Skeleton key={i} className="h-32 rounded" />
         ))}
       </div>
     );
@@ -57,21 +57,21 @@ export function DashboardStats() {
         icon={TrendingUp}
         label="Match Rate"
         value={stats.matchRate}
-        color="text-signal"
+        color="text-brand"
         sub={`${formatNumber(stats.listings.accepted)} accepted`}
       />
       <StatCard
         icon={ClipboardList}
         label="Pending Review"
         value={formatNumber(stats.review.pending)}
-        color={stats.review.pending > 50 ? 'text-amber-400' : 'text-ink-50'}
+        color={stats.review.pending > 50 ? 'text-warning' : 'text-fg'}
       />
       <StatCard icon={Users} label="Users" value={formatNumber(stats.users.total)} />
       <StatCard
         icon={RefreshCw}
         label="Rejected"
         value={formatNumber(stats.listings.rejected)}
-        color="text-red-400"
+        color="text-danger"
       />
     </div>
   );

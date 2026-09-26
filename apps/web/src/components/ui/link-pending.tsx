@@ -1,5 +1,6 @@
 'use client';
 import { useLinkStatus } from 'next/link';
+import { useI18n } from '@/lib/i18n/provider';
 
 /**
  * A thin bar along the bottom of the nearest positioned ancestor while the
@@ -10,12 +11,9 @@ import { useLinkStatus } from 'next/link';
  */
 export function LinkPending() {
   const { pending } = useLinkStatus();
+  const { t } = useI18n();
   if (!pending) return null;
   return (
-    <span
-      role="progressbar"
-      aria-label="Loading"
-      className="absolute inset-x-0 bottom-0 h-0.5 animate-pulse rounded-b-xl bg-signal motion-reduce:animate-none"
-    />
+    <span role="progressbar" aria-label={t.common.loading} className="absolute inset-x-0 bottom-0 h-1 animate-pulse bg-brand" />
   );
 }

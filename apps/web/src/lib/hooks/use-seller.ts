@@ -5,7 +5,8 @@ import type { AxiosError } from 'axios';
 import { sellerApi } from '@/lib/api/seller.api';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { useUiStore } from '@/lib/store/ui.store';
-import { getApiErrorMessage } from '@/lib/utils/api-error';
+import { useI18n } from '@/lib/i18n/provider';
+import { useApiErrorMessage } from '@/lib/hooks/use-api-error';
 import type { CompetitorEventType, OrgType, SellerProductRow } from '@/types/seller.types';
 
 const sellerKeys = {
@@ -30,15 +31,17 @@ export function useWorkspaces() {
 export function useCreateWorkspace() {
   const queryClient = useQueryClient();
   const addToast = useUiStore((s) => s.addToast);
+  const { t } = useI18n();
+  const apiError = useApiErrorMessage();
 
   return useMutation({
     mutationFn: (input: { name: string; type: OrgType; platformId?: string }) =>
       sellerApi.createWorkspace(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: sellerKeys.workspaces });
-      addToast('Workspace created.', 'success');
+      addToast(t.toast.workspaceCreated, 'success');
     },
-    onError: (err: AxiosError) => addToast(getApiErrorMessage(err, 'Could not create workspace'), 'error'),
+    onError: (err: AxiosError) => addToast(apiError(err, t.toast.workspaceCreateFailed), 'error'),
   });
 }
 
@@ -72,6 +75,8 @@ export function useSellerProduct(orgId: string | undefined, productId: string | 
 export function useUpsertSellerProduct(orgId: string) {
   const queryClient = useQueryClient();
   const addToast = useUiStore((s) => s.addToast);
+  const { t } = useI18n();
+  const apiError = useApiErrorMessage();
 
   return useMutation({
     mutationFn: (input: Partial<SellerProductRow> & { sku: string; name: string }) =>
@@ -79,23 +84,25 @@ export function useUpsertSellerProduct(orgId: string) {
     onSuccess: () => {
       // The position and recommendation both derive from what was just saved.
       queryClient.invalidateQueries({ queryKey: ['seller', orgId] });
-      addToast('Saved.', 'success');
+      addToast(t.toast.saved, 'success');
     },
-    onError: (err: AxiosError) => addToast(getApiErrorMessage(err, 'Could not save'), 'error'),
+    onError: (err: AxiosError) => addToast(apiError(err, t.toast.saveFailed), 'error'),
   });
 }
 
 export function useDeleteSellerProduct(orgId: string) {
   const queryClient = useQueryClient();
   const addToast = useUiStore((s) => s.addToast);
+  const { t } = useI18n();
+  const apiError = useApiErrorMessage();
 
   return useMutation({
     mutationFn: (productId: string) => sellerApi.deleteProduct(orgId, productId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['seller', orgId] });
-      addToast('Product removed.', 'success');
+      addToast(t.toast.productRemoved, 'success');
     },
-    onError: (err: AxiosError) => addToast(getApiErrorMessage(err, 'Could not remove'), 'error'),
+    onError: (err: AxiosError) => addToast(apiError(err, t.toast.removeFailed), 'error'),
   });
 }
 
@@ -136,6 +143,8 @@ export function useAlertRules(orgId: string | undefined) {
 export function useUpsertAlertRule(orgId: string) {
   const queryClient = useQueryClient();
   const addToast = useUiStore((s) => s.addToast);
+  const { t } = useI18n();
+  const apiError = useApiErrorMessage();
 
   return useMutation({
     mutationFn: (input: {
@@ -145,6 +154,6 @@ export function useUpsertAlertRule(orgId: string) {
       cooldownHours?: number;
     }) => sellerApi.upsertRule(orgId, input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: sellerKeys.rules(orgId) }),
-    onError: (err: AxiosError) => addToast(getApiErrorMessage(err, 'Could not save the rule'), 'error'),
+    onError: (err: AxiosError) => addToast(apiError(err, t.toast.ruleSaveFailed), 'error'),
   });
 }

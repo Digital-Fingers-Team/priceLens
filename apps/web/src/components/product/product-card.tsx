@@ -1,16 +1,15 @@
 'use client';
-import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
-import { Heart, ShieldCheck, Store } from 'lucide-react';
-import type { SearchHit } from '@/types/search.types';
+import { Heart, ImageOff } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { formatCurrency } from '@/lib/utils/format';
-import { TIER_LABELS } from '@/config/constants';
+import { LinkPending } from '@/components/ui/link-pending';
 import { useIsWatched, useToggleWatchlist } from '@/lib/hooks/use-watchlist';
+import { Link, useRouter } from '@/lib/i18n/navigation';
+import { useI18n } from '@/lib/i18n/provider';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { cn } from '@/lib/utils/cn';
-import { LinkPending } from '@/components/ui/link-pending';
+import { loginHref } from '@/lib/utils/next-path';
+import type { SearchHit } from '@/types/search.types';
 
 interface ProductCardProps {
   product: SearchHit;
@@ -19,6 +18,7 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, priority = false }: ProductCardProps) {
+  const { t, tf, tp, fmt } = useI18n();
   const router = useRouter();
   const { isAuthenticated } = useAuthStore();
   const isWatched = useIsWatched(product.id);
@@ -26,98 +26,78 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
 
   const hasPrice = product.minPriceUsd != null;
   const hasPriceRange = hasPrice && product.maxPriceUsd != null && product.minPriceUsd !== product.maxPriceUsd;
+  const currency = product.priceStats?.currency;
+  const href = `/products/${product.slug}`;
 
   function handleWatchlist(e: React.MouseEvent) {
     e.preventDefault();
     if (!isAuthenticated) {
       // Send guests to sign in instead of silently doing nothing
-      router.push(`/login?next=${encodeURIComponent(`/products/${product.slug}`)}`);
+      router.push(loginHref(href));
       return;
     }
     toggleWatchlist({ productId: product.id, isWatched });
   }
 
   const storeTotal = product.storeCount ?? product.listingCount;
-  const href = `/products/${product.slug}`;
 
   // An article with one stretched link (the title) and the watchlist button
   // beside it, not a link wrapping a button (nested interactive content).
   // Below sm the card is a compact row, so a phone shows several results per
   // screen instead of one (audit 06, U-06/U-07).
   return (
-    <article
-      className={cn(
-        'group relative flex sm:block h-full min-w-0 rounded-xl border border-ink-700 bg-ink-900',
-        'transition-colors duration-200 hover:border-ink-500 hover:bg-ink-800',
-        'focus-within:border-signal/50',
-      )}
-    >
-      {/* Image */}
-      <div className="relative w-28 shrink-0 aspect-square sm:w-full sm:aspect-[4/3] rounded-l-xl sm:rounded-l-none sm:rounded-t-xl overflow-hidden bg-ink-800">
+    <article className="group relative flex h-full min-w-0 overflow-hidden rounded border border-border bg-surface transition-colors hover:border-border-strong focus-within:border-brand sm:flex-col">
+      <div className="relative aspect-square w-28 shrink-0 bg-media sm:aspect-product sm:w-full">
         {product.imageUrl ? (
           <Image
             src={product.imageUrl}
             alt=""
             fill
-            sizes="(max-width: 640px) 112px, (max-width: 1024px) 50vw, 33vw"
+            sizes="(max-width: 640px) 112px, (max-width: 1024px) 50vw, 25vw"
             priority={priority}
             className="object-contain p-2 sm:p-4"
           />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Store className="w-10 h-10 text-ink-700" aria-hidden />
+          <div className="absolute inset-0 flex items-center justify-center text-muted">
+            <ImageOff className="h-6 w-6" aria-hidden />
           </div>
         )}
       </div>
 
-      {/* Content */}
-      <div className="flex min-w-0 flex-1 flex-col gap-2 p-3 sm:p-4 sm:gap-3">
-        <div className="flex items-center gap-2 pr-10">
-          {product.brand && (
-            <p className="text-xs font-medium text-ink-500 uppercase tracking-wider truncate">{product.brand}</p>
-          )}
-          {product.isVerified && (
-            <Badge variant="success">
-              <ShieldCheck className="w-3 h-3" aria-hidden /> Verified
-            </Badge>
-          )}
+      <div className="flex min-w-0 flex-1 flex-col gap-2 p-3 sm:gap-3 sm:p-4">
+        <div className="flex min-h-6 items-center gap-2 pe-10 sm:pe-0">
+          {product.brand && <p className="label-mono truncate text-muted">{product.brand}</p>}
+          {product.isVerified && <Badge variant="success">{t.product.verified}</Badge>}
         </div>
 
         {/* Title: store-supplied text, always rendered as text. Three lines,
             so storage/RAM/color -- what tells variants apart -- stay visible. */}
-        <h3 dir="auto" className="text-sm font-semibold text-ink-100 leading-snug line-clamp-3">
-          <Link
-            href={href}
-            className="after:absolute after:inset-0 after:rounded-xl focus-visible:outline-none"
-          >
+        <h3 dir="auto" className="line-clamp-3 text-sm font-medium text-fg">
+          <Link href={href} className="after:absolute after:inset-0 focus-visible:outline-none">
             {product.title}
             <LinkPending />
           </Link>
         </h3>
 
-        <div className="mt-auto space-y-1">
+        <div className="mt-auto flex flex-col gap-1">
           {hasPrice ? (
-            <p className="flex flex-wrap items-baseline gap-x-1.5">
-              <span className="text-xs text-ink-500">From</span>
-              <span className="text-lg font-bold text-signal whitespace-nowrap">
-                {formatCurrency(product.minPriceUsd, product.priceStats?.currency)}
+            <p className="flex flex-wrap items-baseline gap-x-2">
+              <span className="text-xs text-muted">{t.product.from}</span>
+              <span className="whitespace-nowrap text-base font-semibold tabular-nums text-brand">
+                {fmt.currency(product.minPriceUsd, currency)}
               </span>
               {hasPriceRange && (
-                <span className="text-xs text-ink-500 whitespace-nowrap">
-                  to {formatCurrency(product.maxPriceUsd, product.priceStats?.currency)}
+                <span className="whitespace-nowrap text-xs tabular-nums text-muted">
+                  {tf(t.product.to, { price: fmt.currency(product.maxPriceUsd, currency) })}
                 </span>
               )}
             </p>
           ) : (
-            <p className="text-sm text-ink-500">No current price</p>
+            <p className="text-sm text-muted">{t.product.noCurrentPrice}</p>
           )}
-          <p className="flex items-center justify-between gap-2 text-xs text-ink-500">
-            <span>
-              {product.listingCount === 0
-                ? 'No stores yet'
-                : `Compare ${storeTotal} store${storeTotal === 1 ? '' : 's'}`}
-            </span>
-            <span className="hidden sm:inline">{TIER_LABELS[product.tier] ?? product.tier}</span>
+          <p className="flex items-center justify-between gap-2 text-xs text-muted">
+            <span>{product.listingCount === 0 ? t.product.noStoresYet : tp(t.product.compareStores, storeTotal)}</span>
+            <span className="hidden sm:inline">{t.tiers[product.tier] ?? product.tier}</span>
           </p>
         </div>
       </div>
@@ -129,24 +109,19 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
         onClick={handleWatchlist}
         disabled={isPending}
         className={cn(
-          'absolute top-2 right-2 z-10 w-10 h-10 rounded-full',
-          'flex items-center justify-center transition-colors duration-150',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/60',
-          isWatched
-            ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-            : 'bg-ink-900/80 text-ink-400 border border-ink-700 hover:text-ink-100',
-          'disabled:opacity-50',
+          'absolute end-2 top-2 z-10 flex h-10 w-10 items-center justify-center rounded-full border transition-colors disabled:opacity-50',
+          isWatched ? 'border-brand bg-brand-soft text-brand' : 'border-border bg-surface/90 text-muted hover:text-fg',
         )}
         aria-pressed={isAuthenticated ? isWatched : undefined}
         aria-label={
           !isAuthenticated
-            ? `Sign in to save ${product.title}`
+            ? tf(t.product.signInToSave, { title: product.title })
             : isWatched
-            ? `Remove ${product.title} from watchlist`
-            : `Add ${product.title} to watchlist`
+              ? tf(t.product.removeFromWatchlist, { title: product.title })
+              : tf(t.product.addToWatchlist, { title: product.title })
         }
       >
-        <Heart className={cn('w-4 h-4', isWatched && 'fill-current')} aria-hidden />
+        <Heart className={cn('h-4 w-4', isWatched && 'fill-current')} aria-hidden />
       </button>
     </article>
   );

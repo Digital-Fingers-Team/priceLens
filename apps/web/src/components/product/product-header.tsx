@@ -1,23 +1,29 @@
 'use client';
 import Image from 'next/image';
-import { ShieldCheck, Heart, Bell, Store, Tag, ArrowUpRight } from 'lucide-react';
-import type { CanonicalProduct } from '@/types/product.types';
+import { ArrowUpRight, Bell, Heart, ImageOff } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { buttonClassName } from '@/components/ui/button-styles';
-import { formatCurrency, formatRelativeTime } from '@/lib/utils/format';
-import { TIER_LABELS } from '@/config/constants';
+import { PriceTag } from '@/components/ui/price-tag';
+import { useI18n } from '@/lib/i18n/provider';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { useIsWatched, useToggleWatchlist } from '@/lib/hooks/use-watchlist';
 import { useUiStore } from '@/lib/store/ui.store';
 import { cheapestOffer } from '@/lib/utils/offers';
-import { safeExternalHref } from '@/lib/utils/safe-href';
+import { storeGoHref } from '@/lib/utils/safe-href';
+import type { CanonicalProduct } from '@/types/product.types';
+import { OUTBOUND_REL } from './offer-row';
+import { useCategoryName } from './use-category-name';
 
-interface ProductHeaderProps {
-  product: CanonicalProduct;
+/** "DisplaySize" / "display_size" -> dictionary key "displaySize". */
+function attributeKey(key: string) {
+  const words = key.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase().split(' ');
+  return words.map((w, i) => (i === 0 ? w : w.charAt(0).toUpperCase() + w.slice(1))).join('');
 }
 
-export function ProductHeader({ product }: ProductHeaderProps) {
+export function ProductHeader({ product }: { product: CanonicalProduct }) {
+  const { t, tf, tp, fmt } = useI18n();
+  const categoryName = useCategoryName(product.category);
   const { isAuthenticated } = useAuthStore();
   const isWatched = useIsWatched(product.id);
   const { mutate: toggleWatchlist, isPending: watchlistPending } = useToggleWatchlist();
@@ -32,7 +38,7 @@ export function ProductHeader({ product }: ProductHeaderProps) {
 
   const listings = product.sourceListings ?? [];
   const cheapest = cheapestOffer(listings);
-  const cheapestHref = cheapest ? safeExternalHref(cheapest.externalUrl) : undefined;
+  const cheapestHref = cheapest ? storeGoHref(cheapest) : undefined;
   // When a store last confirmed a price -- what "fresh" means to a shopper,
   // unlike the product row's updatedAt.
   const lastChecked = listings.reduce<string | null>(
@@ -40,15 +46,14 @@ export function ProductHeader({ product }: ProductHeaderProps) {
     null,
   );
 
-  const attrs = Object.fromEntries(
-    Object.entries((product.attributes ?? {}) as Record<string, unknown>).filter(
-      ([, val]) => typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean',
-    ),
-  ) as Record<string, string | number | boolean>;
+  const attributeLabels = t.product.attributes as Record<string, string>;
+  const attrs = Object.entries((product.attributes ?? {}) as Record<string, unknown>)
+    .filter(([, val]) => typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean')
+    .slice(0, 6);
 
   return (
-    <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
-      <div className="relative aspect-square rounded-2xl overflow-hidden bg-ink-800 border border-ink-700">
+    <section className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-12">
+      <div className="relative aspect-square overflow-hidden rounded border border-border bg-media">
         {product.imageUrl ? (
           <Image
             src={product.imageUrl}
@@ -59,154 +64,131 @@ export function ProductHeader({ product }: ProductHeaderProps) {
             priority
           />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Store className="w-20 h-20 text-ink-700" />
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted">
+            <ImageOff className="h-8 w-8" aria-hidden />
+            <span className="text-xs">{t.product.noImage}</span>
           </div>
         )}
       </div>
 
-      <div className="flex flex-col gap-5">
-        <div className="flex items-center flex-wrap gap-2">
-          {product.brand && (
-            <span className="text-sm font-semibold text-ink-400 uppercase tracking-wider">
-              {product.brand}
-            </span>
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {product.brand && <span className="label-mono text-muted">{product.brand}</span>}
+            {product.isVerified && <Badge variant="success">{t.product.verified}</Badge>}
+            <Badge variant="outline">{t.tiers[product.tier] ?? product.tier}</Badge>
+            <Badge variant="neutral">{categoryName}</Badge>
+          </div>
+          <h1 dir="auto" className="text-xl font-semibold text-fg sm:text-2xl">
+            {product.title}
+          </h1>
+          {attrs.length > 0 && (
+            <dl className="flex flex-wrap gap-2">
+              {attrs.map(([key, val]) => (
+                <div key={key} className="flex gap-1 rounded-sm border border-border px-2 py-1 text-xs">
+                  <dt className="text-muted">{attributeLabels[attributeKey(key)] ?? key.replace(/_/g, ' ')}:</dt>
+                  <dd className="text-fg" dir="auto">
+                    {String(val)}
+                  </dd>
+                </div>
+              ))}
+            </dl>
           )}
-          {product.isVerified && (
-            <Badge variant="success" dot>
-              <ShieldCheck className="w-3 h-3" /> Verified
-            </Badge>
-          )}
-          <Badge variant="outline">{TIER_LABELS[product.tier] ?? product.tier}</Badge>
-          <Badge variant="default">
-            <Tag className="w-3 h-3 mr-1" />
-            {product.category.name}
-          </Badge>
         </div>
 
-        <h1 dir="auto" className="text-2xl sm:text-3xl font-bold text-ink-50 leading-tight">{product.title}</h1>
-
-        {Object.keys(attrs).length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {Object.entries(attrs).slice(0, 6).map(([key, val]) => (
-              <span
-                key={key}
-                className="px-2.5 py-1 rounded-lg bg-ink-800 border border-ink-700 text-xs text-ink-300"
-              >
-                <span className="text-ink-500 capitalize">{key.replace(/_/g, ' ')}: </span>
-                {String(val)}
-              </span>
-            ))}
-          </div>
-        )}
-
-        <div className="rounded-xl border border-ink-700 bg-ink-900 p-5 space-y-3">
+        <div className="flex flex-col gap-3 rounded border border-border bg-surface p-4 sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-            <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider">
-              Price Across {storeCount} Store{storeCount !== 1 ? 's' : ''}
-            </p>
-            <div className="flex items-center gap-1 text-xs text-ink-500">
-              <Store className="w-3.5 h-3.5" />
-              <span>{listingCount} listing{listingCount !== 1 ? 's' : ''}</span>
-            </div>
+            <p className="label-mono text-muted">{tp(t.product.priceAcross, storeCount)}</p>
+            <p className="text-xs text-muted">{tp(t.product.listings, listingCount)}</p>
           </div>
 
           {priceStats.min != null ? (
-            <div className="space-y-1">
-              {/* Wraps instead of overflowing: on a phone "EGP 20,250.09" plus
-                  "Up to EGP 24,666.00" is wider than the screen and pushed the
-                  whole page sideways. */}
-              <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
-                <div className="min-w-0">
-                  <p className="text-[10px] text-ink-500 mb-0.5">Best price</p>
-                  <span className="text-3xl sm:text-4xl font-black text-signal tracking-tight">
-                    {formatCurrency(priceStats.min, priceStats.currency)}
-                  </span>
+            <>
+              {/* Wraps instead of overflowing: on a phone the best price plus
+                  "up to" is wider than the screen. */}
+              <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs text-muted">{t.product.bestPrice}</span>
+                  <PriceTag amount={priceStats.min} currency={priceStats.currency} size="lg" emphasis />
                 </div>
                 {hasRange && (
-                  <div className="min-w-0">
-                    <p className="text-[10px] text-ink-500 mb-0.5">Up to</p>
-                    <span className="text-xl font-semibold text-ink-400">
-                      {formatCurrency(priceStats.max, priceStats.currency)}
-                    </span>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs text-muted">{t.product.upTo}</span>
+                    <PriceTag amount={priceStats.max} currency={priceStats.currency} size="md" className="text-muted" />
                   </div>
                 )}
               </div>
 
               {cheapest && (
-                <p className="text-sm text-ink-300">
-                  Cheapest at <span className="font-semibold text-ink-100">{cheapest.platform.name}</span>
+                <p className="text-sm text-muted">
+                  {t.product.cheapestAt} <span className="font-medium text-fg">{cheapest.platform.name}</span>
                   {' · '}
-                  <a href="#offers" className="text-signal hover:underline">
-                    compare all {storeCount}
+                  <a href="#offers" className="text-brand hover:underline">
+                    {tp(t.product.compareAll, storeCount)}
                   </a>
                 </p>
               )}
-              {priceStats.avg != null && (
-                <p className="text-xs text-ink-500">
-                  Average across stores: <span className="text-ink-300">{formatCurrency(priceStats.avg, priceStats.currency)}</span>
-                </p>
-              )}
-              {lastChecked && (
-                <p className="text-xs text-ink-500">Prices checked {formatRelativeTime(lastChecked)}</p>
-              )}
+              <p className="flex flex-wrap gap-x-4 text-xs text-muted">
+                {priceStats.avg != null && (
+                  <span>{tf(t.product.average, { price: fmt.currency(priceStats.avg, priceStats.currency) })}</span>
+                )}
+                {lastChecked && <span>{tf(t.product.pricesChecked, { when: fmt.relative(lastChecked) })}</span>}
+              </p>
               {cheapest && cheapestHref && (
                 <a
                   href={cheapestHref}
                   target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={`Go to ${cheapest.platform.name} (opens in a new tab)`}
-                  className={buttonClassName({ size: 'lg', className: 'mt-2 w-full sm:w-auto' })}
+                  rel={OUTBOUND_REL}
+                  aria-label={tf(t.product.goToStoreNewTab, { store: cheapest.platform.name })}
+                  className={buttonClassName({ size: 'lg', className: 'mt-1 w-full sm:w-auto sm:self-start' })}
                 >
-                  Go to {cheapest.platform.name}
-                  <ArrowUpRight className="h-5 w-5" aria-hidden />
+                  {tf(t.product.goToStore, { store: cheapest.platform.name })}
+                  <ArrowUpRight className="flip-rtl h-4 w-4" aria-hidden />
                 </a>
               )}
-            </div>
+            </>
           ) : (
-            <p className="text-ink-500 text-sm italic">No current prices available</p>
+            <p className="text-sm text-muted">{t.product.noPrices}</p>
           )}
         </div>
 
-        <div className="flex flex-wrap gap-3 text-xs text-ink-500">
-          {product.gtin && <span>GTIN: <span className="text-ink-400 font-mono">{product.gtin}</span></span>}
-          {product.upc && <span>UPC: <span className="text-ink-400 font-mono">{product.upc}</span></span>}
-          {product.mpn && <span>MPN: <span className="text-ink-400 font-mono">{product.mpn}</span></span>}
-        </div>
-
-        <div className="flex flex-wrap gap-3 pt-1">
+        <div className="flex flex-wrap gap-2">
           {isAuthenticated ? (
             <>
               <Button
                 variant={isWatched ? 'secondary' : 'primary'}
                 size="lg"
                 loading={watchlistPending}
-                leftIcon={<Heart className={isWatched ? 'w-5 h-5 fill-current text-red-400' : 'w-5 h-5'} />}
+                aria-pressed={isWatched}
+                leftIcon={<Heart className={isWatched ? 'h-4 w-4 fill-current text-brand' : 'h-4 w-4'} aria-hidden />}
                 onClick={() => toggleWatchlist({ productId: product.id, isWatched })}
               >
-                {isWatched ? 'Watching' : 'Watch for free'}
+                {isWatched ? t.product.watching : t.product.watch}
               </Button>
-              <Button
-                variant="outline"
-                size="lg"
-                leftIcon={<Bell className="w-5 h-5" />}
-                onClick={() => openAlertModal(product.id)}
-              >
-                Set Alert
+              <Button variant="outline" size="lg" leftIcon={<Bell className="h-4 w-4" aria-hidden />} onClick={() => openAlertModal(product.id)}>
+                {t.product.setAlert}
               </Button>
             </>
           ) : (
             <Button
               variant="outline"
               size="lg"
-              leftIcon={<Heart className="w-5 h-5" />}
-              onClick={() => toggleWatchlist({ productId: product.id, isWatched: isWatched })}
+              aria-pressed={isWatched}
+              leftIcon={<Heart className={isWatched ? 'h-4 w-4 fill-current text-brand' : 'h-4 w-4'} aria-hidden />}
+              onClick={() => toggleWatchlist({ productId: product.id, isWatched })}
             >
-              Save without signing in
+              {isWatched ? t.product.saved : t.product.saveWithoutAccount}
             </Button>
           )}
         </div>
 
+        {(product.gtin || product.upc || product.mpn) && (
+          <p className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-muted" dir="ltr">
+            {product.gtin && <span>GTIN {product.gtin}</span>}
+            {product.upc && <span>UPC {product.upc}</span>}
+            {product.mpn && <span>MPN {product.mpn}</span>}
+          </p>
+        )}
       </div>
     </section>
   );

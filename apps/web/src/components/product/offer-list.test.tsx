@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, within } from '@testing-library/react';
+import { renderWithI18n as render } from '@/test/i18n';
 import { OfferList } from './offer-list';
 import type { SourceListing } from '@/types/product.types';
 
@@ -65,24 +66,25 @@ describe('OfferList', () => {
     render(<OfferList listings={offers} />);
     expect(rowNames()).toEqual(['Amazon', 'Jumia', 'Noon']);
     const [first, , last] = screen.getAllByRole('listitem');
-    expect(within(first).getByText('Best Deal')).toBeTruthy();
-    expect(within(last).queryByText('Best Deal')).toBeNull();
+    expect(within(first).getByText('Best deal')).toBeTruthy();
+    expect(within(last).queryByText('Best deal')).toBeNull();
     expect(within(last).getByText('Out of stock')).toBeTruthy();
     expect(first.textContent).toMatch(/EGP|E£/);
   });
 
-  it('links to each store in a new tab, named for the store', () => {
+  it('links to each store through the click-recording redirect, in a new tab (D-21)', () => {
     render(<OfferList listings={[offers[0]]} />);
-    const link = screen.getByRole('link', { name: 'View on Jumia (opens in a new tab)' });
-    expect(link.getAttribute('href')).toBe('https://www.jumia.com.eg/item-1.html');
+    const link = screen.getByRole('link', { name: 'Go to Jumia (opens in a new tab)' });
+    expect(link.getAttribute('href')).toBe('/api/v1/affiliate/go/a');
     expect(link.getAttribute('target')).toBe('_blank');
     expect(link.getAttribute('rel')).toContain('noopener');
+    expect(link.getAttribute('rel')).toContain('sponsored');
     expect(link.textContent).toContain('Go to Jumia');
   });
 
   it('refuses a non-http store URL', () => {
     render(<OfferList listings={[listing({ externalUrl: 'javascript:alert(1)' })]} />);
-    expect(screen.queryByRole('link', { name: /View on Jumia/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: /Go to Jumia/ })).toBeNull();
     expect(screen.getByText('Link unavailable')).toBeTruthy();
   });
 
@@ -96,12 +98,24 @@ describe('OfferList', () => {
     query = 'color=navy';
     render(<OfferList listings={offers} />);
     expect(rowNames()).toEqual(['Jumia', 'Noon']);
-    expect(within(screen.getAllByRole('listitem')[0]).getByText('Best Deal')).toBeTruthy();
+    expect(within(screen.getAllByRole('listitem')[0]).getByText('Best deal')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'navy' }).getAttribute('aria-pressed')).toBe('true');
   });
 
   it('has no color filter when there is only one color', () => {
     render(<OfferList listings={[offers[0]]} />);
     expect(screen.queryByRole('group', { name: 'Filter offers by color' })).toBeNull();
+  });
+});
+
+describe('OfferList in Arabic', () => {
+  afterEach(cleanup);
+
+  it('uses the Arabic copy and keeps the store names as they are', () => {
+    query = '';
+    render(<OfferList listings={offers} />, 'ar');
+    expect(screen.getAllByText('أفضل صفقة').length).toBe(1);
+    expect(screen.getByRole('link', { name: 'اذهب إلى Amazon (يفتح في علامة تبويب جديدة)' })).toBeTruthy();
+    expect(screen.getByText('غير متوفر')).toBeTruthy();
   });
 });

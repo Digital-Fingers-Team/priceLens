@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, screen } from '@testing-library/react';
+import { renderWithI18n as render } from '@/test/i18n';
 import type { SearchHit } from '@/types/search.types';
 import { ProductCard } from './product-card';
 

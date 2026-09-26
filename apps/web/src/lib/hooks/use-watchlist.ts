@@ -2,9 +2,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { watchlistApi } from '@/lib/api/watchlist.api';
 import { QUERY_KEYS } from '@/config/constants';
 import { useUiStore } from '@/lib/store/ui.store';
+import { useI18n } from '@/lib/i18n/provider';
+import { useApiErrorMessage } from '@/lib/hooks/use-api-error';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { getStoredTokens } from '@/lib/api/client';
-import { getApiErrorMessage } from '@/lib/utils/api-error';
 import type { CreateAlertPayload } from '@/lib/api/watchlist.api';
 import { isGuestWatched, toggleGuestWatchlist } from '@/lib/utils/guest-watchlist';
 
@@ -32,6 +33,7 @@ export function useIsWatched(productId: string) {
 export function useToggleWatchlist() {
   const queryClient = useQueryClient();
   const addToast = useUiStore((s) => s.addToast);
+  const { t } = useI18n();
 
   return useMutation({
     mutationFn: async ({
@@ -72,7 +74,7 @@ export function useToggleWatchlist() {
 
     onError: (_err, _vars, context) => {
       queryClient.setQueryData(QUERY_KEYS.watchlist(), context?.previous);
-      addToast('Failed to update watchlist', 'error');
+      addToast(t.toast.watchlistFailed, 'error');
     },
 
     onSuccess: (_data, { isWatched }) => {
@@ -80,7 +82,7 @@ export function useToggleWatchlist() {
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.watchlist() });
       }
       addToast(
-        isWatched ? 'Removed from watchlist' : 'Added to watchlist',
+        isWatched ? t.toast.watchlistRemoved : t.toast.watchlistAdded,
         'success',
       );
     },
@@ -106,6 +108,8 @@ export function useAlerts() {
 export function useCreateAlert() {
   const queryClient = useQueryClient();
   const addToast = useUiStore((s) => s.addToast);
+  const { t } = useI18n();
+  const apiError = useApiErrorMessage();
 
   return useMutation({
     mutationFn: ({ productId, ...payload }: { productId: string } & CreateAlertPayload) =>
@@ -115,26 +119,27 @@ export function useCreateAlert() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.alerts() });
       // The plan's usage counters move when an alert is created.
       queryClient.invalidateQueries({ queryKey: ['billing', 'me'] });
-      addToast('Alert set. We will tell you when it fires.', 'success');
+      addToast(t.toast.alertSet, 'success');
     },
 
     // Surface the server's message rather than a generic failure: a plan-limit
     // or upgrade-required response carries the only text that tells the user
     // what to actually do about it.
-    onError: (err) => addToast(getApiErrorMessage(err, 'Failed to create alert'), 'error'),
+    onError: (err) => addToast(apiError(err, t.toast.alertCreateFailed), 'error'),
   });
 }
 
 export function useDeleteAlert() {
   const queryClient = useQueryClient();
   const addToast = useUiStore((s) => s.addToast);
+  const { t } = useI18n();
 
   return useMutation({
     mutationFn: (alertId: string) => watchlistApi.deleteAlert(alertId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.alerts() });
-      addToast('Alert deleted', 'success');
+      addToast(t.toast.alertDeleted, 'success');
     },
-    onError: () => addToast('Failed to delete alert', 'error'),
+    onError: () => addToast(t.toast.alertDeleteFailed, 'error'),
   });
 }

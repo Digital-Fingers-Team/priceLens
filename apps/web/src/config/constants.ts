@@ -1,6 +1,6 @@
 // Same-origin by default. Pointing this at 127.0.0.1 means the visitor's own
 // machine once it is compiled into the browser bundle, which fails silently.
-const PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL ?? '/api/v1';
+export const PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL ?? '/api/v1';
 
 /**
  * Browser requests go to the public URL, but server-side rendering runs inside
@@ -31,19 +31,15 @@ export const QUERY_KEYS = {
   dashboardStats: () => ['dashboard-stats'] as const,
 } as const;
 
-export const TIER_LABELS: Record<string, string> = {
-  BUDGET: 'Budget',
-  MID_RANGE: 'Mid-Range',
-  PREMIUM: 'Premium',
-  ULTRA_PREMIUM: 'Ultra Premium',
-};
-
+// Labels are in the dictionary (search.sort.<value>).
 export const SORT_OPTIONS = [
-  { label: 'Best Match', value: 'relevance', dir: 'desc' },
-  { label: 'Lowest Price', value: 'minPriceUsd', dir: 'asc' },
-  { label: 'Highest Price', value: 'maxPriceUsd', dir: 'desc' },
-  { label: 'Most Listings', value: 'listingCount', dir: 'desc' },
-  { label: 'Recently Updated', value: 'updatedAt', dir: 'desc' },
+  { value: 'relevance', dir: 'desc' },
+  { value: 'minPriceUsd', dir: 'asc' },
+  { value: 'maxPriceUsd', dir: 'desc' },
+  { value: 'listingCount', dir: 'desc' },
+  { value: 'updatedAt', dir: 'desc' },
 ] as const;
+
+export const PRODUCT_TIERS = ['BUDGET', 'MID_RANGE', 'PREMIUM', 'ULTRA_PREMIUM'] as const;
 
 export const PRICE_HISTORY_DAYS = [7, 30, 90, 180, 365] as const;

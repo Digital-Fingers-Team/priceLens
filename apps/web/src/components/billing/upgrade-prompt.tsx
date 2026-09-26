@@ -1,7 +1,9 @@
 'use client';
 
-import Link from 'next/link';
-import { Lock, Sparkles } from 'lucide-react';
+import { ArrowRight, Lock } from 'lucide-react';
+import { buttonClassName } from '@/components/ui/button-styles';
+import { Link } from '@/lib/i18n/navigation';
+import { useI18n } from '@/lib/i18n/provider';
 import { cn } from '@/lib/utils/cn';
 
 interface UpgradePromptProps {
@@ -25,52 +27,36 @@ interface UpgradePromptProps {
  * instead of a wall. Never used as a security boundary — every gate is
  * enforced server-side as well.
  */
-export function UpgradePrompt({
-  title,
-  description,
-  className,
-  compact,
-  action = { href: '/pricing', label: 'See plans' },
-}: UpgradePromptProps) {
+export function UpgradePrompt({ title, description, className, compact, action }: UpgradePromptProps) {
+  const { t } = useI18n();
+  const target = action ?? { href: '/pricing', label: t.billing.seePlans };
+
   if (compact) {
     return (
       <Link
         href="/pricing"
         className={cn(
-          'flex items-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2',
-          'text-xs text-amber-200/90 transition-colors hover:border-amber-500/50 hover:bg-amber-500/10',
+          'flex items-center gap-2 rounded border border-brand/30 bg-brand-soft/60 px-3 py-2 text-xs text-brand-soft-fg transition-colors hover:border-brand',
           className,
         )}
       >
-        <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        <Lock className="h-4 w-4 shrink-0" aria-hidden />
         <span className="min-w-0 flex-1">{title}</span>
-        <span className="shrink-0 font-medium text-amber-300">Upgrade</span>
+        <span className="label-mono shrink-0">{t.billing.upgrade}</span>
       </Link>
     );
   }
 
   return (
-    <div
-      className={cn(
-        'rounded-xl border border-amber-500/25 bg-gradient-to-br from-amber-500/[0.07] to-transparent p-5',
-        className,
-      )}
-    >
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5 rounded-lg border border-amber-500/25 bg-amber-500/10 p-2">
-          <Sparkles className="h-4 w-4 text-amber-300" aria-hidden />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold text-ink-100">{title}</h3>
-          {description && <p className="mt-1 text-sm leading-relaxed text-ink-400">{description}</p>}
-          <Link
-            href={action.href}
-            className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-200 transition-colors hover:bg-amber-500/25"
-          >
-            {action.label}
-          </Link>
-        </div>
+    <div className={cn('flex flex-col gap-3 rounded border border-brand/30 bg-brand-soft/60 p-4 sm:p-6', className)}>
+      <div className="flex flex-col gap-1">
+        <h3 className="text-sm font-semibold text-fg">{title}</h3>
+        {description && <p className="text-sm text-muted">{description}</p>}
       </div>
+      <Link href={target.href} className={buttonClassName({ size: 'sm', className: 'self-start' })}>
+        {target.label}
+        <ArrowRight className="flip-rtl h-4 w-4" aria-hidden />
+      </Link>
     </div>
   );
 }
@@ -82,10 +68,11 @@ export function UpgradePrompt({
  * price trackers untrustworthy.
  */
 export function InsufficientData({ message, className }: { message: string; className?: string }) {
+  const { t } = useI18n();
   return (
-    <div className={cn('rounded-xl border border-dashed border-ink-700 bg-ink-900/50 p-5', className)}>
-      <p className="text-sm font-medium text-ink-300">Insufficient data</p>
-      <p className="mt-1 text-sm leading-relaxed text-ink-500">{message}</p>
+    <div className={cn('rounded border border-dashed border-border-strong p-4', className)}>
+      <p className="text-sm font-medium text-fg">{t.intel.insufficientData}</p>
+      <p className="mt-1 text-sm text-muted">{message}</p>
     </div>
   );
 }

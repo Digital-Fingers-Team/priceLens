@@ -1,8 +1,10 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Search, X, Loader2 } from 'lucide-react';
+import { Search, X } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { useSuggest } from '@/lib/hooks/use-search';
+import { useRouter } from '@/lib/i18n/navigation';
+import { useI18n } from '@/lib/i18n/provider';
 import { cn } from '@/lib/utils/cn';
 import { useDebounce } from '@/lib/hooks/use-debounce';
 
@@ -13,13 +15,10 @@ interface SearchBarProps {
   className?: string;
 }
 
-export function SearchBar({
-  initialValue = '',
-  size = 'default',
-  onSearch,
-  className,
-}: SearchBarProps) {
+/** The search field is the brand's one pill ("bubble") shape. */
+export function SearchBar({ initialValue = '', size = 'default', onSearch, className }: SearchBarProps) {
   const router = useRouter();
+  const { t, href } = useI18n();
   const [query, setQuery] = useState(initialValue);
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIdx, setHighlightedIdx] = useState(-1);
@@ -88,20 +87,15 @@ export function SearchBar({
     <div ref={containerRef} className={cn('relative', className)}>
       {/* action + name: a submit before the bundle hydrates (slow phone) is a
           plain GET to /search?q=... instead of reloading this page (FE-04). */}
-      <form action="/search" role="search" onSubmit={handleSubmit}>
+      <form action={href('/search')} role="search" onSubmit={handleSubmit}>
         <div className="relative flex items-center">
-          <Search
-            className={cn(
-              'absolute left-4 text-ink-500 pointer-events-none',
-              isHero ? 'w-5 h-5' : 'w-4 h-4',
-            )}
-          />
+          <Search className="pointer-events-none absolute start-4 h-4 w-4 text-muted" aria-hidden />
 
           <input
             ref={inputRef}
             type="search"
             name="q"
-            aria-label="Search products"
+            aria-label={t.search.label}
             dir="auto"
             value={query}
             onChange={(e) => {
@@ -111,58 +105,52 @@ export function SearchBar({
             }}
             onFocus={() => query.length >= 2 && setIsOpen(true)}
             onKeyDown={handleKeyDown}
-            placeholder="Search products, brands, models..."
+            placeholder={t.search.placeholder}
             autoComplete="off"
             className={cn(
-              'w-full rounded-xl border bg-ink-800 text-ink-100',
-              'placeholder:text-ink-500 transition-all duration-150',
-              'focus:outline-none focus:border-signal/60 focus:ring-2 focus:ring-signal/15',
-              'border-ink-600',
-              isHero ? 'h-14 pl-12 pr-24 text-base' : 'h-10 pl-10 pr-20 text-sm',
+              'w-full rounded-full border border-border-strong bg-surface text-fg transition-colors placeholder:text-muted',
+              'hover:border-fg/60 focus-visible:border-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-brand/40',
+              // Room for the clear and submit buttons at the end.
+              isHero ? 'h-12 pe-24 ps-11 text-base' : 'h-10 pe-20 ps-11 text-sm',
             )}
           />
 
           {query && (
             <button
               type="button"
-              aria-label="Clear search"
+              aria-label={t.search.clear}
               onClick={() => {
                 setQuery('');
                 inputRef.current?.focus();
               }}
               className={cn(
-                'absolute p-2 text-ink-500 hover:text-ink-300 transition-colors',
-                'focus-visible:outline-none focus-visible:text-ink-200',
-                isHero ? 'right-12' : 'right-9',
+                'absolute flex h-8 w-8 items-center justify-center rounded-full text-muted transition-colors hover:text-fg',
+                isHero ? 'end-12' : 'end-10',
               )}
             >
-              <X className={isHero ? 'w-5 h-5' : 'w-4 h-4'} />
+              <X className="h-4 w-4" />
             </button>
           )}
 
           <button
             type="submit"
-            aria-label="Search"
+            aria-label={t.search.submit}
             className={cn(
-              'absolute flex items-center justify-center rounded-lg',
-              'bg-signal text-ink-950 font-semibold',
-              'hover:bg-signal-dim transition-colors',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/50',
-              // 32 px inside a 40 px box (was 24 px): easier to hit on a phone.
-              isHero ? 'right-2 h-10 w-10' : 'right-1 h-8 w-8',
+              'absolute flex items-center justify-center rounded-full bg-brand text-brand-fg transition-colors hover:bg-brand-hover',
+              isHero ? 'end-2 h-8 w-8' : 'end-1 h-8 w-8',
             )}
           >
-            <Search className={isHero ? 'w-4 h-4' : 'w-3.5 h-3.5'} />
+            <Search className="h-4 w-4" />
           </button>
         </div>
       </form>
 
       {showDropdown && (
-        <div className="absolute top-full mt-2 left-0 right-0 z-50 rounded-xl border border-ink-700 bg-ink-900 shadow-2xl overflow-hidden">
+        <div className="glass absolute inset-x-0 top-full z-50 mt-2 overflow-hidden rounded border shadow">
           {isFetching && suggestions.length === 0 ? (
-            <div className="flex items-center gap-2 px-4 py-3 text-sm text-ink-400">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Searching...
+            <div className="flex items-center gap-2 px-4 py-3 text-sm text-muted">
+              <Spinner />
+              {t.search.searching}
             </div>
           ) : (
             <ul>
@@ -173,18 +161,17 @@ export function SearchBar({
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => handleSuggestionClick(s.title, s.slug)}
                     className={cn(
-                      'w-full flex items-center gap-3 px-4 py-3 text-left',
-                      'text-sm transition-colors',
-                      i === highlightedIdx
-                        ? 'bg-ink-700 text-ink-50'
-                        : 'text-ink-200 hover:bg-ink-800',
+                      'flex w-full items-center gap-3 px-4 py-3 text-start text-sm transition-colors',
+                      i === highlightedIdx ? 'bg-surface-2 text-fg' : 'text-fg hover:bg-surface-2',
                     )}
                   >
-                    <Search className="w-3.5 h-3.5 text-ink-500 shrink-0" />
-                    <div>
-                      <p className="font-medium" dir="auto">{s.title}</p>
-                      {s.brand && <p className="text-xs text-ink-500 mt-0.5">{s.brand}</p>}
-                    </div>
+                    <Search className="h-4 w-4 shrink-0 text-muted" aria-hidden />
+                    <span className="flex flex-col gap-1">
+                      <span className="font-medium" dir="auto">
+                        {s.title}
+                      </span>
+                      {s.brand && <span className="text-xs text-muted">{s.brand}</span>}
+                    </span>
                   </button>
                 </li>
               ))}

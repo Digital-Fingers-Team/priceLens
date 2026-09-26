@@ -4,6 +4,7 @@ import axios, {
   InternalAxiosRequestConfig,
 } from 'axios';
 import { API_BASE_URL } from '@/config/constants';
+import { localizePath, splitLocale } from '@/lib/i18n/config';
 import { loginHref } from '@/lib/utils/next-path';
 
 // Token refresh queue — prevents multiple simultaneous refresh calls
@@ -113,7 +114,9 @@ apiClient.interceptors.response.use(
         clearStoredTokens();
         // Session over: sign in again, then come back to this page.
         if (typeof window !== 'undefined') {
-          window.location.href = loginHref(window.location.pathname + window.location.search);
+          // In the same language; `next` is the locale-free path.
+          const { locale, path } = splitLocale(window.location.pathname);
+          window.location.href = localizePath(locale, loginHref(path + window.location.search));
         }
         return Promise.reject(refreshError);
       } finally {

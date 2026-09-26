@@ -1,8 +1,10 @@
 'use client';
 
-import Link from 'next/link';
 import { Bell } from 'lucide-react';
+import { iconButtonClassName } from '@/components/ui/button-styles';
 import { useUnreadCount } from '@/lib/hooks/use-notifications';
+import { Link } from '@/lib/i18n/navigation';
+import { useI18n } from '@/lib/i18n/provider';
 
 /**
  * Navbar entry point to the alert inbox.
@@ -12,20 +14,21 @@ import { useUnreadCount } from '@/lib/hooks/use-notifications';
  * exists.
  */
 export function NotificationBell({ onNavigate }: { onNavigate?: () => void }) {
+  const { t, tp } = useI18n();
   const { data: count = 0 } = useUnreadCount();
 
   return (
     <Link
       href="/notifications"
       onClick={onNavigate}
-      aria-label={count > 0 ? `Alerts, ${count} unread` : 'Alerts'}
-      className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-400 transition-colors hover:bg-ink-800 hover:text-ink-100"
+      aria-label={count > 0 ? tp(t.nav.alertsUnread, count) : t.nav.alerts}
+      className={iconButtonClassName({ className: 'relative' })}
     >
       <Bell className="h-4 w-4" aria-hidden />
       {count > 0 && (
         <span
           aria-hidden
-          className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-signal px-1 text-[0.625rem] font-bold tabular-nums text-ink-950"
+          className="absolute -end-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 font-sans text-xs font-semibold normal-case tabular-nums tracking-normal text-brand-fg"
         >
           {count > 9 ? '9+' : count}
         </span>

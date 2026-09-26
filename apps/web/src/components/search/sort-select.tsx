@@ -1,6 +1,7 @@
 'use client';
-import { useId } from 'react';
+import { Select } from '@/components/ui/select';
 import { SORT_OPTIONS } from '@/config/constants';
+import { useI18n } from '@/lib/i18n/provider';
 import type { SearchFilters } from '@/types/search.types';
 
 type Sort = Pick<SearchFilters, 'sortBy' | 'sortDir'>;
@@ -11,7 +12,7 @@ type Sort = Pick<SearchFilters, 'sortBy' | 'sortDir'>;
  * "Descending" -- the old separate Direction select allowed exactly that.
  */
 export function SortSelect({ value, onChange }: { value: Sort; onChange: (sort: Sort) => void }) {
-  const id = useId();
+  const { t } = useI18n();
   const sortBy = value.sortBy ?? 'relevance';
   // A link may carry a direction no option has; show the matching field.
   const current =
@@ -21,24 +22,19 @@ export function SortSelect({ value, onChange }: { value: Sort; onChange: (sort: 
 
   return (
     <div className="flex items-center gap-2">
-      <label htmlFor={id} className="text-sm text-ink-500">
-        Sort
-      </label>
-      <select
-        id={id}
+      <span className="label-mono shrink-0 text-muted" aria-hidden>
+        {t.search.sortLabel}
+      </span>
+      <Select
+        aria-label={t.search.sortLabel}
+        wrapperClassName="w-auto"
         value={current.value}
         onChange={(e) => {
           const option = SORT_OPTIONS.find((o) => o.value === e.target.value) ?? SORT_OPTIONS[0];
           onChange({ sortBy: option.value, sortDir: option.dir });
         }}
-        className="h-10 rounded-lg border border-ink-600 bg-ink-800 px-3 text-sm text-ink-100 focus:border-signal/60 focus:outline-none focus:ring-1 focus:ring-signal/30"
-      >
-        {SORT_OPTIONS.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+        options={SORT_OPTIONS.map((option) => ({ value: option.value, label: t.search.sort[option.value] }))}
+      />
     </div>
   );
 }

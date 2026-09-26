@@ -1,7 +1,8 @@
 'use client';
 
 import { AlertTriangle, BadgeCheck, HelpCircle } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils/format';
+import { useI18n } from '@/lib/i18n/provider';
+import { cn } from '@/lib/utils/cn';
 import type { DiscountCheck } from '@/types/intelligence.types';
 
 /**
@@ -11,71 +12,42 @@ import type { DiscountCheck } from '@/types/intelligence.types';
  * something we had not.
  */
 export function DiscountCheckCard({ check, currency }: { check: DiscountCheck; currency: string }) {
+  const { t, fmt } = useI18n();
   if (check.verdict === 'NO_DISCOUNT_CLAIMED') return null;
 
-  if (check.verdict === 'SUSPICIOUS') {
-    return (
-      <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.07] p-5">
-        <div className="flex items-start gap-3">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" aria-hidden />
-          <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-amber-300">Possibly misleading discount</h3>
-            <p className="mt-1.5 text-sm leading-relaxed text-ink-300">{check.explanation}</p>
-            <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-xs">
-              <div>
-                <dt className="text-ink-500">Advertised was</dt>
-                <dd className="mt-0.5 font-semibold tabular-nums text-ink-300 line-through">
-                  {formatCurrency(check.advertisedWas ?? 0, currency)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-ink-500">Typically sold for</dt>
-                <dd className="mt-0.5 font-semibold tabular-nums text-amber-300">
-                  {formatCurrency(check.observedTypicalPrice ?? 0, currency)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-ink-500">Claimed saving</dt>
-                <dd className="mt-0.5 font-semibold tabular-nums text-ink-300">
-                  {check.claimedDiscountPct?.toFixed(0)}%
-                </dd>
-              </div>
-              <div>
-                <dt className="text-ink-500">Real saving</dt>
-                <dd className="mt-0.5 font-semibold tabular-nums text-amber-300">
-                  {check.realDiscountPct?.toFixed(0)}%
-                </dd>
-              </div>
-            </dl>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (check.verdict === 'UNVERIFIABLE') {
-    return (
-      <div className="rounded-xl border border-ink-700 bg-ink-900/60 p-4">
-        <div className="flex items-start gap-2.5">
-          <HelpCircle className="mt-0.5 h-4 w-4 shrink-0 text-ink-500" aria-hidden />
-          <div>
-            <h3 className="text-sm font-medium text-ink-300">Discount not verified</h3>
-            <p className="mt-1 text-xs leading-relaxed text-ink-500">{check.explanation}</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const variants = {
+    SUSPICIOUS: { Icon: AlertTriangle, tone: 'border-warning/40 bg-warning-soft', icon: 'text-warning', title: t.intel.discountSuspicious },
+    UNVERIFIABLE: { Icon: HelpCircle, tone: 'border-border bg-surface', icon: 'text-muted', title: t.intel.discountUnverified },
+    GENUINE: { Icon: BadgeCheck, tone: 'border-success/40 bg-success-soft', icon: 'text-success', title: t.intel.discountGenuine },
+  } as const;
+  const { Icon, tone, icon, title } = variants[check.verdict as keyof typeof variants] ?? variants.UNVERIFIABLE;
 
   return (
-    <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/[0.05] p-4">
-      <div className="flex items-start gap-2.5">
-        <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" aria-hidden />
-        <div>
-          <h3 className="text-sm font-medium text-emerald-300">Discount looks genuine</h3>
-          <p className="mt-1 text-xs leading-relaxed text-ink-400">{check.explanation}</p>
-        </div>
+    <div className={cn('flex items-start gap-3 rounded border p-4 sm:p-6', tone)}>
+      <Icon className={cn('h-5 w-5 shrink-0', icon)} aria-hidden />
+      <div className="flex min-w-0 flex-col gap-2">
+        <h3 className="text-sm font-semibold text-fg">{title}</h3>
+        <p className="text-sm text-muted" dir="auto">
+          {check.explanation}
+        </p>
+        {check.verdict === 'SUSPICIOUS' && (
+          <dl className="flex flex-wrap gap-x-6 gap-y-2 text-xs">
+            <Fact label={t.intel.advertisedWas} value={<s>{fmt.currency(check.advertisedWas ?? 0, currency)}</s>} />
+            <Fact label={t.intel.typicallySold} value={fmt.currency(check.observedTypicalPrice ?? 0, currency)} />
+            <Fact label={t.intel.claimedSaving} value={fmt.percent(check.claimedDiscountPct)} />
+            <Fact label={t.intel.realSaving} value={fmt.percent(check.realDiscountPct)} />
+          </dl>
+        )}
       </div>
+    </div>
+  );
+}
+
+function Fact({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <dt className="text-muted">{label}</dt>
+      <dd className="font-semibold tabular-nums text-fg">{value}</dd>
     </div>
   );
 }

@@ -1,19 +1,20 @@
 'use client';
 
-import { Badge } from '@/components/ui/badge';
+import { Badge, type BadgeVariant } from '@/components/ui/badge';
+import { useI18n } from '@/lib/i18n/provider';
 import type { PositionLabel } from '@/types/seller.types';
 
 /** One consistent reading of market position everywhere it appears. */
-const PRESENTATION: Record<PositionLabel, { label: string; variant: 'success' | 'info' | 'warning' | 'danger' | 'outline' }> = {
-  CHEAPEST: { label: 'Cheapest', variant: 'success' },
-  BELOW_MARKET: { label: 'Below market', variant: 'success' },
-  AT_MARKET: { label: 'At market', variant: 'info' },
-  ABOVE_MARKET: { label: 'Above market', variant: 'warning' },
-  MOST_EXPENSIVE: { label: 'Most expensive', variant: 'danger' },
-  INSUFFICIENT_DATA: { label: 'Not enough data', variant: 'outline' },
+const VARIANT: Record<PositionLabel, BadgeVariant> = {
+  CHEAPEST: 'success',
+  BELOW_MARKET: 'success',
+  AT_MARKET: 'info',
+  ABOVE_MARKET: 'warning',
+  MOST_EXPENSIVE: 'danger',
+  INSUFFICIENT_DATA: 'outline',
 };
 
 export function PositionBadge({ label }: { label: PositionLabel }) {
-  const presentation = PRESENTATION[label];
-  return <Badge variant={presentation.variant}>{presentation.label}</Badge>;
+  const { t } = useI18n();
+  return <Badge variant={VARIANT[label]}>{t.seller.positions[label]}</Badge>;
 }

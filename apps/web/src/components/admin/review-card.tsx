@@ -34,25 +34,25 @@ export function ReviewCard({ item }: ReviewCardProps) {
   }
 
   return (
-    <div className="rounded-xl border border-ink-700 bg-ink-900 overflow-hidden">
+    <div className="rounded border border-border bg-surface overflow-hidden">
       <div className="p-4 flex items-start gap-4">
         <div className="shrink-0 flex flex-col items-center gap-1">
           <div
             className={cn(
-              'w-14 h-14 rounded-xl flex items-center justify-center text-xl font-black border-2',
-              confidenceLevel === 'high' && 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400',
-              confidenceLevel === 'medium' && 'border-amber-500/40 bg-amber-500/10 text-amber-400',
-              confidenceLevel === 'low' && 'border-red-500/40 bg-red-500/10 text-red-400',
+              'w-14 h-14 rounded flex items-center justify-center text-xl font-semibold border',
+              confidenceLevel === 'high' && 'border-success/40 bg-success/10 text-success',
+              confidenceLevel === 'medium' && 'border-warning/40 bg-warning/10 text-warning',
+              confidenceLevel === 'low' && 'border-danger/40 bg-danger/10 text-danger',
             )}
           >
             {(item.confidence * 100).toFixed(0)}
           </div>
-          <span className="text-[9px] text-ink-500 uppercase tracking-wider font-semibold">
+          <span className="label-mono text-muted">
             conf. %
           </span>
         </div>
 
-        <div className="flex-1 min-w-0 space-y-1.5">
+        <div className="flex-1 min-w-0 space-y-2">
           <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="outline">{item.sourceListing.platform.name}</Badge>
             <Badge
@@ -66,24 +66,24 @@ export function ReviewCard({ item }: ReviewCardProps) {
             >
               {confidenceLevel} confidence
             </Badge>
-            <span className="text-xs text-ink-500">{formatRelativeTime(item.createdAt)}</span>
+            <span className="text-xs text-muted">{formatRelativeTime(item.createdAt)}</span>
           </div>
 
-          <p dir="auto" className="text-sm font-semibold text-ink-100 line-clamp-1">
+          <p dir="auto" className="text-sm font-semibold text-fg line-clamp-1">
             {item.sourceListing.rawTitle}
           </p>
 
           {item.canonicalProduct && (
-            <p className="text-xs text-ink-500 flex items-center gap-1">
-              <Store className="w-3 h-3 shrink-0" />
+            <p className="text-xs text-muted flex items-center gap-1">
+              <Store className="w-4 h-4 shrink-0" aria-hidden />
               Candidate:{' '}
-              <span className="text-ink-300 font-medium">{item.canonicalProduct.title}</span>
+              <span className="text-muted font-medium">{item.canonicalProduct.title}</span>
             </p>
           )}
 
-          <div className="flex items-center gap-3 text-xs text-ink-400">
+          <div className="flex items-center gap-3 text-xs text-muted">
             {item.sourceListing.rawPrice != null && (
-              <span className="font-semibold text-signal">
+              <span className="font-semibold text-brand">
                 {formatCurrency(item.sourceListing.rawPrice ?? undefined, item.sourceListing.rawCurrency)}
               </span>
             )}
@@ -91,10 +91,10 @@ export function ReviewCard({ item }: ReviewCardProps) {
               href={safeExternalHref(item.sourceListing.externalUrl)}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 hover:text-signal transition-colors"
+              className="flex items-center gap-1 hover:text-brand transition-colors"
               onClick={(e) => e.stopPropagation()}
             >
-              View listing <ExternalLink className="w-3 h-3" />
+              View listing <ExternalLink className="w-4 h-4" aria-hidden />
             </a>
           </div>
         </div>
@@ -119,8 +119,11 @@ export function ReviewCard({ item }: ReviewCardProps) {
             Accept
           </Button>
           <button
+            type="button"
             onClick={() => setExpanded(!expanded)}
-            className="text-ink-500 hover:text-ink-300 transition-colors p-1"
+            aria-expanded={expanded}
+            aria-label={expanded ? 'Hide score breakdown' : 'Show score breakdown'}
+            className="rounded-sm p-2 text-muted transition-colors hover:text-fg"
           >
             {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
@@ -128,35 +131,35 @@ export function ReviewCard({ item }: ReviewCardProps) {
       </div>
 
       {expanded && (
-        <div className="border-t border-ink-800 p-4 space-y-4">
-          <h4 className="text-xs font-semibold text-ink-500 uppercase tracking-wider">
+        <div className="border-t border-border p-4 space-y-4">
+          <h4 className="label-mono text-muted">
             Matching Score Breakdown
           </h4>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {scoreEntries.map(([key, step]) => (
-              <div key={key} className="flex items-center gap-3 py-1.5">
+              <div key={key} className="flex items-center gap-3 py-2">
                 <div className="w-32 shrink-0">
-                  <p className="text-xs text-ink-400 capitalize">
+                  <p className="text-xs text-muted capitalize">
                     {key.replace(/([A-Z])/g, ' $1').trim()}
                   </p>
                 </div>
-                <div className="flex-1 h-1.5 rounded-full bg-ink-700 overflow-hidden">
+                <div className="flex-1 h-2 rounded-full bg-surface-2 overflow-hidden">
                   <div
                     className={cn(
                       'h-full rounded-full transition-all',
                       step.score >= 0.8
-                        ? 'bg-emerald-500'
+                        ? 'bg-success'
                         : step.score >= 0.6
-                          ? 'bg-amber-500'
-                          : 'bg-red-500',
+                          ? 'bg-warning'
+                          : 'bg-danger',
                     )}
                     style={{ width: `${step.score * 100}%` }}
                   />
                 </div>
                 <span
                   className={cn(
-                    'text-xs font-mono w-10 text-right shrink-0',
+                    'text-xs font-mono w-10 text-end shrink-0',
                     getConfidenceColor(getConfidenceLevel(step.score)),
                   )}
                 >
@@ -167,7 +170,7 @@ export function ReviewCard({ item }: ReviewCardProps) {
           </div>
 
           <div className="pt-2">
-            <label className="text-xs text-ink-500 block mb-1.5">
+            <label className="text-xs text-muted block mb-2">
               Notes (optional)
             </label>
             <textarea
@@ -175,7 +178,7 @@ export function ReviewCard({ item }: ReviewCardProps) {
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
               placeholder="Add context about your decision..."
-              className="w-full px-3 py-2 rounded-lg text-sm bg-ink-800 border border-ink-700 text-ink-200 placeholder:text-ink-600 focus:outline-none focus:border-signal/50 resize-none"
+              className="w-full px-3 py-2 rounded text-sm bg-surface border border-border-strong text-fg placeholder:text-muted resize-none"
             />
           </div>
         </div>

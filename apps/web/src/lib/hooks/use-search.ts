@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { categoriesApi } from '@/lib/api/categories.api';
 import { searchApi } from '@/lib/api/search.api';
 import { QUERY_KEYS } from '@/config/constants';
 import type { SearchFilters } from '@/types/search.types';
@@ -26,5 +27,14 @@ export function useSuggest(q: string) {
     queryFn: () => searchApi.suggest(q),
     enabled: q.trim().length >= 2,
     staleTime: 10 * 1000,
+  });
+}
+
+export function useCategories() {
+  return useQuery({
+    queryKey: ['categories'],
+    queryFn: () => categoriesApi.list(),
+    // Categories change when an operator adds one, not per visit.
+    staleTime: 60 * 60 * 1000,
   });
 }

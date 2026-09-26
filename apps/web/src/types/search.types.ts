@@ -36,3 +36,12 @@ export interface SuggestionItem {
   title: string;
   brand: string | null;
 }
+/** GET /categories: a category that holds products. */
+export interface CategoryOption {
+  id: string;
+  slug: string;
+  name: string;
+  parentId: string | null;
+  level: number;
+  productCount: number;
+}

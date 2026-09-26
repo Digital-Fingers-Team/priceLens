@@ -2,15 +2,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export function PriceChartSkeleton() {
   return (
-    <div className="rounded-xl border border-ink-700 bg-ink-900 p-5 space-y-4">
+    <div className="flex flex-col gap-4 rounded border border-border bg-surface p-4 sm:p-6">
       <div className="flex items-center justify-between">
-        <div className="space-y-1.5">
-          <Skeleton className="h-5 w-32" />
-          <Skeleton className="h-3 w-48" />
-        </div>
-        <Skeleton className="h-8 w-40 rounded-lg" />
+        <Skeleton className="h-4 w-48" />
+        <Skeleton className="h-10 w-56" />
       </div>
-      <Skeleton className="h-[280px] w-full rounded-xl" />
+      <Skeleton className="h-72 w-full" />
     </div>
   );
 }

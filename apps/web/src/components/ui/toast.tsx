@@ -1,45 +1,44 @@
 'use client';
+import { AlertTriangle, CheckCircle2, Info, X, XCircle } from 'lucide-react';
+import { useI18n } from '@/lib/i18n/provider';
 import { useUiStore, type ToastVariant } from '@/lib/store/ui.store';
 import { cn } from '@/lib/utils/cn';
-import { CheckCircle, XCircle, Info, AlertTriangle, X } from 'lucide-react';
 
 const icons: Record<ToastVariant, React.ReactNode> = {
-  success: <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />,
-  error:   <XCircle className="w-4 h-4 text-red-400 shrink-0" />,
-  info:    <Info className="w-4 h-4 text-blue-400 shrink-0" />,
-  warning: <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />,
+  success: <CheckCircle2 className="h-4 w-4 shrink-0 text-success" aria-hidden />,
+  error: <XCircle className="h-4 w-4 shrink-0 text-danger" aria-hidden />,
+  info: <Info className="h-4 w-4 shrink-0 text-info" aria-hidden />,
+  warning: <AlertTriangle className="h-4 w-4 shrink-0 text-warning" aria-hidden />,
 };
 
-const borders: Record<ToastVariant, string> = {
-  success: 'border-emerald-500/30',
-  error:   'border-red-500/30',
-  info:    'border-blue-500/30',
-  warning: 'border-amber-500/30',
-};
-
+/** Bottom end corner (right in LTR, left in RTL); announced politely. */
 export function ToastContainer() {
+  const { t } = useI18n();
   const { toasts, removeToast } = useUiStore();
 
-  if (toasts.length === 0) return null;
-
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 max-w-sm w-full">
+    <div
+      role="status"
+      aria-live="polite"
+      className="pointer-events-none fixed inset-x-4 bottom-4 z-50 flex flex-col gap-2 sm:inset-x-auto sm:end-6 sm:bottom-6 sm:w-96"
+    >
       {toasts.map((toast) => (
         <div
           key={toast.id}
           className={cn(
-            'flex items-start gap-3 px-4 py-3 rounded-xl',
-            'bg-ink-800 border shadow-2xl animate-fade-up',
-            borders[toast.variant],
+            'pointer-events-auto flex animate-enter items-start gap-3 rounded border border-border bg-surface px-4 py-3 shadow',
+            toast.variant === 'error' && 'border-danger/40',
           )}
         >
           {icons[toast.variant]}
-          <p className="text-sm text-ink-200 flex-1 leading-relaxed">{toast.message}</p>
+          <p className="flex-1 text-sm text-fg">{toast.message}</p>
           <button
+            type="button"
             onClick={() => removeToast(toast.id)}
-            className="text-ink-500 hover:text-ink-200 transition-colors shrink-0"
+            aria-label={t.common.dismiss}
+            className="-m-1 shrink-0 rounded-sm p-1 text-muted transition-colors hover:text-fg"
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
       ))}

@@ -2,50 +2,95 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Colors, scales and themes live in design-tokens.js + tailwind.config.js.
+   This file holds only what utilities cannot express. */
+
 @layer base {
-  :root {
-    --font-body: 'Inter', system-ui, sans-serif;
-    --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
-  }
-
-  * {
-    box-sizing: border-box;
-  }
-
   html {
-    scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-size-adjust: 100%;
   }
 
   body {
-    @apply bg-ink-950 text-ink-200 font-body;
+    @apply bg-bg font-sans text-sm text-fg;
+  }
+
+  :root {
+    --font-sans: var(--font-plex-sans), var(--font-plex-arabic);
+    --font-mono: var(--font-plex-mono);
+  }
+
+  /* Arabic: Plex Sans Arabic first (it carries matching Latin), taller lines
+     for the marks above and below, and never letter-spacing, which breaks
+     the joins between letters. */
+  :lang(ar) {
+    --font-sans: var(--font-plex-arabic), var(--font-plex-sans);
+    --font-mono: var(--font-plex-mono), var(--font-plex-arabic);
+    letter-spacing: 0 !important;
+  }
+  :lang(ar) body,
+  :lang(ar) p,
+  :lang(ar) li {
+    line-height: 1.7;
+  }
+  :lang(ar) * {
+    letter-spacing: 0 !important;
   }
 
   ::selection {
-    @apply bg-signal/20 text-signal;
+    @apply bg-brand-soft text-brand-soft-fg;
   }
 
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+  :focus-visible {
+    @apply outline outline-2 outline-offset-2 outline-brand;
   }
 
-  ::-webkit-scrollbar-track {
-    @apply bg-ink-900;
+  /* One icon stroke across the app (lucide sets the class). */
+  .lucide {
+    stroke-width: 1.75;
   }
 
-  ::-webkit-scrollbar-thumb {
-    @apply bg-ink-700 rounded-full;
+  /* Directional icons (arrows, chevrons) point the reading direction. */
+  [dir='rtl'] .flip-rtl {
+    transform: scaleX(-1);
   }
 
-  ::-webkit-scrollbar-thumb:hover {
-    @apply bg-ink-500;
+  * {
+    scrollbar-color: rgb(var(--color-border-strong)) transparent;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
+@layer components {
+  /* Mono uppercase labels: section eyebrows, table heads, badges, buttons
+     (the owner's reference card). Arabic has no case; :lang(ar) drops the
+     tracking above. */
+  .label-mono {
+    @apply font-mono text-xs font-medium uppercase tracking-wider;
+  }
+
+  /* The glass recipe (the "bubble" identity), used on the sticky header,
+     sheets and menus only. Solid surface where backdrop-filter is missing. */
+  .glass {
+    background-color: rgb(var(--color-surface) / 0.97);
+    border-color: rgb(var(--color-border) / 0.8);
+  }
+  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glass {
+      background-color: rgb(var(--color-surface) / 0.72);
+      -webkit-backdrop-filter: blur(16px) saturate(1.4);
+      backdrop-filter: blur(16px) saturate(1.4);
+    }
   }
 }
