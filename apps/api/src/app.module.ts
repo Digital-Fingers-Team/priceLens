@@ -36,7 +36,8 @@ import billingConfig from './config/billing.config';
 import notificationsConfig from './config/notifications.config';
 import { resolveEnvFiles } from './config/env-files';
 import { validateEnv } from './config/env.validation';
-import { RedisCacheShutdown } from './common/redis-cache-shutdown';
+import { RedisCacheLifecycle } from './common/redis-cache-lifecycle';
+import { reconnectDelay } from './common/redis-resilience';
 
 export const ENV_FILES = resolveEnvFiles();
 
@@ -88,6 +89,12 @@ export const ENV_FILES = resolveEnvFiles();
         password: config.get('redis.password'),
         db: config.get('redis.db', 0),
         ttl: 300, // default 5 min cache TTL
+        // The cache is optional: with Redis down, a cache call must fail fast
+        // so callers fall back to Postgres, not wait for a reconnect (B-01).
+        enableOfflineQueue: false,
+        commandTimeout: 1000,
+        maxRetriesPerRequest: 1,
+        retryStrategy: reconnectDelay,
       }),
     }),
 
@@ -137,7 +144,7 @@ export const ENV_FILES = resolveEnvFiles();
     // registered, every @Throttle decorator in the app is inert and endpoints
     // like login and the scrape-triggering search are unthrottled.
     { provide: APP_GUARD, useClass: ThrottlerGuard },
-    RedisCacheShutdown,
+    RedisCacheLifecycle,
     // FeatureGuard (@RequiresFeature) is registered in AuthModule, directly
     // after JwtAuthGuard -- it needs request.user, so it must not run before
     // authentication has populated it.

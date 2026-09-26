@@ -1,5 +1,5 @@
 import { InjectQueue } from '@nestjs/bull';
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bull';
 import {
@@ -15,6 +15,7 @@ import {
   RUN_LAUNCH_DETECTION_JOB,
   RUN_WEEKLY_REPORTS_JOB,
 } from './ingestion.jobs';
+import { retryUntilDone } from '../common/redis-resilience';
 
 const REPEATABLE_JOB_ID = 'scheduled-live-ingestion';
 const RECONCILIATION_JOB_ID = 'scheduled-reconciliation';
@@ -28,15 +29,35 @@ const LAUNCH_DETECTION_JOB_ID = 'scheduled-launch-detection';
 const WEEKLY_REPORTS_JOB_ID = 'scheduled-weekly-reports';
 
 @Injectable()
-export class IngestionScheduler implements OnModuleInit {
+export class IngestionScheduler implements OnApplicationBootstrap, OnApplicationShutdown {
   private readonly logger = new Logger(IngestionScheduler.name);
+  private stopped = false;
+  /** Settles once the jobs are registered (or the app shuts down). Exposed for tests. */
+  registration: Promise<void> = Promise.resolve();
 
   constructor(
     @InjectQueue(INGESTION_QUEUE) private readonly queue: Queue,
     private readonly configService: ConfigService,
   ) {}
 
-  async onModuleInit() {
+  /**
+   * Registers the repeatable jobs in the background. Bootstrap must not wait
+   * on Redis: with Redis down, awaiting this kept the API from ever listening
+   * (B-01). It retries with backoff until Redis answers.
+   */
+  onApplicationBootstrap() {
+    this.registration = retryUntilDone(() => this.registerJobs(), {
+      label: 'Registering scheduled ingestion jobs',
+      logger: this.logger,
+      isStopped: () => this.stopped,
+    });
+  }
+
+  onApplicationShutdown() {
+    this.stopped = true;
+  }
+
+  async registerJobs() {
     const existingRepeatableJobs = await this.queue.getRepeatableJobs();
     for (const repeatableJob of existingRepeatableJobs) {
       await this.queue.removeRepeatableByKey(repeatableJob.key);

@@ -1,5 +1,6 @@
 import type { Queue } from 'bull';
-import { IngestionQueue } from '../../src/workers/ingestion-queue.service';
+import { ENQUEUE_TIMEOUT_MS, IngestionQueue } from '../../src/workers/ingestion-queue.service';
+import { RedisTimeoutError } from '../../src/common/redis-resilience';
 import {
   RUN_LIVE_INGESTION_JOB,
   RUN_QUERY_INGESTION_JOB,
@@ -59,5 +60,22 @@ describe('IngestionQueue (producer)', () => {
       { maxProducts: 5 },
       expect.objectContaining({ jobId: expect.stringMatching(/^manual-store-coverage-sweep:\d+$/), ...ON_DEMAND }),
     );
+  });
+});
+
+describe('IngestionQueue with Redis unreachable (B-01)', () => {
+  it('fails fast instead of hanging the caller', async () => {
+    jest.useFakeTimers();
+    try {
+      const add = jest.fn(() => new Promise(() => undefined)); // Bull waiting for a connection
+      const producer = new IngestionQueue({ add } as unknown as Queue);
+
+      const pending = producer.enqueueQueryIngestion('iphone 16', 12);
+      jest.advanceTimersByTime(ENQUEUE_TIMEOUT_MS);
+
+      await expect(pending).rejects.toBeInstanceOf(RedisTimeoutError);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
