@@ -1,5 +1,5 @@
 // apps/api/src/auth/interfaces/auth.interfaces.ts
-import { UserRole } from '@prisma/client';
+import { User, UserRole } from '@prisma/client';
 
 export interface TokenPayload {
   sub: string;    // user ID
@@ -10,18 +10,33 @@ export interface TokenPayload {
   exp?: number;
 }
 
+/** The only user fields the API ever returns about the signed-in user. */
+export interface PublicUser {
+  id: string;
+  email: string;
+  username: string;
+  displayName: string | null;
+  role: UserRole;
+  emailVerified: boolean;
+  avatarUrl: string | null;
+}
+
+export function toPublicUser(user: User): PublicUser {
+  return {
+    id: user.id,
+    email: user.email,
+    username: user.username,
+    displayName: user.displayName,
+    role: user.role,
+    emailVerified: user.emailVerified,
+    avatarUrl: user.avatarUrl,
+  };
+}
+
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
-  user: {
-    id: string;
-    email: string;
-    username: string;
-    displayName: string | null;
-    role: UserRole;
-    emailVerified: boolean;
-    avatarUrl: string | null;
-  };
+  user: PublicUser;
 }
 
 export interface RegisterDto {

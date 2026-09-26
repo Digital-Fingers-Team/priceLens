@@ -36,6 +36,9 @@ interface MagentoSearchResponse {
   errors?: Array<{ message?: string }>;
 }
 
+/** Matches the HTTP path's timeout. */
+const IN_PAGE_FETCH_TIMEOUT_MS = 30_000;
+
 const SEARCH_QUERY = `
   query SearchProducts($search: String!, $pageSize: Int!) {
     products(search: $search, pageSize: $pageSize) {
@@ -123,11 +126,12 @@ export abstract class MagentoGraphqlConnector implements RetailerConnector {
       // challenge will redirect back to once it clears.
       await openThroughBotWall(page, `${base}/robots.txt`);
       const result = await page.evaluate(
-        async ({ endpoint, body, store }) => {
+        async ({ endpoint, body, store, timeoutMs }) => {
           const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Store: store },
             body,
+            signal: AbortSignal.timeout(timeoutMs),
           });
           return { status: response.status, text: await response.text() };
         },
@@ -135,6 +139,8 @@ export abstract class MagentoGraphqlConnector implements RetailerConnector {
           endpoint: `${base}/graphql`,
           body: JSON.stringify({ query: SEARCH_QUERY, variables: { search, pageSize } }),
           store: this.storeCode,
+          // page.evaluate has no timeout of its own: a hung call would hang the job (B-19).
+          timeoutMs: IN_PAGE_FETCH_TIMEOUT_MS,
         },
       );
       if (result.status !== 200) {

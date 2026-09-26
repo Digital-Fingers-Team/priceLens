@@ -12,7 +12,7 @@ import { User, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { RegisterDto } from './dto/auth.dto';
-import { TokenPayload, AuthTokens } from './interfaces/auth.interfaces';
+import { TokenPayload, AuthTokens, toPublicUser } from './interfaces/auth.interfaces';
 import { NotificationChannelsService } from '../notifications/notification-channels.service';
 
 @Injectable()
@@ -198,15 +198,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        username: user.username,
-        displayName: user.displayName,
-        role: user.role,
-        emailVerified: user.emailVerified,
-        avatarUrl: user.avatarUrl,
-      },
+      user: toPublicUser(user),
     };
   }
 }

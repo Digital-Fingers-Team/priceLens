@@ -124,6 +124,17 @@ describe('Auth (integration)', () => {
       expect(res.body.data.email).toBe(testUser.email);
     });
 
+    it('returns only the public profile fields (B-18)', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/auth/me')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(Object.keys(res.body.data).sort()).toEqual(
+        ['avatarUrl', 'displayName', 'email', 'emailVerified', 'id', 'role', 'username'],
+      );
+    });
+
     it('rejects unauthenticated request', async () => {
       await request(app.getHttpServer())
         .get('/api/v1/auth/me')

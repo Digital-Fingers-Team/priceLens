@@ -16,6 +16,7 @@ import { LoginDto, RegisterDto, RefreshDto } from './dto/auth.dto';
 import { CurrentUser } from '../common/decorators/index';
 import { Public } from '../common/decorators/index';
 import { User } from '@prisma/client';
+import { PublicUser, toPublicUser } from './interfaces/auth.interfaces';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -77,9 +78,7 @@ export class AuthController {
   @Get('me')
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Get current user profile' })
-  async me(@CurrentUser() user: User) {
-    const { passwordHash, ...safeUser } = user;
-    void passwordHash;
-    return safeUser;
+  me(@CurrentUser() user: User): PublicUser {
+    return toPublicUser(user);
   }
 }

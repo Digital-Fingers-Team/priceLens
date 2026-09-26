@@ -55,45 +55,4 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     await this.$disconnect();
     this.logger.log('Database disconnected');
   }
-
-  /**
-   * Execute multiple operations in a transaction with automatic retry
-   * on serialization failures (deadlocks).
-   */
-  async withRetryTransaction<T>(
-    fn: (prisma: PrismaClient) => Promise<T>,
-    maxRetries = 3,
-  ): Promise<T> {
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        return await this.$transaction(fn as any, {
-          maxWait: 5000,
-          timeout: 30000,
-          isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
-        });
-      } catch (err) {
-        const isRetryable =
-          err instanceof Prisma.PrismaClientKnownRequestError &&
-          ['P2034', 'P2028'].includes(err.code); // serialization / timeout errors
-
-        if (isRetryable && attempt < maxRetries) {
-          this.logger.warn(`Transaction retry ${attempt}/${maxRetries}`);
-          await new Promise((r) => setTimeout(r, 100 * attempt));
-          continue;
-        }
-        throw err;
-      }
-    }
-    throw new Error('Transaction failed after max retries');
-  }
-
-  /**
-   * Soft-delete pattern: set deletedAt instead of removing the row.
-   */
-  async softDelete(model: string, id: string): Promise<void> {
-    await (this as any)[model].update({
-      where: { id },
-      data: { deletedAt: new Date() },
-    });
-  }
 }
