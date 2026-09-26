@@ -2,7 +2,8 @@ import type { MetadataRoute } from 'next';
 import { absoluteUrl } from '@/lib/seo';
 import { searchApi } from '@/lib/api/search.api';
 
-const ROUTES = ['/', '/search', '/collections', '/watchlist'];
+// No /collections: placeholder content, unlinked since phase 06 (D-23).
+const ROUTES = ['/', '/search', '/watchlist'];
 
 // Google caps a single sitemap at 50k URLs; the catalogue is well under that,
 // but the crawl still has to be paid for page by page, so it is fetched in

@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { Heart, Bell, Trash2, Store } from 'lucide-react';
 import { useWatchlist, useToggleWatchlist } from '@/lib/hooks/use-watchlist';
 import { useAuthStore } from '@/lib/store/auth.store';
+import { loginHref } from '@/lib/utils/next-path';
 import { Button } from '@/components/ui/button';
 import { buttonClassName } from '@/components/ui/button-styles';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -19,7 +20,7 @@ export default function WatchlistPage() {
 
   useEffect(() => {
     if (hasHydrated && !isAuthenticated) {
-      router.replace('/login');
+      router.replace(loginHref('/watchlist'));
     }
   }, [hasHydrated, isAuthenticated, router]);
 

@@ -6,6 +6,7 @@ import { useAuthStore } from '@/lib/store/auth.store';
 import { useUiStore } from '@/lib/store/ui.store';
 import type { LoginCredentials, RegisterCredentials } from '@/types/auth.types';
 import { getApiErrorMessage } from '@/lib/utils/api-error';
+import { nextFromLocation } from '@/lib/utils/next-path';
 
 export function useLogin() {
   const setAuth = useAuthStore((s) => s.setAuth);
@@ -17,7 +18,8 @@ export function useLogin() {
     onSuccess: (data) => {
       setAuth(data.user, data.accessToken, data.refreshToken);
       addToast(`Welcome back, ${data.user.displayName ?? data.user.username}!`, 'success');
-      router.push('/');
+      // Back to the page that asked for sign-in (?next=), else home.
+      router.push(nextFromLocation());
     },
     onError: (err: AxiosError<{ error?: { message?: string } }>) => {
       addToast(getApiErrorMessage(err, 'Login failed'), 'error');
@@ -35,7 +37,8 @@ export function useRegister() {
     onSuccess: (data) => {
       setAuth(data.user, data.accessToken, data.refreshToken);
       addToast('Account created!', 'success');
-      router.push('/');
+      // Back to the page that asked for sign-in (?next=), else home.
+      router.push(nextFromLocation());
     },
     onError: (err: AxiosError<{ error?: { message?: string } }>) => {
       addToast(getApiErrorMessage(err, 'Registration failed'), 'error');

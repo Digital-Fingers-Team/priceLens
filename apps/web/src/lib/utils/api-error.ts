@@ -25,13 +25,16 @@ export function getApiErrorMessage(err: unknown, fallback = 'Something went wron
   const apiError = axiosErr?.response?.data?.error;
   const details = apiError?.details;
 
+  // Checked before the server's message: the rate limiter's message is the
+  // framework's ("ThrottlerException: Too Many Requests"), not user copy.
+  if (axiosErr?.response?.status === 429 || apiError?.code === 'RATE_LIMITED') {
+    return 'Too many attempts. Please wait a minute and try again.';
+  }
+
   if (Array.isArray(details) && details.length > 0) return details.join('. ');
   if (typeof details === 'string' && details.trim()) return details;
   if (apiError?.message) return apiError.message;
 
-  if (axiosErr?.response?.status === 429) {
-    return 'Too many attempts. Please wait a moment and try again.';
-  }
   if (axiosErr?.response && axiosErr.response.status >= 500) {
     return 'The server ran into a problem. Please try again shortly.';
   }

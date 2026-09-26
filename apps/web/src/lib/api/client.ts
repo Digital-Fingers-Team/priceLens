@@ -4,6 +4,7 @@ import axios, {
   InternalAxiosRequestConfig,
 } from 'axios';
 import { API_BASE_URL } from '@/config/constants';
+import { loginHref } from '@/lib/utils/next-path';
 
 // Token refresh queue — prevents multiple simultaneous refresh calls
 let isRefreshing = false;
@@ -110,9 +111,9 @@ apiClient.interceptors.response.use(
         }
         processQueue(refreshError, null);
         clearStoredTokens();
-        // Redirect to login — works in client components
+        // Session over: sign in again, then come back to this page.
         if (typeof window !== 'undefined') {
-          window.location.href = '/login';
+          window.location.href = loginHref(window.location.pathname + window.location.search);
         }
         return Promise.reject(refreshError);
       } finally {

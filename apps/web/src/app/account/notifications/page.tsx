@@ -15,6 +15,7 @@ import {
   useVerifyChannel,
 } from '@/lib/hooks/use-notifications';
 import { useAuthStore } from '@/lib/store/auth.store';
+import { loginHref } from '@/lib/utils/next-path';
 import type { NotificationChannelType } from '@/types/billing.types';
 
 const CHANNEL_META: Record<
@@ -55,7 +56,7 @@ export default function NotificationSettingsPage() {
     return (
       <div className="mx-auto max-w-2xl px-4 py-12 text-center">
         <p className="text-sm text-ink-400">
-          <Link href="/login" className="text-signal hover:underline">
+          <Link href={loginHref('/account/notifications')} className="text-signal hover:underline">
             Sign in
           </Link>{' '}
           to manage how you are notified.

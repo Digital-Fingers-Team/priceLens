@@ -9,6 +9,7 @@ import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useBillingPortal, useCancelSubscription, useMyBilling } from '@/lib/hooks/use-billing';
 import { useAuthStore } from '@/lib/store/auth.store';
+import { loginHref } from '@/lib/utils/next-path';
 import { cn } from '@/lib/utils/cn';
 
 const STATUS_VARIANT = {
@@ -36,7 +37,7 @@ export default function BillingPage() {
     return (
       <div className="mx-auto max-w-2xl px-4 py-12 text-center">
         <p className="text-sm text-ink-400">
-          <Link href="/login" className="text-signal hover:underline">
+          <Link href={loginHref('/account/billing')} className="text-signal hover:underline">
             Sign in
           </Link>{' '}
           to see your plan.

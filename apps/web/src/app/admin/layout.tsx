@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { LayoutDashboard, ClipboardList } from 'lucide-react';
 import { useAuthStore } from '@/lib/store/auth.store';
+import { loginHref } from '@/lib/utils/next-path';
 import { cn } from '@/lib/utils/cn';
 
 const NAV = [
@@ -19,7 +20,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (!hasHydrated) return;
     if (!isAuthenticated || (user?.role !== 'ADMIN' && user?.role !== 'MODERATOR')) {
-      router.replace('/login');
+      router.replace(loginHref('/admin'));
     }
   }, [hasHydrated, isAuthenticated, router, user?.role]);
 

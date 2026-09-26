@@ -13,6 +13,8 @@ interface UpgradePromptProps {
   description?: string;
   className?: string;
   compact?: boolean;
+  /** Defaults to the pricing page. A sign-in prompt passes its own. */
+  action?: { href: string; label: string };
 }
 
 /**
@@ -23,7 +25,13 @@ interface UpgradePromptProps {
  * instead of a wall. Never used as a security boundary — every gate is
  * enforced server-side as well.
  */
-export function UpgradePrompt({ title, description, className, compact }: UpgradePromptProps) {
+export function UpgradePrompt({
+  title,
+  description,
+  className,
+  compact,
+  action = { href: '/pricing', label: 'See plans' },
+}: UpgradePromptProps) {
   if (compact) {
     return (
       <Link
@@ -56,10 +64,10 @@ export function UpgradePrompt({ title, description, className, compact }: Upgrad
           <h3 className="text-sm font-semibold text-ink-100">{title}</h3>
           {description && <p className="mt-1 text-sm leading-relaxed text-ink-400">{description}</p>}
           <Link
-            href="/pricing"
+            href={action.href}
             className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-200 transition-colors hover:bg-amber-500/25"
           >
-            See plans
+            {action.label}
           </Link>
         </div>
       </div>

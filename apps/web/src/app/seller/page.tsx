@@ -12,6 +12,7 @@ import { UpgradePrompt } from '@/components/billing/upgrade-prompt';
 import { useCreateWorkspace, useWorkspaces } from '@/lib/hooks/use-seller';
 import { useEntitlements } from '@/lib/hooks/use-billing';
 import { useAuthStore } from '@/lib/store/auth.store';
+import { loginHref } from '@/lib/utils/next-path';
 import { FEATURES } from '@/types/billing.types';
 
 export default function SellerHomePage() {
@@ -33,7 +34,7 @@ export default function SellerHomePage() {
     return (
       <div className="mx-auto max-w-2xl px-4 py-12 text-center">
         <p className="text-sm text-ink-400">
-          <Link href="/login" className="text-signal hover:underline">
+          <Link href={loginHref('/seller')} className="text-signal hover:underline">
             Sign in
           </Link>{' '}
           to open your seller workspace.

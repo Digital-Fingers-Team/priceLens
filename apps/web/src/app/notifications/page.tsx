@@ -10,6 +10,7 @@ import {
   useNotifications,
 } from '@/lib/hooks/use-notifications';
 import { useAuthStore } from '@/lib/store/auth.store';
+import { loginHref } from '@/lib/utils/next-path';
 import { cn } from '@/lib/utils/cn';
 
 export default function NotificationsPage() {
@@ -28,7 +29,7 @@ export default function NotificationsPage() {
     return (
       <div className="mx-auto max-w-2xl px-4 py-12 text-center">
         <p className="text-sm text-ink-400">
-          <Link href="/login" className="text-signal hover:underline">
+          <Link href={loginHref('/notifications')} className="text-signal hover:underline">
             Sign in
           </Link>{' '}
           to see your alerts.

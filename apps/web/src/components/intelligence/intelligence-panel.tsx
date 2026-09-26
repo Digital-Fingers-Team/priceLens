@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { Activity } from 'lucide-react';
 import { useProductIntelligence } from '@/lib/hooks/use-intelligence';
 import { useEntitlements } from '@/lib/hooks/use-billing';
@@ -7,6 +8,7 @@ import { useAuthStore } from '@/lib/store/auth.store';
 import { Skeleton } from '@/components/ui/skeleton';
 import { UpgradePrompt } from '@/components/billing/upgrade-prompt';
 import { FEATURES } from '@/types/billing.types';
+import { loginHref } from '@/lib/utils/next-path';
 import { BuyVerdictCard } from './buy-verdict-card';
 import { DealScoreCard } from './deal-score-card';
 import { DiscountCheckCard } from './discount-check-card';
@@ -20,6 +22,7 @@ import { DiscountCheckCard } from './discount-check-card';
  * fake-discount check are the paid surfaces.
  */
 export function IntelligencePanel({ productId }: { productId: string }) {
+  const pathname = usePathname();
   const isAuthenticated = useAuthStore((s) => Boolean(s.user));
   const { hasFeature, isLoading: entitlementsLoading } = useEntitlements();
   const { data, isLoading, isError, error } = useProductIntelligence(
@@ -32,7 +35,8 @@ export function IntelligencePanel({ productId }: { productId: string }) {
         <Heading />
         <UpgradePrompt
           title="Sign in to see whether now is a good time to buy"
-          description="PriceLens compares this price against the history we have recorded ourselves and tells you whether to buy or wait."
+          description="PriceLens compares this price against the history we have recorded ourselves and tells you whether to buy or wait. Free with an account."
+          action={{ href: loginHref(pathname ?? '/'), label: 'Sign in' }}
         />
       </section>
     );

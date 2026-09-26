@@ -3,13 +3,17 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { Heart, User, LogOut, Shield, Menu, X, TrendingUp, Sparkles, Building2 } from 'lucide-react';
+import { Heart, User, LogOut, Shield, Menu, X, Sparkles, Building2, Bell } from 'lucide-react';
 import { NotificationBell } from '@/components/notifications/notification-bell';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { useLogout } from '@/lib/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { buttonClassName } from '@/components/ui/button-styles';
 import { SearchBar } from '@/components/search/search-bar';
+
+// 44 px rows: the phone menu is all touch targets.
+const mobileItem =
+  'flex min-h-11 w-full items-center gap-2 px-3 rounded-lg text-ink-200 hover:bg-ink-800 text-sm text-left';
 
 export function Navbar() {
   const pathname = usePathname();
@@ -80,9 +84,6 @@ export function Navbar() {
                   <Sparkles className="w-4 h-4" />
                   Deal Hunter
                 </Link>
-                <Link href="/collections" className={buttonClassName({ variant: 'ghost', size: 'sm' })}>
-                  Collections
-                </Link>
 
                 <Link href="/seller" className={buttonClassName({ variant: 'ghost', size: 'sm' })}>
                   <Building2 className="w-4 h-4" />
@@ -133,7 +134,7 @@ export function Navbar() {
           {/* Mobile menu toggle */}
           <button
             type="button"
-            className="md:hidden text-ink-300 hover:text-ink-100 transition-colors"
+            className="md:hidden -mr-2.5 p-2.5 text-ink-300 hover:text-ink-100 transition-colors"
             aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={mobileOpen}
             aria-controls="mobile-menu"
@@ -150,37 +151,38 @@ export function Navbar() {
           {!onSearchPage && <SearchBar onSearch={handleMobileSearch} />}
 
           <nav aria-label="Mobile" className="flex flex-col gap-1">
+            {/* Same destinations as the desktop bar (audit 06, U-10). */}
             {!hasHydrated ? null : isAuthenticated ? (
               <>
-                <Link href="/watchlist" onClick={() => setMobileOpen(false)}
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-ink-200 hover:bg-ink-800 text-sm">
-                  <Heart className="w-4 h-4" /> Watchlist
-                </Link>
-                <Link href="/collections" onClick={() => setMobileOpen(false)}
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-ink-200 hover:bg-ink-800 text-sm">
-                  <TrendingUp className="w-4 h-4" /> Collections
-                </Link>
-                {isAdmin && (
-                  <Link href="/admin" onClick={() => setMobileOpen(false)}
-                    className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-ink-200 hover:bg-ink-800 text-sm">
-                    <Shield className="w-4 h-4" /> Admin Panel
+                {[
+                  { href: '/watchlist', label: 'Watchlist', Icon: Heart },
+                  { href: '/deal-hunter', label: 'Deal Hunter', Icon: Sparkles },
+                  { href: '/notifications', label: 'Notifications', Icon: Bell },
+                  { href: '/seller', label: 'Seller', Icon: Building2 },
+                  { href: '/account/billing', label: 'Account & plan', Icon: User },
+                  ...(isAdmin ? [{ href: '/admin', label: 'Admin', Icon: Shield }] : []),
+                ].map(({ href, label, Icon }) => (
+                  <Link key={href} href={href} onClick={() => setMobileOpen(false)} className={mobileItem}>
+                    <Icon className="w-4 h-4" aria-hidden /> {label}
                   </Link>
-                )}
+                ))}
                 <button
                   type="button"
                   onClick={() => { logout(); setMobileOpen(false); }}
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-ink-200 hover:bg-ink-800 text-sm text-left"
+                  className={mobileItem}
                 >
-                  <LogOut className="w-4 h-4" /> Sign out
+                  <LogOut className="w-4 h-4" aria-hidden /> Sign out
                 </button>
               </>
             ) : (
               <>
-                <Link href="/login" onClick={() => setMobileOpen(false)}
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-ink-200 hover:bg-ink-800 text-sm">
-                  <User className="w-4 h-4" /> Sign in
+                <Link href="/pricing" onClick={() => setMobileOpen(false)} className={mobileItem}>
+                  <Sparkles className="w-4 h-4" aria-hidden /> Pricing
                 </Link>
-                <Link href="/register" onClick={() => setMobileOpen(false)} className={buttonClassName({ variant: 'primary', size: 'sm', className: 'w-full' })}>
+                <Link href="/login" onClick={() => setMobileOpen(false)} className={mobileItem}>
+                  <User className="w-4 h-4" aria-hidden /> Sign in
+                </Link>
+                <Link href="/register" onClick={() => setMobileOpen(false)} className={buttonClassName({ variant: 'primary', size: 'md', className: 'w-full mt-2' })}>
                   Get started
                 </Link>
               </>

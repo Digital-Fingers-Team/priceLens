@@ -1,11 +1,10 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import Link from 'next/link';
-import { TrendingUp, BarChart3, Bell, Store, Share2, BadgeCheck } from 'lucide-react';
+import { TrendingUp, BarChart3, Bell, Store } from 'lucide-react';
 import { SearchBar } from '@/components/search/search-bar';
 import { TrendingSection } from './_components/trending-section';
 import { ProductCardSkeleton } from '@/components/product/product-card-skeleton';
-import { buttonClassName } from '@/components/ui/button-styles';
 import { absoluteUrl } from '@/lib/seo';
 
 // Trending prices come from the live API; without this the page was rendered
@@ -70,9 +69,16 @@ export default function HomePage() {
       </section>
 
       <section className="max-w-7xl mx-auto px-4 sm:px-6 py-12 space-y-6">
-        <div className="flex items-center gap-3">
-          <TrendingUp className="w-5 h-5 text-signal" />
-          <h2 className="text-xl font-bold text-ink-100">Trending Products</h2>
+        {/* Sorted by how many store listings a product has: "most compared",
+            not a popularity signal we do not measure. */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <TrendingUp className="w-5 h-5 text-signal" aria-hidden />
+            <h2 className="text-xl font-bold text-ink-100">Most compared</h2>
+          </div>
+          <Link href="/search?sortBy=listingCount" className="text-sm text-signal hover:underline">
+            See all
+          </Link>
         </div>
         <Suspense
           fallback={
@@ -83,43 +89,6 @@ export default function HomePage() {
         >
           <TrendingSection />
         </Suspense>
-      </section>
-
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 pb-16">
-        <div className="rounded-3xl border border-ink-800 bg-gradient-to-br from-ink-900 via-ink-950 to-ink-900 p-6 sm:p-8">
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
-            <div className="max-w-2xl space-y-3">
-              <p className="text-sm uppercase tracking-[0.2em] text-signal">Shareable collections</p>
-              <h2 className="text-2xl sm:text-3xl font-black text-ink-50">
-                Turn product research into something people actually forward to friends.
-              </h2>
-              <p className="text-ink-400">
-                Pricelens works best when people can compare, save, and share without friction. Collections give them a reason to come back.
-              </p>
-            </div>
-            <Link href="/collections" className={buttonClassName({ variant: 'primary' })}>
-              <Share2 className="w-4 h-4" />
-              Browse collections
-            </Link>
-          </div>
-
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              { title: 'Best deals today', copy: 'A live feed of the sharpest price drops.', badge: 'Trending' },
-              { title: 'Budget picks', copy: 'The cheapest good options across key categories.', badge: 'Saved often' },
-              { title: 'Verified favorites', copy: 'Top products with strong matching and trust signals.', badge: 'Trusted' },
-            ].map((item) => (
-              <div key={item.title} className="rounded-2xl border border-ink-700 bg-ink-950/70 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="font-semibold text-ink-100">{item.title}</h3>
-                  <BadgeCheck className="w-4 h-4 text-signal" />
-                </div>
-                <p className="mt-2 text-sm text-ink-400">{item.copy}</p>
-                <p className="mt-4 text-xs uppercase tracking-wider text-ink-500">{item.badge}</p>
-              </div>
-            ))}
-          </div>
-        </div>
       </section>
     </>
   );
