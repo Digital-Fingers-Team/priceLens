@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-export default function GlobalError({
+export default function RouteError({
   error,
   reset,
 }: {
@@ -11,7 +11,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('Global error:', error);
+    console.error('Page error:', error);
   }, [error]);
 
   return (

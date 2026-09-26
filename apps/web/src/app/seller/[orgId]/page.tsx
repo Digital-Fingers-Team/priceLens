@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { AlertTriangle, Bell, Package, Plus, Search, TrendingDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { buttonClassName } from '@/components/ui/button-styles';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -41,15 +42,14 @@ export default function WorkspaceDashboard() {
             Where you stand against every store we track.
           </p>
         </div>
-        <Link href={`/seller/${orgId}/events`}>
-          <Button variant="ghost" leftIcon={<Bell className="h-4 w-4" />}>
-            Competitor activity
-            {summary && summary.unacknowledgedEvents > 0 && (
-              <span className="ml-2 rounded-full bg-signal px-1.5 text-[0.65rem] font-bold text-ink-950">
-                {summary.unacknowledgedEvents}
-              </span>
-            )}
-          </Button>
+        <Link href={`/seller/${orgId}/events`} className={buttonClassName({ variant: 'ghost' })}>
+          <Bell className="h-4 w-4" />
+          Competitor activity
+          {summary && summary.unacknowledgedEvents > 0 && (
+            <span className="ml-2 rounded-full bg-signal px-1.5 text-[0.65rem] font-bold text-ink-950">
+              {summary.unacknowledgedEvents}
+            </span>
+          )}
         </Link>
       </header>
 

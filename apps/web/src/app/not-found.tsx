@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Search, Home } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { buttonClassName } from '@/components/ui/button-styles';
 
 export default function NotFound() {
   return (
@@ -14,15 +14,13 @@ export default function NotFound() {
           </p>
         </div>
         <div className="flex gap-3">
-          <Link href="/">
-            <Button variant="outline" leftIcon={<Home className="w-4 h-4" />}>
-              Go home
-            </Button>
+          <Link href="/" className={buttonClassName({ variant: 'outline' })}>
+            <Home className="w-4 h-4" />
+            Go home
           </Link>
-          <Link href="/search">
-            <Button variant="primary" leftIcon={<Search className="w-4 h-4" />}>
-              Search products
-            </Button>
+          <Link href="/search" className={buttonClassName({ variant: 'primary' })}>
+            <Search className="w-4 h-4" />
+            Search products
           </Link>
         </div>
       </div>

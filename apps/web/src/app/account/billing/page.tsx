@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { CreditCard, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { buttonClassName } from '@/components/ui/button-styles';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -21,9 +22,15 @@ const STATUS_VARIANT = {
 
 export default function BillingPage() {
   const isAuthenticated = useAuthStore((s) => Boolean(s.user));
+  const hasHydrated = useAuthStore((s) => s.hasHydrated);
   const { data, isLoading } = useMyBilling();
   const { mutate: openPortal, isPending: portalPending } = useBillingPortal();
   const { mutate: cancel, isPending: cancelPending } = useCancelSubscription();
+
+  // Until the stored session is read, "signed out" is not known yet.
+  if (!hasHydrated) {
+    return <div className="mx-auto max-w-2xl px-4 py-12" aria-busy="true" />;
+  }
 
   if (!isAuthenticated) {
     return (
@@ -120,10 +127,9 @@ export default function BillingPage() {
                 Payment & invoices
               </Button>
             )}
-            <Link href="/pricing">
-              <Button variant={isPaid ? 'ghost' : 'primary'} rightIcon={<ExternalLink className="h-4 w-4" />}>
-                {isPaid ? 'Change plan' : 'See plans'}
-              </Button>
+            <Link href="/pricing" className={buttonClassName({ variant: isPaid ? 'ghost' : 'primary' })}>
+              {isPaid ? 'Change plan' : 'See plans'}
+              <ExternalLink className="h-4 w-4" />
             </Link>
             {isPaid && !data.cancelAtPeriodEnd && (
               <Button

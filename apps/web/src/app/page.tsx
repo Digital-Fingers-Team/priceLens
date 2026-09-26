@@ -5,7 +5,7 @@ import { TrendingUp, BarChart3, Bell, Store, Share2, BadgeCheck } from 'lucide-r
 import { SearchBar } from '@/components/search/search-bar';
 import { TrendingSection } from './_components/trending-section';
 import { ProductCardSkeleton } from '@/components/product/product-card-skeleton';
-import { Button } from '@/components/ui/button';
+import { buttonClassName } from '@/components/ui/button-styles';
 import { absoluteUrl } from '@/lib/seo';
 
 // Trending prices come from the live API; without this the page was rendered
@@ -97,10 +97,9 @@ export default function HomePage() {
                 Pricelens works best when people can compare, save, and share without friction. Collections give them a reason to come back.
               </p>
             </div>
-            <Link href="/collections">
-              <Button variant="primary" leftIcon={<Share2 className="w-4 h-4" />}>
-                Browse collections
-              </Button>
+            <Link href="/collections" className={buttonClassName({ variant: 'primary' })}>
+              <Share2 className="w-4 h-4" />
+              Browse collections
             </Link>
           </div>
 

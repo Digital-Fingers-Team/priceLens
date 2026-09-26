@@ -6,6 +6,7 @@ import { Heart, Bell, Trash2, Store } from 'lucide-react';
 import { useWatchlist, useToggleWatchlist } from '@/lib/hooks/use-watchlist';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { Button } from '@/components/ui/button';
+import { buttonClassName } from '@/components/ui/button-styles';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, formatRelativeTime } from '@/lib/utils/format';
 import { useUiStore } from '@/lib/store/ui.store';
@@ -78,8 +79,8 @@ function WatchlistContent() {
             Search for products and click the heart icon to track prices.
           </p>
         </div>
-        <Link href="/search">
-          <Button variant="primary">Browse products</Button>
+        <Link href="/search" className={buttonClassName({ variant: 'primary' })}>
+          Browse products
         </Link>
       </div>
     );
@@ -114,7 +115,7 @@ function WatchlistContent() {
             {/* Info */}
             <div className="flex-1 min-w-0">
               <Link href={`/products/${product.slug}`}>
-                <h3 className="font-semibold text-ink-100 text-sm line-clamp-1 hover:text-signal transition-colors">
+                <h3 dir="auto" className="font-semibold text-ink-100 text-sm line-clamp-1 hover:text-signal transition-colors">
                   {product.title}
                 </h3>
               </Link>

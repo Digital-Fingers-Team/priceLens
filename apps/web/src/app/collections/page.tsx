@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ArrowRight, Share2, Sparkles, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { buttonClassName } from '@/components/ui/button-styles';
 
 const COLLECTIONS = [
   {
@@ -68,10 +69,9 @@ export default function CollectionsPage() {
             Users are more likely to share a useful list than a lone product URL.
           </p>
         </div>
-        <Link href="/search">
-          <Button variant="primary" leftIcon={<Share2 className="w-4 h-4" />}>
-            Start browsing
-          </Button>
+        <Link href="/search" className={buttonClassName({ variant: 'primary' })}>
+          <Share2 className="w-4 h-4" />
+          Start browsing
         </Link>
       </div>
     </div>

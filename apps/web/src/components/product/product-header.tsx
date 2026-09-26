@@ -72,7 +72,7 @@ export function ProductHeader({ product }: ProductHeaderProps) {
           </Badge>
         </div>
 
-        <h1 className="text-2xl sm:text-3xl font-bold text-ink-50 leading-tight">{product.title}</h1>
+        <h1 dir="auto" className="text-2xl sm:text-3xl font-bold text-ink-50 leading-tight">{product.title}</h1>
 
         {Object.keys(attrs).length > 0 && (
           <div className="flex flex-wrap gap-2">

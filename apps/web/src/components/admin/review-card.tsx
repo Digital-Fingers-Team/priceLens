@@ -69,7 +69,7 @@ export function ReviewCard({ item }: ReviewCardProps) {
             <span className="text-xs text-ink-500">{formatRelativeTime(item.createdAt)}</span>
           </div>
 
-          <p className="text-sm font-semibold text-ink-100 line-clamp-1">
+          <p dir="auto" className="text-sm font-semibold text-ink-100 line-clamp-1">
             {item.sourceListing.rawTitle}
           </p>
 

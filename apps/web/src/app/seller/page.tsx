@@ -16,12 +16,18 @@ import { FEATURES } from '@/types/billing.types';
 
 export default function SellerHomePage() {
   const isAuthenticated = useAuthStore((s) => Boolean(s.user));
+  const hasHydrated = useAuthStore((s) => s.hasHydrated);
   const { hasFeature, isLoading: entitlementsLoading } = useEntitlements();
   const { data: workspaces, isLoading } = useWorkspaces();
   const { mutate: create, isPending } = useCreateWorkspace();
 
   const [name, setName] = useState('');
   const canCreateSeller = hasFeature(FEATURES.SELLER_WORKSPACE);
+
+  // Until the stored session is read, "signed out" is not known yet.
+  if (!hasHydrated) {
+    return <div className="mx-auto max-w-2xl px-4 py-12" aria-busy="true" />;
+  }
 
   if (!isAuthenticated) {
     return (

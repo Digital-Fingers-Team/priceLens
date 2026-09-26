@@ -14,9 +14,15 @@ import { cn } from '@/lib/utils/cn';
 
 export default function NotificationsPage() {
   const isAuthenticated = useAuthStore((s) => Boolean(s.user));
+  const hasHydrated = useAuthStore((s) => s.hasHydrated);
   const { data, isLoading } = useNotifications();
   const { mutate: markRead } = useMarkNotificationRead();
   const { mutate: markAllRead, isPending: markingAll } = useMarkAllNotificationsRead();
+
+  // Until the stored session is read, "signed out" is not known yet.
+  if (!hasHydrated) {
+    return <div className="mx-auto max-w-2xl px-4 py-12" aria-busy="true" />;
+  }
 
   if (!isAuthenticated) {
     return (

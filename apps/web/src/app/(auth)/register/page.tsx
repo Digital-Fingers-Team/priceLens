@@ -99,7 +99,8 @@ export default function RegisterPage() {
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               className="text-ink-500 hover:text-ink-300 transition-colors"
-              tabIndex={-1}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              aria-pressed={showPassword}
             >
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>

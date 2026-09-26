@@ -54,7 +54,9 @@ export function ListingTable({ listings, showConfidence = false }: ListingTableP
             <th className="text-right px-4 py-3 text-xs font-semibold text-ink-500 uppercase tracking-wider hidden lg:table-cell">
               Updated
             </th>
-            <th className="px-4 py-3" />
+            <th className="px-4 py-3">
+              <span className="sr-only">Store link</span>
+            </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-ink-800">
@@ -94,6 +96,7 @@ export function ListingTable({ listings, showConfidence = false }: ListingTableP
                   {/* One product covers every color of a model, so each store's
                       own title is what says which color (and bundle) it sells. */}
                   <p
+                    dir="auto"
                     className="mt-1 max-w-[15rem] sm:max-w-sm text-xs text-ink-500 line-clamp-2"
                     title={listing.rawTitle}
                   >
@@ -122,11 +125,11 @@ export function ListingTable({ listings, showConfidence = false }: ListingTableP
                 {/* Stock */}
                 <td className="px-4 py-3.5 text-center hidden sm:table-cell">
                   {listing.inStock == null ? (
-                    <span className="text-ink-600 text-xs">—</span>
+                    <span className="text-ink-600 text-xs" aria-label="Stock unknown">—</span>
                   ) : listing.inStock ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" aria-label="In stock" role="img" />
                   ) : (
-                    <AlertCircle className="w-4 h-4 text-red-400 mx-auto" />
+                    <AlertCircle className="w-4 h-4 text-red-400 mx-auto" aria-label="Out of stock" role="img" />
                   )}
                 </td>
 
@@ -175,6 +178,7 @@ export function ListingTable({ listings, showConfidence = false }: ListingTableP
                     href={safeExternalHref(listing.externalUrl)}
                     target="_blank"
                     rel="noopener noreferrer"
+                    aria-label={`View on ${listing.platform.name} (opens in a new tab)`}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-signal border border-signal/20 hover:bg-signal/10 transition-colors"
                     onClick={(e) => e.stopPropagation()}
                   >

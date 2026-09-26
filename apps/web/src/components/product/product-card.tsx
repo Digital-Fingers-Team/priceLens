@@ -13,9 +13,11 @@ import { cn } from '@/lib/utils/cn';
 
 interface ProductCardProps {
   product: SearchHit;
+  /** Load the image eagerly: set for the first row, where it is usually the LCP. */
+  priority?: boolean;
 }
 
-export function ProductCard({ product }: ProductCardProps) {
+export function ProductCard({ product, priority = false }: ProductCardProps) {
   const router = useRouter();
   const { isAuthenticated } = useAuthStore();
   const isWatched = useIsWatched(product.id);
@@ -51,6 +53,7 @@ export function ProductCard({ product }: ProductCardProps) {
               alt={product.title}
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              priority={priority}
               className="object-contain p-4 transition-transform duration-300 group-hover:scale-105"
             />
           ) : (
@@ -104,7 +107,7 @@ export function ProductCard({ product }: ProductCardProps) {
           )}
 
           {/* Title: store-supplied text, always rendered as text */}
-          <h3 className="text-sm font-semibold text-ink-100 leading-snug line-clamp-2">{product.title}</h3>
+          <h3 dir="auto" className="text-sm font-semibold text-ink-100 leading-snug line-clamp-2">{product.title}</h3>
 
           {/* Store count (distinct retailers, not raw listing rows) */}
           <div className="flex items-center gap-1 text-xs text-ink-500">

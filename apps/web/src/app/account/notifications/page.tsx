@@ -43,7 +43,13 @@ const CHANNEL_META: Record<
 
 export default function NotificationSettingsPage() {
   const isAuthenticated = useAuthStore((s) => Boolean(s.user));
+  const hasHydrated = useAuthStore((s) => s.hasHydrated);
   const { data, isLoading } = useNotificationChannels();
+
+  // Until the stored session is read, "signed out" is not known yet.
+  if (!hasHydrated) {
+    return <div className="mx-auto max-w-2xl px-4 py-12" aria-busy="true" />;
+  }
 
   if (!isAuthenticated) {
     return (
