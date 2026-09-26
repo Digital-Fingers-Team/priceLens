@@ -7,14 +7,12 @@ import {
   HttpCode,
   HttpStatus,
   Request,
-  UseGuards,
   Delete,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { AuthGuard } from '@nestjs/passport';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
-import { RegisterDto, RefreshDto } from './dto/auth.dto';
+import { LoginDto, RegisterDto, RefreshDto } from './dto/auth.dto';
 import { CurrentUser } from '../common/decorators/index';
 import { Public } from '../common/decorators/index';
 import { User } from '@prisma/client';
@@ -37,13 +35,18 @@ export class AuthController {
     );
   }
 
+  /**
+   * The body is validated like every other one (LoginDto) and checked here.
+   * It used to go through passport-local, whose guard runs before pipes, so
+   * the body was never validated and unknown fields were accepted (B-04).
+   */
   @Public()
-  @UseGuards(AuthGuard('local'))
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @ApiOperation({ summary: 'Login with email and password' })
-  async login(@CurrentUser() user: User, @Request() req: any) {
+  async login(@Body() dto: LoginDto, @Request() req: any) {
+    const user = await this.authService.validateLocalUser(dto.email, dto.password);
     return this.authService.login(user, req.ip, req.headers['user-agent']);
   }
 

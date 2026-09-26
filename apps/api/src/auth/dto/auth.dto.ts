@@ -41,11 +41,13 @@ export class RegisterDto {
 export class LoginDto {
   @ApiProperty({ example: 'user@example.com' })
   @IsEmail()
+  @MaxLength(254)
   email: string;
 
   @ApiProperty()
   @IsString()
   @MinLength(1)
+  @MaxLength(128)
   password: string;
 }
 

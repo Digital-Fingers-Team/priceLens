@@ -8,7 +8,6 @@ import { APP_GUARD } from '@nestjs/core';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
-import { LocalStrategy } from './strategies/local.strategy';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -29,7 +28,6 @@ import { FeatureGuard } from '../billing/feature.guard';
   providers: [
     AuthService,
     JwtStrategy,
-    LocalStrategy,
     JwtRefreshStrategy,
     // Apply JWT auth globally — use @Public() to opt out.
     //

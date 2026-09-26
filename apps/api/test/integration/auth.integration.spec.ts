@@ -63,6 +63,14 @@ describe('Auth (integration)', () => {
         .send({ ...testUser, email: 'other@example.com', password: 'weak' })
         .expect(400);
     });
+
+    it('rejects the same email in different case as "already registered" (B-04)', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/auth/register')
+        .send({ ...testUser, email: testUser.email.toUpperCase(), username: `${testUser.username}x`.slice(0, 20) })
+        .expect(409);
+      expect(res.body.error.message).toBe('Email already registered');
+    });
   });
 
   describe('POST /api/v1/auth/login', () => {
@@ -80,6 +88,29 @@ describe('Auth (integration)', () => {
         .post('/api/v1/auth/login')
         .send({ email: testUser.email, password: 'WrongPass999' })
         .expect(401);
+    });
+
+    it('logs in with the email in any case', async () => {
+      await request(app.getHttpServer())
+        .post('/api/v1/auth/login')
+        .send({ email: testUser.email.toUpperCase(), password: testUser.password })
+        .expect(200);
+    });
+
+    it('validates the body (B-04): malformed fields are a 400 naming them, unknown fields are refused', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/auth/login')
+        .send({ email: { x: 1 }, password: [1], junk: 1 })
+        .expect(400);
+      expect(res.body.error.code).toBe('BAD_REQUEST');
+      const details = (res.body.error.details as string[]).join(' | ');
+      expect(details).toContain('email must be an email');
+      expect(details).toContain('password must be a string');
+      expect(details).toContain('property junk should not exist');
+    });
+
+    it('rejects a missing password with 400, not 401', async () => {
+      await request(app.getHttpServer()).post('/api/v1/auth/login').send({ email: testUser.email }).expect(400);
     });
   });
 

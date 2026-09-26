@@ -27,14 +27,17 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto, ip?: string, userAgent?: string): Promise<AuthTokens> {
-    // Check uniqueness
+    // Both are stored lowercased, so compare lowercased: "User@X.com" used to
+    // miss "user@x.com" here and fail later on the unique index instead.
+    const email = dto.email.toLowerCase();
+    const username = dto.username.toLowerCase();
     const existing = await this.prisma.user.findFirst({
-      where: { OR: [{ email: dto.email }, { username: dto.username }] },
+      where: { OR: [{ email }, { username }] },
       select: { email: true, username: true },
     });
 
     if (existing) {
-      if (existing.email === dto.email) {
+      if (existing.email === email) {
         throw new ConflictException('Email already registered');
       }
       throw new ConflictException('Username already taken');
@@ -45,8 +48,8 @@ export class AuthService {
 
     const user = await this.prisma.user.create({
       data: {
-        email: dto.email.toLowerCase(),
-        username: dto.username.toLowerCase(),
+        email,
+        username,
         displayName: dto.displayName ?? dto.username,
         passwordHash,
         role: UserRole.USER,
