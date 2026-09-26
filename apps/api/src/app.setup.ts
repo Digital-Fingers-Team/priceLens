@@ -8,6 +8,7 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { ApiExceptionFilter } from './common/filters/api-exception.filter';
 import { AppException } from './common/errors/app.exception';
+import { allowedCorsOrigins } from './config/site-origins';
 import { REQUEST_ID_HEADER, requestIdMiddleware } from './common/request-id.middleware';
 
 /**
@@ -62,16 +63,11 @@ export function configureApp(app: NestExpressApplication): void {
   app.use(compression());
 
   // ─── CORS ────────────────────────────────────────────────────────────────
-  const configuredOrigins = (process.env.FRONTEND_URL ?? '')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean);
-  const defaultOrigins = ['http://localhost:3000', 'http://127.0.0.1:3000'];
-  const allowedOrigins = Array.from(new Set([...defaultOrigins, ...configuredOrigins]));
+  const { any: allowAnyOrigin, origins: allowedOrigins } = allowedCorsOrigins();
 
   app.enableCors({
     origin: (origin, callback) => {
-      if (configuredOrigins.includes('*')) {
+      if (allowAnyOrigin) {
         callback(null, true);
         return;
       }

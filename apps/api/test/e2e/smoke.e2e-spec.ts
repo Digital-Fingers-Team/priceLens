@@ -22,6 +22,8 @@ import { generateStores } from '../../seed/generators/generateStores';
  */
 
 const QUERY = 'iphone 15 128gb';
+// The site origin as production sets it; FRONTEND_URL in .env.test leaves it out (S-02).
+const SITE_ORIGIN = 'https://site.pricelens.test';
 
 function listing(externalId: string, title: string, price: number): RetailerListing {
   return {
@@ -64,6 +66,7 @@ describe('Smoke (e2e)', () => {
       .compile();
 
     app = moduleRef.createNestApplication<NestExpressApplication>({ rawBody: true });
+    process.env.NEXT_PUBLIC_SITE_URL = SITE_ORIGIN;
     configureApp(app);
     await app.init();
 
@@ -170,6 +173,14 @@ describe('Smoke (e2e)', () => {
       .set('Origin', 'https://evil.example')
       .expect(403);
     expect(cors.body).toMatchObject({ success: false, error: { code: 'CORS_ORIGIN_NOT_ALLOWED' } });
+
+    // Browsers send Origin on same-origin POSTs; the site's own login must reach the handler.
+    const ownSite = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .set('Origin', SITE_ORIGIN)
+      .send({ email: 'nobody@example.com', password: 'wrong-password' })
+      .expect(401);
+    expect(ownSite.headers['access-control-allow-origin']).toBe(SITE_ORIGIN);
   });
 
   it('search returns the ingested product', async () => {
