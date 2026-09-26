@@ -2,22 +2,14 @@ import { expect, type Page, test } from '@playwright/test';
 
 const API_URL = process.env.E2E_API_URL ?? 'http://localhost:3001/api/v1';
 
-/**
- * Wait for client JS before interacting. The search form has no `action`, so
- * a submit before hydration is a native reload of the current page (audit 00,
- * handoff to phase 06) -- the tests exercise the hydrated app.
- */
+/** Wait for client JS before interacting (flows.spec.ts covers the no-JS search). */
 async function openHydrated(page: Page, path: string) {
   await page.goto(path);
   await page.waitForLoadState('networkidle');
 }
 
-/**
- * The mobile menu toggle has no accessible name yet (audit 00, handoff to
- * phase 05/06), so it is found as the last button in the header.
- */
 async function openMobileMenu(page: Page) {
-  await page.getByRole('banner').getByRole('button').last().click();
+  await page.getByRole('button', { name: 'Open menu' }).click();
 }
 
 test('search → results → product page', async ({ page }) => {
