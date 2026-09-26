@@ -214,4 +214,77 @@ describe('Search ranking (e2e)', () => {
   it('20. "بلايستيشن ٥": the console first', async () => {
     expect((await search('بلايستيشن ٥'))[0]).toBe(t('ps5'));
   });
+
+  // ─── Suggestions (B-10: now SQL, same rules) ─────────────────────────────
+
+  async function suggest(q: string, limit?: number): Promise<string[]> {
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/search/suggest')
+      .query(limit ? { q, limit } : { q })
+      .expect(200);
+    return res.body.data.map((item: { title: string }) => item.title);
+  }
+
+  it('suggest: titles starting with what was typed come first, every term must match', async () => {
+    const titles = await suggest('samsung galaxy a57');
+    expect(titles.length).toBeGreaterThanOrEqual(2);
+    expect(new Set(titles.slice(0, 2))).toEqual(new Set([t('a57-8'), t('a57-12')]));
+    for (const title of titles) expect(title.toLowerCase()).toContain('a57');
+  });
+
+  it('suggest: Arabic brand names reach English titles', async () => {
+    const titles = await suggest('سامسونج جالاكسي');
+    expect(titles).toEqual(expect.arrayContaining([t('a57-8'), t('a57-12')]));
+  });
+
+  it('suggest: respects limit, and under 2 characters returns nothing', async () => {
+    expect(await suggest('samsung', 2)).toHaveLength(2);
+    expect(await suggest('s')).toEqual([]);
+  });
+
+  // ─── Input handling (B-02, B-13) ─────────────────────────────────────────
+
+  it('LIKE wildcards in a query match literally', async () => {
+    expect(await search('%')).toEqual([]);
+    expect(await search('_')).toEqual([]);
+    expect(await suggest('%%')).toEqual([]);
+  });
+
+  it('reports a measured processing time', async () => {
+    const res = await request(app.getHttpServer()).get('/api/v1/search').query({ q: 'iphone' }).expect(200);
+    expect(typeof res.body.data.processingTimeMs).toBe('number');
+    expect(res.body.data.processingTimeMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it.each([
+    ['a non-numeric price', { minPrice: 'abc' }],
+    ['a negative price', { maxPrice: -1 }],
+    ['an unknown sort', { sortBy: 'bogus' }],
+    ['an unknown tier', { tier: 'CHEAP' }],
+    ['a non-uuid category', { categoryId: 'phones' }],
+    ['a page below 1', { page: 0 }],
+    ['a limit above 100', { limit: 101 }],
+    ['an unknown parameter', { extra: 1 }],
+    ['a 201-character query', { q: 'a'.repeat(201) }],
+  ])('GET /search rejects %s with 400', async (_label, query) => {
+    const res = await request(app.getHttpServer()).get('/api/v1/search').query(query).expect(400);
+    expect(res.body.error.code).toBe('BAD_REQUEST');
+    expect(Array.isArray(res.body.error.details)).toBe(true);
+  });
+
+  it.each([
+    ['a negative limit', { q: 'samsung', limit: -1 }],
+    ['a limit above 20', { q: 'samsung', limit: 21 }],
+    ['a non-numeric limit', { q: 'samsung', limit: 'abc' }],
+  ])('GET /search/suggest rejects %s with 400', async (_label, query) => {
+    await request(app.getHttpServer()).get('/api/v1/search/suggest').query(query).expect(400);
+  });
+
+  it('accepts every filter the web app sends', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/search')
+      .query({ q: 'samsung', brand: 'Samsung', tier: 'MID_RANGE', minPrice: 1, maxPrice: 100000, sortBy: 'minPriceUsd', sortDir: 'asc', page: 1, limit: 20 })
+      .expect(200);
+    expect(res.body.data.page).toBe(1);
+  });
 });

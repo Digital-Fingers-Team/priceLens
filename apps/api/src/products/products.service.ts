@@ -1,31 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { MatchStatus, Prisma, ProductTier } from '@prisma/client';
+import { MatchStatus } from '@prisma/client';
 import type { CanonicalProduct, SourceListing } from '@prisma/client';
 import type { CurrentPricesResponse, PriceHistoryResponse } from '@pricelens/contracts';
 import { PrismaService } from '../database/prisma.service';
-import { OfferPolicy, liveOfferSql, liveOfferWhere, liveOffers, toPrice } from '../prices/offer-rules';
+import { OfferPolicy, liveOfferWhere, liveOffers, toPrice } from '../prices/offer-rules';
 import { HistoryRow, buildPriceHistory, recordedPriceStats } from '../prices/price-history';
 import { IngestionQueue } from '../workers/ingestion-queue.service';
-import { normalizedTextSql, searchPhrase, searchTermGroups } from './search-text';
-import { normalizeArabic } from '../matching/text/arabic';
-
-type SortBy = 'relevance' | 'minPriceUsd' | 'maxPriceUsd' | 'listingCount' | 'updatedAt';
-type SortDir = 'asc' | 'desc';
-
-interface SearchProductsOptions {
-  liveFetch?: boolean;
-  q?: string;
-  brand?: string;
-  categoryId?: string;
-  minPrice?: number;
-  maxPrice?: number;
-  tier?: string;
-  page?: number;
-  limit?: number;
-  sortBy?: SortBy;
-  sortDir?: SortDir;
-}
 
 interface ProductWithRelations extends CanonicalProduct {
   category: {
@@ -60,7 +41,6 @@ interface ProductWithListings {
   }>;
 }
 
-const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
 
 /** Coerces untrusted pagination input into a usable positive integer. */
@@ -105,313 +85,6 @@ export class ProductsService {
     return { maxAgeDays: this.offerMaxAgeDays };
   }
 
-  async searchProducts(options: SearchProductsOptions) {
-    const {
-      q = '',
-      brand,
-      categoryId,
-      minPrice,
-      maxPrice,
-      tier,
-      page = 1,
-      limit = 20,
-      sortBy = 'relevance',
-      sortDir = 'desc',
-      liveFetch = true,
-    } = options;
-
-    const normalizedQuery = q.trim().toLowerCase();
-    // `page`/`limit` arrive straight from public query-string input, so a
-    // non-numeric or oversized value must not reach the SQL or blow up the
-    // response shape (NaN previously produced `LIMIT NaN` and a null page).
-    const safeLimit = clampPageSize(limit, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
-    const rawPage = clampPageNumber(page);
-    const offset = (rawPage - 1) * safeLimit;
-
-    const termGroups = searchTermGroups(normalizedQuery);
-    const whereClause = this.buildSearchWhereSql(termGroups, brand, categoryId, tier);
-    const havingClause = this.buildHavingSql(minPrice, maxPrice);
-    const relevanceSql = this.buildRelevanceScoreSql(termGroups, normalizedQuery);
-    const orderBySql = this.buildOrderBySql(sortBy, sortDir, relevanceSql, normalizedQuery);
-
-    // Sort/filter/paginate at the DB level first — only the current page's
-    // products get their full listings fetched, instead of pulling every
-    // matching product's entire listing set just to sort and slice 20 out of it.
-    const [pageRows, countRows] = await Promise.all([
-      this.prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
-        SELECT cp.id
-        FROM canonical_products cp
-        JOIN categories c ON c.id = cp.category_id
-        JOIN source_listings sl ON sl.canonical_product_id = cp.id
-        WHERE ${whereClause}
-        GROUP BY cp.id
-        ${havingClause}
-        ORDER BY ${orderBySql}
-        LIMIT ${safeLimit} OFFSET ${offset}
-      `),
-      this.prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
-        SELECT COUNT(*)::bigint as count FROM (
-          SELECT cp.id
-          FROM canonical_products cp
-          JOIN categories c ON c.id = cp.category_id
-          JOIN source_listings sl ON sl.canonical_product_id = cp.id
-          WHERE ${whereClause}
-          GROUP BY cp.id
-          ${havingClause}
-        ) matched
-      `),
-    ]);
-
-    const total = Number(countRows[0]?.count ?? 0);
-    const totalPages = Math.max(1, Math.ceil(total / safeLimit));
-    const currentPage = Math.min(rawPage, totalPages);
-
-    let liveFetchTriggered = false;
-    if (liveFetch && normalizedQuery) {
-      liveFetchTriggered = await this.triggerOnDemandLiveFetch(normalizedQuery);
-    }
-
-    const pageIds = pageRows.map((row) => row.id);
-    let hits: ReturnType<ProductsService['mapSearchHit']>[] = [];
-
-    if (pageIds.length > 0) {
-      const products = await this.prisma.canonicalProduct.findMany({
-        where: { id: { in: pageIds } },
-        include: { category: true, sourceListings: { include: { platform: true } } },
-      });
-      const productsById = new Map(products.map((product) => [product.id, product]));
-      hits = pageIds
-        .map((id) => productsById.get(id))
-        .filter((product) => !!product)
-        .map((product) => this.mapSearchHit(product as ProductWithRelations));
-
-      // Same coverage guarantee as the product detail page (getBySlug below), but
-      // for the listing/grid view: a card showing "1 store" wouldn't otherwise
-      // get expanded until someone opens that specific product. triggerStoreExpansion
-      // already dedups per product (Bull jobId) and cools down for 5 minutes, so
-      // firing it for every under-covered hit on the page is safe to repeat per search.
-      for (const product of products) {
-        if (this.countDistinctStores(product as ProductWithRelations) < this.minStoresPerProduct) {
-          void this.triggerStoreExpansion(product.id);
-        }
-      }
-    }
-
-    return {
-      hits,
-      total,
-      query: q.trim(),
-      processingTimeMs: 0,
-      page: currentPage,
-      limit: safeLimit,
-      liveFetchTriggered,
-    };
-  }
-
-  private buildSearchWhereSql(
-    termGroups: string[][],
-    brand?: string,
-    categoryId?: string,
-    tier?: string,
-  ): Prisma.Sql {
-    // Only live offers count: a product's price filter, price sort and
-    // listing count use the same offers its card and page show (L-15).
-    const conditions: Prisma.Sql[] = [liveOfferSql('sl', this.offerPolicy())];
-    const title = normalizedTextSql(Prisma.sql`cp.title`);
-
-    // Every term must match; a term matches through any of its alternatives
-    // (the Arabic-normalized word or an English spelling of it).
-    for (const alternatives of termGroups) {
-      const matches = alternatives.map((term) => {
-        const pattern = `%${term}%`;
-        return Prisma.sql`(
-          ${title} LIKE ${pattern} OR
-          cp.normalized_title LIKE ${pattern} OR
-          cp.brand ILIKE ${pattern} OR
-          cp.model ILIKE ${pattern} OR
-          cp.slug ILIKE ${pattern} OR
-          EXISTS (SELECT 1 FROM unnest(string_to_array(lower(c.name), ' ')) tok WHERE tok = ${term}) OR
-          EXISTS (SELECT 1 FROM unnest(c.search_terms) st WHERE st ILIKE ${pattern})
-        )`;
-      });
-      conditions.push(Prisma.sql`(${Prisma.join(matches, ' OR ')})`);
-    }
-
-    if (brand) {
-      conditions.push(Prisma.sql`cp.brand ILIKE ${brand}`);
-    }
-    if (categoryId) {
-      conditions.push(Prisma.sql`cp.category_id = ${categoryId}`);
-    }
-    if (tier && (Object.values(ProductTier) as string[]).includes(tier)) {
-      conditions.push(Prisma.sql`cp.tier = ${tier}::"ProductTier"`);
-    }
-
-    return Prisma.join(conditions, ' AND ');
-  }
-
-  private buildHavingSql(minPrice?: number, maxPrice?: number): Prisma.Sql {
-    const parts: Prisma.Sql[] = [];
-    if (minPrice != null) {
-      parts.push(Prisma.sql`MIN(sl.price_usd) >= ${minPrice}`);
-    }
-    if (maxPrice != null) {
-      parts.push(Prisma.sql`MAX(sl.price_usd) <= ${maxPrice}`);
-    }
-    return parts.length ? Prisma.sql`HAVING ${Prisma.join(parts, ' AND ')}` : Prisma.empty;
-  }
-
-  private buildOrderBySql(
-    sortBy: SortBy,
-    sortDir: SortDir,
-    relevanceSql: Prisma.Sql,
-    normalizedQuery = '',
-  ): Prisma.Sql {
-    if (sortBy === 'relevance' && !normalizedQuery) {
-      // Browsing with no query: relevance is the same for everything, so show
-      // the products compared across the most stores first rather than the
-      // cheapest (which surfaced a page of $2 earphones).
-      return Prisma.sql`COUNT(DISTINCT sl.platform_id) DESC, COUNT(sl.id) DESC, cp.updated_at DESC`;
-    }
-    if (sortBy === 'relevance') {
-      const direction = sortDir === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
-      return Prisma.sql`MAX(${relevanceSql}) ${direction}, MIN(sl.price_usd) ASC NULLS LAST, cp.updated_at DESC`;
-    }
-
-    const column = {
-      minPriceUsd: Prisma.sql`MIN(sl.price_usd)`,
-      maxPriceUsd: Prisma.sql`MAX(sl.price_usd)`,
-      listingCount: Prisma.sql`COUNT(sl.id)`,
-      updatedAt: Prisma.sql`cp.updated_at`,
-    }[sortBy];
-
-    const direction = sortDir === 'desc' ? Prisma.sql`DESC` : Prisma.sql`ASC`;
-    return Prisma.sql`${column} ${direction} NULLS LAST, cp.updated_at DESC`;
-  }
-
-  /**
-   * Titles like "iPhone 17" satisfy `ILIKE '%phone%'` purely because "iPhone"
-   * contains that substring — so a case titled "... for iPhone 17 ..." scores
-   * the same as the phone itself on title match, then wins on the price
-   * tie-break for being cheaper. Demoting known accessory nouns (unless the
-   * query itself asks for one) keeps the base product above its accessories
-   * for any category, not just phones.
-   */
-  private static readonly ACCESSORY_KEYWORDS = [
-    'case', 'cover', 'protector', 'skin', 'pod', 'bumper', 'sleeve', 'pouch',
-    'stand', 'mount', 'strap', 'charger', 'cable', 'tempered glass', 'screen guard',
-    // A console search should show the console before its gamepads.
-    'controller', 'gamepad',
-  ];
-
-  /**
-   * Weighted relevance score for ranking search hits. Without this, results were
-   * ordered purely by price, so a cheap unrelated accessory (e.g. a phone case
-   * matching "phone" only through its category) would outrank an actual phone.
-   * Title matches are weighted far above category/search-term matches so that
-   * loosely-related category matches sink instead of dominating page one.
-   */
-  private buildRelevanceScoreSql(termGroups: string[][], normalizedQuery: string): Prisma.Sql {
-    if (termGroups.length === 0) {
-      return Prisma.sql`0`;
-    }
-    const title = normalizedTextSql(Prisma.sql`cp.title`);
-
-    // A term scores through its best alternative, so an Arabic word and its
-    // English spelling never count twice.
-    const termScores = termGroups.map((alternatives) =>
-      Prisma.sql`GREATEST(${Prisma.join(
-        alternatives.map((term) => this.termScoreSql(term, title)),
-        ', ',
-      )})`,
-    );
-
-    // The full-phrase bonus checks both the query as typed (normalized) and
-    // its English-spelled form.
-    const phrases = Array.from(
-      new Set([termGroups.map((alternatives) => alternatives[0]).join(' '), searchPhrase(termGroups)]),
-    );
-    const fullPhraseBonus = Prisma.sql`GREATEST(${Prisma.join(
-      phrases.map(
-        (phrase) => Prisma.sql`(
-          CASE
-            WHEN ${title} LIKE ${phrase} THEN 50
-            WHEN ${title} LIKE ${`${phrase}%`} THEN 20
-            WHEN ${title} LIKE ${`%${phrase}%`} THEN 8
-            ELSE 0
-          END
-        )`,
-      ),
-      ', ',
-    )})`;
-
-    const englishQuery = `${normalizedQuery} ${searchPhrase(termGroups)}`;
-    const queryAsksForAccessory = ProductsService.ACCESSORY_KEYWORDS.some((keyword) =>
-      englishQuery.includes(keyword),
-    );
-    const accessoryPenalty = queryAsksForAccessory
-      ? Prisma.sql`0`
-      : Prisma.sql`(CASE WHEN ${Prisma.join(
-          ProductsService.ACCESSORY_KEYWORDS.map((keyword) => Prisma.sql`cp.title ILIKE ${`%${keyword}%`}`),
-          ' OR ',
-        )} THEN -20 ELSE 0 END)`;
-
-    return Prisma.sql`(${fullPhraseBonus} + ${accessoryPenalty} + ${Prisma.join(termScores, ' + ')})`;
-  }
-
-  private termScoreSql(term: string, title: Prisma.Sql): Prisma.Sql {
-    const contains = `%${term}%`;
-    const startsWith = `${term}%`;
-    return Prisma.sql`(
-        CASE
-          WHEN ${title} LIKE ${startsWith} OR cp.normalized_title LIKE ${startsWith} THEN 12
-          WHEN ${title} LIKE ${contains} OR cp.normalized_title LIKE ${contains} THEN 6
-          ELSE 0
-        END +
-        CASE
-          WHEN cp.brand ILIKE ${term} THEN 10
-          WHEN cp.brand ILIKE ${contains} THEN 4
-          ELSE 0
-        END +
-        CASE WHEN cp.model ILIKE ${contains} THEN 6 ELSE 0 END +
-        CASE
-          WHEN EXISTS (SELECT 1 FROM unnest(string_to_array(lower(c.name), ' ')) tok WHERE tok = ${term}) THEN 5
-          ELSE 0
-        END +
-        CASE
-          WHEN EXISTS (SELECT 1 FROM unnest(c.search_terms) st WHERE st ILIKE ${contains}) THEN 2
-          ELSE 0
-        END
-      )`;
-  }
-
-  /** Per-query cooldown so repeat searches (pagination, sorting, retyping) don't re-scrape. */
-  private static readonly LIVE_FETCH_COOLDOWN_MS = 30 * 1000;
-  private readonly lastLiveFetchAt = new Map<string, number>();
-
-  /**
-   * Queues a background job that searches connectors for what the user actually typed,
-   * instead of blocking the search request on it. Results are served from the DB
-   * immediately while this refreshes prices/products from the retailer APIs. The jobId
-   * dedups concurrent triggers for the same query — Bull returns the existing job instead
-   * of piling up duplicate scrapes while one is in flight — and the cooldown map skips
-   * queries that were already refreshed recently.
-   */
-  private async triggerOnDemandLiveFetch(query: string): Promise<boolean> {
-    const lastRun = this.lastLiveFetchAt.get(query);
-    if (lastRun != null && Date.now() - lastRun < ProductsService.LIVE_FETCH_COOLDOWN_MS) {
-      return false;
-    }
-
-    try {
-      await this.ingestionQueue.enqueueQueryIngestion(query, 12);
-      this.lastLiveFetchAt.set(query, Date.now());
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
   /**
    * Per-product cooldown so repeated views of a short-store product don't re-queue
    * the search. Concurrent views are already deduped by Bull's jobId (see
@@ -443,52 +116,30 @@ export class ProductsService {
     }
   }
 
-  async suggest(q: string, limit = 6) {
-    const query = q.trim().toLowerCase();
-    if (query.length < 2) return [];
-    const termGroups = searchTermGroups(query);
+  /**
+   * Search hits for a page of product ids, in the order given (SearchService
+   * ranks, this maps). Under-covered products get a background store
+   * expansion, the same coverage guarantee as the product page: a card showing
+   * "1 store" would otherwise wait until someone opens that product.
+   */
+  async searchHits(ids: string[]) {
+    if (ids.length === 0) return [];
+    const products = (await this.prisma.canonicalProduct.findMany({
+      where: { id: { in: ids } },
+      include: { category: true, sourceListings: { include: { platform: true } } },
+    })) as ProductWithRelations[];
 
-    const products = await this.prisma.canonicalProduct.findMany({
-      where: {
-        sourceListings: {
-          some: {
-            priceUsd: { not: null },
-          },
-        },
-      },
-      include: { category: true },
+    for (const product of products) {
+      if (this.countDistinctStores(product) < this.minStoresPerProduct) {
+        void this.triggerStoreExpansion(product.id);
+      }
+    }
+
+    const byId = new Map(products.map((product) => [product.id, product]));
+    return ids.flatMap((id) => {
+      const product = byId.get(id);
+      return product ? [this.mapSearchHit(product)] : [];
     });
-
-    return products
-      .filter((product) => {
-        // Category name is matched as whole words only (not "haystack.includes"),
-        // otherwise a query like "phone" substring-matches the "Headphones"
-        // category and floods phone suggestions with earbuds/headphones.
-        // Same term rules as search: Arabic normalized, each term matched
-        // through any of its spellings.
-        const haystack = normalizeArabic(
-          [product.title, product.brand ?? '', product.model ?? '', product.slug].join(' ').toLowerCase(),
-        );
-        const categoryTokens = product.category.name.toLowerCase().split(/\s+/);
-        return (
-          termGroups.length > 0 &&
-          termGroups.every((alternatives) =>
-            alternatives.some((term) => haystack.includes(term) || categoryTokens.includes(term)),
-          )
-        );
-      })
-      .sort((a, b) => {
-        const aStarts = a.title.toLowerCase().startsWith(query) ? 0 : 1;
-        const bStarts = b.title.toLowerCase().startsWith(query) ? 0 : 1;
-        return aStarts - bStarts || a.title.localeCompare(b.title);
-      })
-      .slice(0, limit)
-      .map((product) => ({
-        id: product.id,
-        slug: product.slug,
-        title: product.title,
-        brand: product.brand,
-      }));
   }
 
   async getBySlug(slug: string) {
