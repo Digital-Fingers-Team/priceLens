@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { AlertStatus, AlertType, MatchStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { OfferPolicy, liveOffers, offerCutoff } from '../prices/offer-rules';
 
 export interface EvaluationResult {
   checked: number;
@@ -25,17 +26,23 @@ const BASELINE_BACKED_TYPES: ReadonlySet<AlertType> = new Set([
 
 /** Per-product market snapshot used to evaluate every alert on that product. */
 interface MarketSnapshot {
-  bestPrice: number;
-  /** BOOL_OR across live listings; null when no store publishes stock. */
+  /** Cheapest live offer (offer-rules); null when every fresh listing is sold out. */
+  bestPrice: number | null;
+  /**
+   * Any fresh listing in stock -> true; all that report stock are sold out ->
+   * false; no store publishes stock -> null.
+   */
   inStock: boolean | null;
   storeCount: number;
 }
 
 /** Per-product historical aggregates, fetched once for the whole batch. */
 interface HistoryAggregate {
+  /** Lowest price ever recorded for a listing matched to the product. */
   allTimeLow: number | null;
   /** Median of the last 90 days of daily minimums. */
   trailingMedian: number | null;
+  /** Days between the first recorded price and now. */
   dayCount: number;
 }
 
@@ -62,6 +69,8 @@ interface TriggerOutcome {
 export class PriceAlertService {
   private readonly logger = new Logger(PriceAlertService.name);
   private readonly currency: string;
+  private readonly offerPolicy: OfferPolicy;
+  private readonly marketTimeZone: string;
   /** Depth of drop vs trailing median that counts as a "major" discount. */
   private static readonly MAJOR_DISCOUNT_PCT = 15;
   /** Tolerance for "at its lowest ever", so a 1-piastre gap still counts. */
@@ -73,6 +82,8 @@ export class PriceAlertService {
     config: ConfigService,
   ) {
     this.currency = config.get<string>('pricing.fxBaseCurrency', 'EGP');
+    this.offerPolicy = { maxAgeDays: config.get<number>('pricing.offerMaxAgeDays', 7) };
+    this.marketTimeZone = config.get<string>('pricing.marketTimeZone', 'Africa/Cairo');
   }
 
   async evaluateActiveAlerts(batchSize = 500): Promise<EvaluationResult> {
@@ -115,7 +126,7 @@ export class PriceAlertService {
     for (const alert of alerts) {
       const market = markets.get(alert.canonicalProductId);
 
-      // No live priced listing at all. Still stamp lastCheckedAt so this
+      // No fresh listing at all. Still stamp lastCheckedAt so this
       // alert does not monopolise the head of the queue forever.
       if (!market) {
         await this.prisma.priceAlert.update({
@@ -125,7 +136,22 @@ export class PriceAlertService {
         continue;
       }
 
-      const outcome = this.evaluate(alert, market, histories.get(alert.canonicalProductId), baselines.get(alert.id));
+      // Everything fresh is sold out: nothing can trigger, but the stock
+      // state is recorded so RESTOCK sees the transition later.
+      if (market.bestPrice === null) {
+        await this.prisma.priceAlert.update({
+          where: { id: alert.id },
+          data: { lastCheckedAt: now, ...(market.inStock !== null ? { lastSeenInStock: market.inStock } : {}) },
+        });
+        continue;
+      }
+
+      const outcome = this.evaluate(
+        alert,
+        { ...market, bestPrice: market.bestPrice },
+        histories.get(alert.canonicalProductId),
+        baselines.get(alert.id),
+      );
 
       if (!outcome.triggered) {
         await this.prisma.priceAlert.update({
@@ -155,10 +181,12 @@ export class PriceAlertService {
         }
       }
 
-      triggered += 1;
-
-      await this.prisma.priceAlert.update({
-        where: { id: alert.id },
+      // Compare-and-set: the trigger only counts if the alert is still in the
+      // state this sweep read. Two overlapping sweeps (the job can outlive
+      // its 30-minute schedule, and up to 12 queue jobs run at once) would
+      // otherwise both fire it and both notify (audit 02, L-17).
+      const { count: won } = await this.prisma.priceAlert.updateMany({
+        where: { id: alert.id, status: AlertStatus.ACTIVE, lastNotifiedAt: alert.lastNotifiedAt },
         data: {
           // A repeating alert re-arms; a one-shot parks in TRIGGERED.
           status: alert.repeatable ? AlertStatus.ACTIVE : AlertStatus.TRIGGERED,
@@ -169,6 +197,8 @@ export class PriceAlertService {
           ...(market.inStock !== null ? { lastSeenInStock: market.inStock } : {}),
         },
       });
+      if (won === 0) continue;
+      triggered += 1;
 
       // A notification failure must not roll back the trigger, or the alert
       // would fire again on the next sweep and spam on recovery.
@@ -213,7 +243,7 @@ export class PriceAlertService {
       lastSeenInStock: boolean | null;
       canonicalProduct: { title: string };
     },
-    market: MarketSnapshot,
+    market: MarketSnapshot & { bestPrice: number },
     history: HistoryAggregate | undefined,
     baseline: number | null | undefined,
   ): TriggerOutcome {
@@ -313,66 +343,104 @@ export class PriceAlertService {
   // ─── Batched lookups ────────────────────────────────────────────────────
 
   /**
-   * Cheapest live price and aggregate stock per product.
+   * Cheapest live offer and stock state per product.
    *
-   * `inStock` is BOOL_OR so a product available anywhere counts as available;
-   * it stays NULL when no store publishes stock at all, which the RESTOCK
-   * rule relies on to stay quiet rather than guess.
+   * The price is the product page's best price: live offers only (accepted,
+   * priced, not sold out, seen within the offer window), deduplicated, and
+   * without market outliers (offer-rules). An alert used to fire on a sold-out
+   * or months-old price, or on a mismatched spare part (audit 02, L-17).
+   *
+   * Stock looks at every fresh listing, sold-out ones included, so a product
+   * that sold out everywhere reads as `false` and RESTOCK can see it come
+   * back.
    */
   private async getMarketSnapshots(productIds: string[]): Promise<Map<string, MarketSnapshot>> {
     if (productIds.length === 0) return new Map();
 
-    const rows = await this.prisma.$queryRaw<
-      Array<{ product_id: string; best: Prisma.Decimal; in_stock: boolean | null; store_count: bigint }>
-    >`
-      SELECT
-        sl.canonical_product_id           AS product_id,
-        MIN(sl.price_usd)                 AS best,
-        BOOL_OR(sl.in_stock)              AS in_stock,
-        COUNT(DISTINCT sl.platform_id)    AS store_count
-      FROM source_listings sl
-      WHERE sl.canonical_product_id = ANY(${productIds}::text[])
-        AND sl.price_usd IS NOT NULL
-        AND sl.price_usd > 0
-        AND sl.match_status IN (${MatchStatus.ACCEPTED}::"MatchStatus", ${MatchStatus.MANUAL_ACCEPT}::"MatchStatus")
-      GROUP BY 1
-    `;
+    const listings = await this.prisma.sourceListing.findMany({
+      where: {
+        canonicalProductId: { in: productIds },
+        matchStatus: { in: [MatchStatus.ACCEPTED, MatchStatus.MANUAL_ACCEPT] },
+        priceUsd: { gt: 0 },
+        lastSeenAt: { gte: offerCutoff(this.offerPolicy) },
+      },
+      select: {
+        canonicalProductId: true,
+        priceUsd: true,
+        inStock: true,
+        matchStatus: true,
+        lastSeenAt: true,
+        platformId: true,
+        rawTitle: true,
+      },
+    });
+
+    const byProduct = new Map<string, typeof listings>();
+    for (const listing of listings) {
+      const bucket = byProduct.get(listing.canonicalProductId!) ?? [];
+      bucket.push(listing);
+      byProduct.set(listing.canonicalProductId!, bucket);
+    }
 
     const map = new Map<string, MarketSnapshot>();
-    for (const row of rows) {
-      map.set(row.product_id, {
-        bestPrice: Number(row.best),
-        inStock: row.in_stock,
-        storeCount: Number(row.store_count),
+    for (const [productId, fresh] of byProduct) {
+      const live = liveOffers(fresh, this.offerPolicy);
+      const stock = fresh.map((listing) => listing.inStock).filter((value): value is boolean => value !== null);
+      map.set(productId, {
+        bestPrice: live.length ? Math.min(...live.map((listing) => Number(listing.priceUsd))) : null,
+        inStock: stock.length === 0 ? null : stock.some(Boolean),
+        storeCount: new Set(live.map((listing) => listing.platformId)).size,
       });
     }
     return map;
   }
 
-  /** All-time low and 90-day trailing median of daily minimums, per product. */
+  /**
+   * Per product: the lowest price ever recorded, the 90-day trailing median
+   * of daily minimums, and how many days the product has been tracked.
+   * Only listings matched onto the product now count (not rejected junk, not
+   * listings moved to another product); days are market days. "All-time"
+   * used to mean the last 90 days, and "days of history" the number of days
+   * with a price *change* (audit 02, L-17).
+   */
   private async getHistoryAggregates(productIds: string[]): Promise<Map<string, HistoryAggregate>> {
     if (productIds.length === 0) return new Map();
 
     const rows = await this.prisma.$queryRaw<
-      Array<{ product_id: string; all_time_low: Prisma.Decimal | null; trailing_median: number | null; day_count: bigint }>
+      Array<{ product_id: string; all_time_low: Prisma.Decimal | null; trailing_median: number | null; day_count: number | Prisma.Decimal | null }>
     >`
-      WITH daily AS (
+      WITH points AS (
         SELECT
-          ph.canonical_product_id                  AS product_id,
-          date_trunc('day', ph.recorded_at)::date  AS day,
-          MIN(ph.price_usd)                        AS day_min
+          sl.canonical_product_id AS product_id,
+          ph.recorded_at,
+          ph.price_usd
         FROM price_history ph
-        WHERE ph.canonical_product_id = ANY(${productIds}::text[])
+        JOIN source_listings sl ON sl.id = ph.source_listing_id
+        WHERE sl.canonical_product_id = ANY(${productIds}::text[])
+          AND sl.match_status IN ('ACCEPTED', 'MANUAL_ACCEPT')
           AND ph.price_usd > 0
-          AND ph.recorded_at >= NOW() - INTERVAL '90 days'
+      ),
+      daily AS (
+        SELECT
+          product_id,
+          ((recorded_at AT TIME ZONE 'UTC') AT TIME ZONE ${this.marketTimeZone})::date AS day,
+          MIN(price_usd) AS day_min
+        FROM points
+        WHERE recorded_at >= NOW() - INTERVAL '90 days'
         GROUP BY 1, 2
+      ),
+      medians AS (
+        SELECT product_id, PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY day_min) AS trailing_median
+        FROM daily
+        GROUP BY 1
       )
       SELECT
-        d.product_id,
-        MIN(d.day_min)                                                        AS all_time_low,
-        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY d.day_min)                AS trailing_median,
-        COUNT(*)                                                              AS day_count
-      FROM daily d
+        p.product_id,
+        MIN(p.price_usd)                                                 AS all_time_low,
+        MAX(m.trailing_median)                                           AS trailing_median,
+        FLOOR(EXTRACT(EPOCH FROM (NOW() - MIN(p.recorded_at))) / 86400)  AS day_count
+      FROM points p
+      LEFT JOIN medians m ON m.product_id = p.product_id
       GROUP BY 1
     `;
 
@@ -388,11 +456,14 @@ export class PriceAlertService {
   }
 
   /**
-   * What each product cost when its alert was created.
+   * What each product cost when its alert was created: the best price
+   * across its listings at that moment (each listing's last recorded price at
+   * or before creation, the cheapest of those). When nothing was recorded
+   * before the alert, the cheapest first price recorded after it.
    *
-   * A LATERAL join over the alert list resolves every baseline in one round
-   * trip. Falls back to the most recent recorded price when the alert predates
-   * any history, which is the same rule the previous implementation used.
+   * It used to be the first history row of ANY listing after creation, so a
+   * dearer store's first point could become the baseline and a "drop" fire
+   * on no drop at all (audit 02, L-17). One round trip for all alerts.
    */
   private async getBaselines(
     requests: Array<{ alertId: string; productId: string; createdAt: Date }>,
@@ -413,25 +484,34 @@ export class PriceAlertService {
       )
       SELECT
         w.alert_id,
-        COALESCE(after_alert.price_usd, latest.price_usd) AS baseline
+        COALESCE(at_creation.best, after_creation.best) AS baseline
       FROM wanted w
       LEFT JOIN LATERAL (
-        SELECT ph.price_usd
-        FROM price_history ph
-        WHERE ph.canonical_product_id = w.product_id
-          AND ph.recorded_at >= w.created_at
-          AND ph.price_usd > 0
-        ORDER BY ph.recorded_at ASC
-        LIMIT 1
-      ) after_alert ON TRUE
+        SELECT MIN(last_point.price_usd) AS best
+        FROM (
+          SELECT DISTINCT ON (ph.source_listing_id) ph.price_usd
+          FROM price_history ph
+          JOIN source_listings sl ON sl.id = ph.source_listing_id
+          WHERE sl.canonical_product_id = w.product_id
+            AND sl.match_status IN ('ACCEPTED', 'MANUAL_ACCEPT')
+            AND ph.recorded_at <= w.created_at
+            AND ph.price_usd > 0
+          ORDER BY ph.source_listing_id, ph.recorded_at DESC
+        ) last_point
+      ) at_creation ON TRUE
       LEFT JOIN LATERAL (
-        SELECT ph.price_usd
-        FROM price_history ph
-        WHERE ph.canonical_product_id = w.product_id
-          AND ph.price_usd > 0
-        ORDER BY ph.recorded_at DESC
-        LIMIT 1
-      ) latest ON TRUE
+        SELECT MIN(first_point.price_usd) AS best
+        FROM (
+          SELECT DISTINCT ON (ph.source_listing_id) ph.price_usd
+          FROM price_history ph
+          JOIN source_listings sl ON sl.id = ph.source_listing_id
+          WHERE sl.canonical_product_id = w.product_id
+            AND sl.match_status IN ('ACCEPTED', 'MANUAL_ACCEPT')
+            AND ph.recorded_at > w.created_at
+            AND ph.price_usd > 0
+          ORDER BY ph.source_listing_id, ph.recorded_at ASC
+        ) first_point
+      ) after_creation ON TRUE
     `;
 
     const map = new Map<string, number | null>();
