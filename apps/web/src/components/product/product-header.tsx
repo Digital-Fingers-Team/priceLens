@@ -1,15 +1,17 @@
 'use client';
 import Image from 'next/image';
-import { ShieldCheck, Heart, Bell, Store, Tag, BadgeCheck, Clock3 } from 'lucide-react';
+import { ShieldCheck, Heart, Bell, Store, Tag, ArrowUpRight } from 'lucide-react';
 import type { CanonicalProduct } from '@/types/product.types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { buttonClassName } from '@/components/ui/button-styles';
 import { formatCurrency, formatRelativeTime } from '@/lib/utils/format';
 import { TIER_LABELS } from '@/config/constants';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { useIsWatched, useToggleWatchlist } from '@/lib/hooks/use-watchlist';
 import { useUiStore } from '@/lib/store/ui.store';
-import { ShareActions } from '@/components/product/share-actions';
+import { cheapestOffer } from '@/lib/utils/offers';
+import { safeExternalHref } from '@/lib/utils/safe-href';
 
 interface ProductHeaderProps {
   product: CanonicalProduct;
@@ -27,6 +29,16 @@ export function ProductHeader({ product }: ProductHeaderProps) {
   const storeCount =
     product.storeCount ??
     (product.sourceListings?.length ? new Set(product.sourceListings.map((l) => l.platform.id)).size : 0);
+
+  const listings = product.sourceListings ?? [];
+  const cheapest = cheapestOffer(listings);
+  const cheapestHref = cheapest ? safeExternalHref(cheapest.externalUrl) : undefined;
+  // When a store last confirmed a price -- what "fresh" means to a shopper,
+  // unlike the product row's updatedAt.
+  const lastChecked = listings.reduce<string | null>(
+    (latest, l) => (latest == null || l.lastSeenAt > latest ? l.lastSeenAt : latest),
+    null,
+  );
 
   const attrs = Object.fromEntries(
     Object.entries((product.attributes ?? {}) as Record<string, unknown>).filter(
@@ -121,36 +133,39 @@ export function ProductHeader({ product }: ProductHeaderProps) {
                 )}
               </div>
 
+              {cheapest && (
+                <p className="text-sm text-ink-300">
+                  Cheapest at <span className="font-semibold text-ink-100">{cheapest.platform.name}</span>
+                  {' · '}
+                  <a href="#offers" className="text-signal hover:underline">
+                    compare all {storeCount}
+                  </a>
+                </p>
+              )}
               {priceStats.avg != null && (
                 <p className="text-xs text-ink-500">
-                  Avg: <span className="text-ink-300">{formatCurrency(priceStats.avg, priceStats.currency)}</span>
+                  Average across stores: <span className="text-ink-300">{formatCurrency(priceStats.avg, priceStats.currency)}</span>
                 </p>
+              )}
+              {lastChecked && (
+                <p className="text-xs text-ink-500">Prices checked {formatRelativeTime(lastChecked)}</p>
+              )}
+              {cheapest && cheapestHref && (
+                <a
+                  href={cheapestHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Go to ${cheapest.platform.name} (opens in a new tab)`}
+                  className={buttonClassName({ size: 'lg', className: 'mt-2 w-full sm:w-auto' })}
+                >
+                  Go to {cheapest.platform.name}
+                  <ArrowUpRight className="h-5 w-5" aria-hidden />
+                </a>
               )}
             </div>
           ) : (
             <p className="text-ink-500 text-sm italic">No current prices available</p>
           )}
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-          <div className="rounded-xl border border-ink-700 bg-ink-900 p-3">
-            <p className="text-[10px] uppercase tracking-wider text-ink-500">Verified status</p>
-            <p className="mt-1 font-medium text-ink-100 flex items-center gap-2">
-              <BadgeCheck className="w-4 h-4 text-signal" />
-              {product.isVerified ? 'Canonical match confirmed' : 'Under review'}
-            </p>
-          </div>
-          <div className="rounded-xl border border-ink-700 bg-ink-900 p-3">
-            <p className="text-[10px] uppercase tracking-wider text-ink-500">Last updated</p>
-            <p className="mt-1 font-medium text-ink-100 flex items-center gap-2">
-              <Clock3 className="w-4 h-4 text-signal" />
-              {formatRelativeTime(product.updatedAt)}
-            </p>
-          </div>
-          <div className="rounded-xl border border-ink-700 bg-ink-900 p-3">
-            <p className="text-[10px] uppercase tracking-wider text-ink-500">Why users trust it</p>
-            <p className="mt-1 font-medium text-ink-100">Multiple retailers, live price history, and verified matching.</p>
-          </div>
         </div>
 
         <div className="flex flex-wrap gap-3 text-xs text-ink-500">
@@ -192,11 +207,6 @@ export function ProductHeader({ product }: ProductHeaderProps) {
           )}
         </div>
 
-        <ShareActions
-          title={product.title}
-          url={`/products/${product.slug}`}
-          summary={`${product.title} starts at ${formatCurrency(product.priceStats.min, product.priceStats.currency)} on Pricelens.`}
-        />
       </div>
     </section>
   );

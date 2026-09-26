@@ -3,12 +3,12 @@ import Link from 'next/link';
 import { ArrowLeft, RefreshCw, Store } from 'lucide-react';
 import { ProductHeader } from '@/components/product/product-header';
 import { ProductHeaderSkeleton } from '@/components/product/product-header-skeleton';
-import { ListingTable } from '@/components/product/listing-table';
+import { OfferList } from '@/components/product/offer-list';
+import { ShareActions } from '@/components/product/share-actions';
 import { ListingTableSkeleton } from '@/components/product/listing-table-skeleton';
 import { PriceChart } from '@/components/charts/price-chart';
 import { IntelligencePanel } from '@/components/intelligence/intelligence-panel';
 import { PriceChartSkeleton } from '@/components/charts/price-chart-skeleton';
-import { PriceStatsBar } from '@/components/product/price-stats-bar';
 import { Button } from '@/components/ui/button';
 import { usePriceStats } from '@/lib/hooks/use-price-history';
 import { formatCurrency } from '@/lib/utils/format';
@@ -29,14 +29,8 @@ function ProductDetailSkeleton() {
         <span className="text-sm text-ink-500">Loading product details</span>
       </div>
       <ProductHeaderSkeleton />
-      <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
-        <div className="xl:col-span-3">
-          <PriceChartSkeleton />
-        </div>
-        <div className="xl:col-span-2">
-          <ListingTableSkeleton rows={5} />
-        </div>
-      </div>
+      <ListingTableSkeleton rows={4} />
+      <PriceChartSkeleton />
     </div>
   );
 }
@@ -89,86 +83,60 @@ export function ProductDetailClient({ slug, initialProduct }: ProductDetailClien
   const listings = product.sourceListings ?? [];
   const allTime = stats?.allTime;
   const week52 = stats?.week52;
+  const currency = product.priceStats.currency;
+  const storeCount = new Set(listings.map((l) => l.platform.id)).size;
 
+  // Order follows what a visitor came for (audit 06, U-01): which store is
+  // cheapest and a way to go there, then whether to buy now, then the history
+  // behind that advice. Each price figure appears once.
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
-      <div className="flex items-center justify-between gap-4">
-        <Link href="/search" className="text-sm text-ink-500 hover:text-signal transition-colors">
-          ← Back to search
-        </Link>
-        <div className="text-xs text-ink-500">
-          {listings.length} listing{listings.length === 1 ? '' : 's'}
-        </div>
-      </div>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-10">
+      <Link href="/search" className="inline-block text-sm text-ink-500 hover:text-signal transition-colors">
+        ← Back to search
+      </Link>
 
       <ProductHeader product={product} />
 
-      <div className="space-y-6">
-        <PriceStatsBar
-          min={product.priceStats.min}
-          max={product.priceStats.max}
-          avg={product.priceStats.avg}
-          week52Low={week52?.low ?? null}
-          week52High={week52?.high ?? null}
-          currency={product.priceStats.currency}
-        />
-
-        {/* Placed above the chart: the decision ("buy or wait") is what the
-            visitor came for; the chart is the supporting evidence. */}
-        <IntelligencePanel productId={product.id} />
-
-        <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
-          <div className="xl:col-span-3">
-            <PriceChart productId={product.id} />
-          </div>
-
-          <div className="xl:col-span-2 rounded-xl border border-ink-700 bg-ink-900 p-5 space-y-4">
-            <div>
-              <h2 className="font-semibold text-ink-100">Price Snapshot</h2>
-              <p className="text-xs text-ink-500 mt-1">All-time statistics for this product</p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="rounded-lg border border-ink-800 bg-ink-950/40 p-3">
-                <p className="text-ink-500 text-xs">All-time low</p>
-                <p className="text-ink-100 font-semibold mt-1">
-                  {formatCurrency(allTime?.min, product.priceStats.currency)}
-                </p>
-              </div>
-              <div className="rounded-lg border border-ink-800 bg-ink-950/40 p-3">
-                <p className="text-ink-500 text-xs">All-time high</p>
-                <p className="text-ink-100 font-semibold mt-1">
-                  {formatCurrency(allTime?.max, product.priceStats.currency)}
-                </p>
-              </div>
-              <div className="rounded-lg border border-ink-800 bg-ink-950/40 p-3">
-                <p className="text-ink-500 text-xs">Data points</p>
-                <p className="text-ink-100 font-semibold mt-1">{allTime?.dataPoints ?? 0}</p>
-              </div>
-              <div className="rounded-lg border border-ink-800 bg-ink-950/40 p-3">
-                <p className="text-ink-500 text-xs">Current median</p>
-                <p className="text-ink-100 font-semibold mt-1">
-                  {formatCurrency(product.priceStats.median, product.priceStats.currency)}
-                </p>
-              </div>
-            </div>
-
-            <div className="rounded-lg border border-ink-800 bg-ink-950/40 p-3 text-xs text-ink-500">
-              Historical prices and store listings update as new data is ingested.
-            </div>
-          </div>
+      <section id="offers" aria-labelledby="offers-heading" className="space-y-4 scroll-mt-24">
+        <div>
+          <h2 id="offers-heading" className="text-lg font-semibold text-ink-100">
+            Compare {storeCount} store{storeCount === 1 ? '' : 's'}
+          </h2>
+          <p className="text-sm text-ink-500 mt-1">
+            Cheapest first. Each price is the store&apos;s own, in its own currency.
+          </p>
         </div>
+        <OfferList listings={listings} />
+      </section>
 
-        <section className="space-y-4">
-          <div>
-            <h2 className="text-lg font-semibold text-ink-100">Store Listings</h2>
-            <p className="text-sm text-ink-500 mt-1">
-              Matching listings across retailers, sorted by confidence and price.
-            </p>
-          </div>
-          <ListingTable listings={listings} showConfidence />
-        </section>
-      </div>
+      <IntelligencePanel productId={product.id} />
+
+      <section aria-labelledby="history-heading" className="space-y-4">
+        <h2 id="history-heading" className="text-lg font-semibold text-ink-100">
+          Price history
+        </h2>
+        <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+          {[
+            ['52-week low', formatCurrency(week52?.low, currency)],
+            ['52-week high', formatCurrency(week52?.high, currency)],
+            ['All-time low', formatCurrency(allTime?.min, currency)],
+            ['All-time high', formatCurrency(allTime?.max, currency)],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-lg border border-ink-800 bg-ink-900 p-3">
+              <dt className="text-xs text-ink-500">{label}</dt>
+              <dd className="mt-1 font-semibold text-ink-100">{value}</dd>
+            </div>
+          ))}
+        </dl>
+        <PriceChart productId={product.id} />
+      </section>
+
+      {/* Secondary: after the comparison, not between the price and the stores. */}
+      <ShareActions
+        title={product.title}
+        url={`/products/${product.slug}`}
+        summary={`${product.title} starts at ${formatCurrency(product.priceStats.min, currency)} on Pricelens.`}
+      />
     </div>
   );
 }
