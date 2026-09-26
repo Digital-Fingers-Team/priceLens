@@ -63,6 +63,17 @@ export class IngestionScheduler implements OnApplicationBootstrap, OnApplication
       await this.queue.removeRepeatableByKey(repeatableJob.key);
     }
 
+    // Each job family has its own switch. LIVE_INGESTION_SCHEDULE_ENABLED used
+    // to return early here and silently took alerts, billing maintenance,
+    // notification retries, reconciliation and brand jobs down with it (B-08).
+    await this.scheduleLiveIngestion();
+    await this.scheduleReconciliation();
+    await this.scheduleStoreCoverageSweep();
+    await this.schedulePriceAlerts();
+    await this.scheduleOperationalJobs();
+  }
+
+  private async scheduleLiveIngestion() {
     if (!this.configService.get<boolean>('retailers.liveIngestionScheduleEnabled', true)) {
       this.logger.log('Scheduled live ingestion is disabled (LIVE_INGESTION_SCHEDULE_ENABLED=false)');
       return;
@@ -80,10 +91,6 @@ export class IngestionScheduler implements OnApplicationBootstrap, OnApplication
     );
 
     this.logger.log(`Scheduled live ingestion to run on cron "${cron}"`);
-
-    await this.scheduleReconciliation();
-    await this.scheduleStoreCoverageSweep();
-    await this.scheduleOperationalJobs();
   }
 
   /**
@@ -188,8 +195,15 @@ export class IngestionScheduler implements OnApplicationBootstrap, OnApplication
       },
     );
 
-    // Price alerts are cheap to evaluate and users expect them to be timely,
-    // so run them far more often than the scraping sweeps.
+    this.logger.log(`Scheduled store coverage sweep to run on cron "${cron}"`);
+  }
+
+  /**
+   * Price alerts are cheap to evaluate and users expect them to be timely, so
+   * they run far more often than the scraping sweeps, and no scraping switch
+   * turns them off (they used to depend on STORE_COVERAGE_SWEEP_ENABLED).
+   */
+  private async schedulePriceAlerts() {
     const priceAlertCron = this.configService.get<string>('retailers.priceAlertCron', '*/30 * * * *');
 
     await this.queue.add(
@@ -202,6 +216,5 @@ export class IngestionScheduler implements OnApplicationBootstrap, OnApplication
     );
 
     this.logger.log(`Scheduled price alert evaluation (${priceAlertCron})`);
-    this.logger.log(`Scheduled store coverage sweep to run on cron "${cron}"`);
   }
 }
