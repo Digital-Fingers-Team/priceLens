@@ -134,14 +134,83 @@ Severity: P0 broken/unsafe (Critical/High) · P1 real user/business harm (Medium
 
 ## Fix log
 
-(filled in as fixes land)
+| Finding | Status | Commit | Evidence (regression test / check) |
+| --- | --- | --- | --- |
+| S-01 JSON-LD injection | **Fixed** | `9d6e19a` | `web json-ld.test.ts`: a `</script><script>` title serializes with no `<>&`/U+2028/9 and round-trips. Browser check: product page JSON-LD renders, 0 CSP violations. |
+| S-02 CORS rejects own site | **Fixed** (live after deploy) | `ea78b28` | `unit site-origins.spec.ts` (4); `e2e smoke`: `POST /auth/login` with `Origin: <site>` → 401 (was 403), ACAO header = site. |
+| S-03 Next image optimizer RCE | **Mitigated**; upgrade **Deferred** → 05 | `f664300` | `next start` on the build: `/_next/image?url=…` → **404** (prod today: 200 `image/png`). |
+| S-04 access token after logout | **Fixed** | `56ce9a7` | `integration auth-sessions`: logout → `/auth/me` 401; log-out-everywhere → other devices 401; another user's refresh token can't be revoked. |
+| S-05 rotation race / reuse | **Fixed** | `56ce9a7` | Concurrent refresh → exactly one 200 and one 401. Replay inside 60 s → 401, session kept. Replay after 60 s → all sessions dead. |
+| S-06 plaintext refresh tokens | **Fixed** | `56ce9a7` + migration `20260926150000_session_rotated_at` | Stored value = SHA-256. Legacy raw row still refreshes (fallback until 2026-10-26). |
+| S-07 admin demotes owner | **Fixed** | `d024bcf` | `e2e endpoints`: ADMIN re-adding the owner as MEMBER → 400, owner role unchanged. |
+| S-08 no web security headers | **Fixed** | `e9c5636` | Dev stack `curl -I /` shows CSP, `X-Frame-Options: DENY`, `Referrer-Policy`, no `x-powered-by`. Headless Chrome over `/`, search, product, login, pricing: 0 CSP violations, images load. Playwright: see Gate. |
+| S-09 scraped URLs as links/redirects | **Fixed** | `d024bcf`, `e9c5636` | `unit store-url.spec.ts` (look-alikes, `javascript:`, userinfo, `//`); `e2e`: `evil.example` and `javascript:` listing URLs → 404 with no `Location`; `web safe-href.test.ts`. The allowlist was checked against 36 real prod listings via the public API (aliexpress→ar.aliexpress.com, amazon row .com→listings .eg, noon, jumia, 2b), all accepted. |
+| S-10 login timing | **Fixed** | `56ce9a7` | The dummy hash is valid bcrypt cost 12 (`getRounds` = 12). |
+| S-11 secrets in logs | **Fixed** | `55e76fa` | `unit redact-url.spec.ts`. |
+| S-12 e-mail in logs | **Fixed** | `56ce9a7` | Logs the user id. |
+| S-13 spoofable click IP | **Fixed** | `d024bcf` | Uses `req.ip` (trust proxy 1). |
+| S-14 CORS defaults / no Origin | **Fixed** (localhost dev-only) / no-Origin **kept on purpose** | `ea78b28` | `unit site-origins`; rationale in SECURITY.md. |
+| S-15 API on 0.0.0.0:3002 | **Fixed in config**; live at next api recreate | `6d5b003` | `docker-compose.server.yml` `127.0.0.1:3002:3001`. |
+| S-16 7-day sessions vs 30-day tokens | **Fixed** | `56ce9a7` | `expiresAt` = refresh token `exp` (integration test). |
+| S-17 vulnerable deps | **Fixed** for nodemailer/axios/bcrypt/lodash/qs/js-yaml; Next → 05; Nest 11 → 10 | `ce7b65f` | `pnpm audit --prod` 91 (3 crit / 38 high) → 43 (2 crit / 18 high). All remaining are `next` or `@nestjs@10` transitive. Check image `phase04-check` built; in-image unit tests 537 passed / 2 skipped; bcrypt 6 native module OK; nodemailer 9.1.1 `sendMail` OK. |
+| S-18 tokens in localStorage | **Needs decision** (D-17) | — | Mitigated by S-01, S-08, S-09. |
+| S-19 no cross-user test | **Fixed** | `d024bcf` | `e2e endpoints` "another user cannot read or change what is not theirs". |
+| S-20 refresh unthrottled | **Fixed** (30/min); lockout **not added** on purpose | `56ce9a7` | Reasoning in SECURITY.md. |
+| S-21 MongoDB on 0.0.0.0:27017 | **Needs decision** (D-18, other project) | — | — |
+
+New dependencies: none. Upgrades only, plus pnpm `overrides` floors.
+
+### Gate at the end of the phase (`ce7b65f` + docs)
+- API: tsc 0, eslint 0, nest build 0, unit **539**, integration **48**, e2e **73**, all passed (was 535 / 39 / 72 at the start of the phase, before the new tests).
+- Web: tsc 0, next lint clean, vitest **18** passed, next build OK.
+- Playwright vs the dev stack (13000/13001): 6 tests. First run: 4 passed; "search → results → product page" failed on desktop and mobile while `next dev` compiled the route on first visit. The re-run of that test: 2/2 passed.
 
 ## Summary
 
-(at the end)
+- Two live P0s fixed:
+  - Script injection through product JSON-LD.
+  - CORS rejecting the site's own origin, which has broken login, sign-up and every write on pricelens.work.gd.
+- The unpatched Next 14 image-optimizer RCE is neutralised by turning the optimizer off. The real fix is the Next 15 upgrade.
+- Sessions are now real sessions:
+  - logout and log-out-everywhere end access tokens at once
+  - refresh tokens are stored hashed, rotate atomically, and a replayed token ends every session
+  - session lifetime matches the configured 30 days
+  - login timing no longer reveals accounts
+- Authorization was verified route by route. One privilege bug fixed: an ADMIN could demote the OWNER. A cross-user regression test now guards the rest.
+- Scraped URLs can no longer become `javascript:` links or open redirects. The web app has CSP and anti-framing headers.
+- Logs no longer carry the webhook secret or user e-mails. The API port is bound to localhost in the compose file.
+- Dependency advisories went from 91 to 43; everything left needs a framework upgrade. `SECURITY.md` documents the auth model, trust boundaries and secret handling.
 
 ## Remaining items
 
+- **Deploy.** The fixes reach users only after `deploy-api.sh` + `deploy-web.sh`. The permission classifier blocked me twice, including after the owner's chat OK (morning list). Until then the live login stays broken (S-02).
+- Next 15 upgrade: clears the remaining critical/high advisories and lets the CSP drop `'unsafe-inline'` with nonces.
+- Nest 11 upgrade (`multer` etc.; not reachable today).
+- Remove the raw-refresh-token fallback after 2026-10-26.
+- Recreate the API container (any deploy does it) to apply the `127.0.0.1` port binding.
+
 ## Handoff → other phases
 
+- **05 Frontend**
+  - Upgrade Next 14 → 15.5.24+ with React 19 (S-03/S-17). Afterwards re-enable the image optimizer only if AVIF decoding is patched, and add CSP nonces via middleware to drop `script-src 'unsafe-inline'`.
+  - `listing-table` "View" links go straight to the store (`externalUrl`), bypassing `/affiliate/go` click tracking. Product decision, not security.
+- **06 UX**
+  - Login/sign-up forms: once S-02 is deployed, check the error states for 401/409/429.
+  - A replayed-token lockout (S-05) logs the user out everywhere; the login page could say why.
+- **08 Optimization:** `JwtStrategy` now does one indexed session lookup (with the user) per authenticated request; it replaced the user lookup, so it's the same count.
+- **10 DevOps**
+  - Nest 11 upgrade for the `@nestjs/platform-express` transitive advisories.
+  - CI should run `pnpm audit --prod` and gitleaks.
+  - Set `FRONTEND_URL` in the prod `.env` to the real origin(s). With the S-02 fix it's no longer required, but the value (`http://130.110.124.121`) is misleading.
+  - nginx access logs still record the affiliate `?secret=` query (S-11 covers only the app).
+
 ## Decisions for Baraa
+
+- **D-17 — Tokens in localStorage vs httpOnly cookies (S-18).**
+  - Cookies would keep tokens out of reach of any future XSS, but need CSRF protection, a cookie-reading refresh endpoint, and same-site deployment of web and API (true today).
+  - **Recommendation:** yes, in phase 05 after the Next 15 upgrade, keeping bearer tokens for the partner API. Until then CSP plus the S-01/S-09 fixes cover the known paths.
+- **D-18 — MongoDB (AradoBot's `aradobotd-mongo`) is published on `0.0.0.0:27017`.** firewalld doesn't open 27017, so it's probably unreachable from outside, but one firewall change away from exposing a database.
+  - **Recommendation:** bind it to `127.0.0.1` the next time you touch AradoBot, and make sure it has auth enabled.
+- **D-19 — Deploy the phase 04 fixes now.** Login/sign-up are broken live until the API is redeployed (S-02).
+  - **Recommendation:** run `ssh pricelens 'cd ~/pricelens && ./scripts/deploy-api.sh && ./scripts/deploy-web.sh'`, or add a permission rule so I can. Then check a real login in the browser.
+  - Everyone gets one silent token refresh after the API deploy: old access tokens carry no session id.
