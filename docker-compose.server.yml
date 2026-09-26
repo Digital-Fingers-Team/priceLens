@@ -1,6 +1,7 @@
 # Production stack for this server.
 # Differs from docker-compose.prod.yml in two ways:
-#   - api is published on host 3002 (3001 is taken by aradobot-web under pm2)
+#   - api is published on host 127.0.0.1:3002 only (3001 is taken by aradobot-web
+#     under pm2; nginx is the public way in, S-15)
 #   - an nginx proxy on :80 serves the web app and routes /api/ to the api,
 #     which is what NEXT_PUBLIC_API_URL / NEXT_PUBLIC_SITE_URL in .env expect
 version: "3.9"
@@ -49,7 +50,7 @@ services:
     restart: always
     env_file: .env
     ports:
-      - "3002:3001"
+      - "127.0.0.1:3002:3001"
     depends_on:
       postgres:
         condition: service_healthy
