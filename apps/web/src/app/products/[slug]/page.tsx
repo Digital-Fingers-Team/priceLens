@@ -3,6 +3,7 @@ import { ProductDetailClient } from './_product-detail-client';
 import { productApi } from '@/lib/api/product.api';
 import { absoluteUrl } from '@/lib/seo';
 import type { CanonicalProduct } from '@/types/product.types';
+import { serializeJsonLd } from '@/lib/utils/json-ld';
 
 export const revalidate = 300;
 
@@ -107,7 +108,7 @@ export default async function ProductPage({ params }: { params: { slug: string }
       {jsonLd ? (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
         />
       ) : null}
       <ProductDetailClient slug={params.slug} initialProduct={product} />
