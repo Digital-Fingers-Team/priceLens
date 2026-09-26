@@ -46,19 +46,15 @@ test('filters and sort live in the URL, and back/forward restores them', async (
   await openHydrated(page, '/search?q=galaxy');
   await expect(page.getByRole('main').locator('a[href^="/products/"]').first()).toBeVisible();
 
-  await page.getByRole('button', { name: /Filters/ }).click();
-  await page.getByLabel('Sort by').selectOption('minPriceUsd');
-  await page.getByLabel('Direction').selectOption('asc');
-  await page.getByRole('button', { name: 'Apply' }).click();
+  // Sort sits on the results bar (audit 06, U-05); one choice sets both.
+  await page.getByLabel('Sort', { exact: true }).selectOption('minPriceUsd');
   await expect(page).toHaveURL(/[?&]sortBy=minPriceUsd/, NAV);
   await expect(page).toHaveURL(/[?&]sortDir=asc/);
   await expect(page).toHaveURL(/[?&]q=galaxy/);
 
   // A reload (or a shared link) gives the same state back.
   await page.reload();
-  await page.getByRole('button', { name: /Filters/ }).click();
-  await expect(page.getByLabel('Sort by')).toHaveValue('minPriceUsd');
-  await page.getByRole('button', { name: 'Close filters' }).click();
+  await expect(page.getByLabel('Sort', { exact: true })).toHaveValue('minPriceUsd');
 
   // A new search, then back: the box and the URL show the earlier search.
   const box = page.getByRole('main').getByRole('searchbox', { name: 'Search products' });

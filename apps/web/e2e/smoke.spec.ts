@@ -47,7 +47,8 @@ test('login and logout', async ({ page, request, isMobile }) => {
   await form.getByLabel('Email').fill(email);
   await form.getByLabel('Password', { exact: true }).fill(password);
   await form.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page).not.toHaveURL(/\/login/);
+  // Client navigation under next dev on the shared server can exceed 5 s.
+  await expect(page).not.toHaveURL(/\/login/, { timeout: 20_000 });
 
   if (isMobile) await openMobileMenu(page);
   await page.getByRole('button', { name: 'Sign out' }).click();
