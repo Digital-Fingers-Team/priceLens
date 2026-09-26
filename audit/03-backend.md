@@ -6,6 +6,7 @@ Baseline gate at the start: api unit **504**, integration **29**, e2e **32**, al
 
 Production containers at the start (checked again at the end):
 `pricelens-api 2026-09-25 23:35:13 rc=2 · pricelens-web-green 17:32:06 rc=0 · pricelens-proxy 11:42:35 · pricelens-postgres 11:37:34 · pricelens-redis 11:37:34`
+At the end of the phase, before the deploy: identical start times and restart counts, all running.
 
 Scope notes:
 - **Meilisearch:** there is none. ADR 0003 (phase 01) removed it; search is Postgres. The prompt's Meilisearch checks were applied to Postgres search instead: empty query, Arabic handling, typo tolerance. Phase 02 already covered Arabic with 20 real-query ranking tests.
@@ -102,11 +103,9 @@ Severity: P0 broken/unsafe · P1 real user/business harm · P2 polish.
 - The `@nestjs/swagger` CLI plugin is enabled in `nest-cli.json`, so `nest build` adds DTO schemas. But:
   - comment introspection is off, so the field docs written in the DTOs never reach the document;
   - tags exist for 8 of 17 controllers;
-  - the Stripe webhook shows up as a normal endpoint;
   - nothing builds the document outside a running dev server, and nothing checks it matches the routes.
 - Fix:
   - Turn on `introspectComments` and tag every controller.
-  - Exclude the Stripe webhook with `@ApiExcludeController`.
   - Build the document in one shared function (main.ts and tests).
   - Commit it as `docs/openapi.json`.
   - A test, run with the same plugin as a ts-jest transformer, checks that every registered route is in the document and that the committed file is current.
@@ -187,14 +186,82 @@ Benchmark database: `pricelens_bench` on the dev Postgres, migrated to 43ff342 a
 - Reconciliation is 4× faster. What is left is the per-row `category_id` filter: the GiST scan walks titles nearest first and discards other categories' rows. A composite `(category_id, normalized_title)` GiST index would need the `btree_gist` extension. 11.6 s for an hourly job is acceptable at this size, so phase 08 revisits it with production row counts.
 - Search and suggest filter on an expression over `concat_ws(title, brand, model, slug)`, so no trigram index can serve their `LIKE`. At 5,000 products they answer in tens of milliseconds. An expression index is phase 08 work once production volumes justify it.
 
-## Fix log
+## Status by finding
 
-(Filled in as fixes land.)
+| Finding | Status | Commit | Evidence |
+|---|---|---|---|
+| B-01 Redis down blocks boot, hangs requests | Fixed | `5afcdc3` | Dev API with Redis unreachable (port 6390): boots, search 200 in 1.1 s, `/health/ready` 503 naming cache and queue; 200 again once Redis is back. Unit tests for timeouts, retries, background registration. |
+| B-02 unvalidated public input | Fixed | `77e9191` | `SearchQueryDto`/`SuggestQueryDto`; e2e 400s for bad limits, LIKE wildcards matched literally |
+| B-03 admin/affiliate bodies unvalidated | Fixed | `daad84c` | DTO classes; endpoint suite sends invalid bodies (400) |
+| B-04 login body never validated | Fixed | `3e35bcd` | passport-local removed; integration tests for unknown fields, case-insensitive duplicate e-mail |
+| B-05 no readiness check | Fixed | `a8e8ad5` | `/health/ready` probes Postgres, cache Redis, queue Redis; e2e 200 and 503 cases |
+| B-06 request ids | Fixed | `a8e8ad5` | One id per request in header, error body and logs; unsafe client ids replaced (e2e) |
+| B-07 one failing query ends a sweep; breaker on one path; no pacing | Fixed | `43ff342` | `StoreCallGuard`: shared breaker, per-store pacing, one retry; unit tests for each; characterization snapshot gained only zero counters |
+| B-08 one flag disables unrelated jobs | Fixed | `94815d8` | A switch per job family; scheduler unit tests |
+| B-09 schema diff drops hot indexes | Fixed | `7845ea7` | Indexes declared in `schema.prisma`; drift test (migrations and migrated DB vs schema) in integration |
+| B-10 suggest loads the catalog | Fixed | `77e9191` | One SQL query with `LIMIT`; e2e |
+| B-11 OpenAPI incomplete, untested | Fixed | `365e5bb` | `docs/openapi.json` (80 paths, 23 schemas); e2e checks every route is documented and the file is current. The Stripe webhook and partner API were already `@ApiExcludeController`. |
+| B-12 most endpoints untested | Fixed | `6cee563` | Endpoint suite: every registered route called, route list enforced, no forbidden field in any response |
+| B-13 fake `processingTimeMs` | Fixed | `77e9191` | Measured |
+| B-14 tests share dev Redis dbs | Fixed | `365e5bb` | `REDIS_QUEUE_DB`; `.env.test` uses dbs 2/3 |
+| B-15 currency default USD | Fixed | `7845ea7` | Default `EGP` in schema and migration |
+| B-16 search inside ProductsService | Fixed | `77e9191` | `SearchService` |
+| B-17 untyped config keys | Fixed | `365e5bb` | Unit test resolves every `config.get` literal (none unknown); `reconciliationMaxPairs` fallback aligned to 500 |
+| B-18 `/auth/me` returns the raw row | Fixed | `fe7f034` | `toPublicUser`; integration test asserts the exact 7 keys |
+| B-19 Magento in-page fetch without timeout | Fixed | `fe7f034` | `AbortSignal.timeout(30 s)` |
+| B-20 dead Prisma helpers | Fixed | `fe7f034` | Removed; no callers |
+| B-21 normalized-title backfill | Fixed (tool); running it in prod: **Needs decision** (D-15) | `6cee563` | On the seeded copy: dry run 611 products / 7,621 listings, apply updated 8,232, re-run found 0, rollback restored all |
+| B-22 pgvector unused; KNN without index | Fixed (index, dead code); dropping the column: **Needs decision** (D-16) | `7845ea7` | Reconciliation 46.7 s → 11.6 s (Query plans) |
+
+One process note: `7845ea7` replaced `31647fd`, which only ever reached the server test clone. Its drift test failed there (Prisma leaves extensions out of the migrations side of the diff), so the fix was folded in before anything was pushed to origin, with the owner's approval.
+
+## After
+
+| Check | phase-02-done | phase-03-done |
+|---|---|---|
+| api unit / integration / e2e | 504 / 29 / 32 | **525 / 36 / 72** (at `6cee563`; tsc, eslint, build clean) |
+| Routes with a test | a handful (smoke, auth, alerts) | all of them, enforced |
+| Redis down | API never starts | serves from Postgres; readiness reports it |
+| Reconciliation neighbour query, 5,000 products | 46.7 s | 11.6 s |
+| OpenAPI | dev server only, 8 of 17 controllers tagged | committed, tested, every controller tagged |
 
 ## Summary
 
+- The API no longer depends on Redis to start or to answer. The cache fails fast, job registration retries in the background, and `/health/ready` tells the deploy what is actually up.
+- Every request body and query is validated by a DTO, login included. `/auth/me` returns only public fields, and a suite that calls every route checks that no response carries a password hash, key hash, verification token, IP hash or stray refresh token.
+- One store failing no longer costs a whole sweep. Every path to a store shares one circuit breaker, pacing and retry.
+- Scheduled jobs have one switch per family, so turning off scraping no longer turns off alerts and billing.
+- The schema and migrations agree, and a test keeps them agreeing. The duplicate-matching query is 4× faster with a GiST index.
+- Search moved to its own service with SQL suggestions and escaped `LIKE` patterns. Its timing field is now measured.
+- The OpenAPI document is committed and tested against the real routes.
+
 ## Remaining items
+
+- Running the title backfill in production (D-15) and dropping the unused embedding column (D-16) wait for the owner.
+- OpenAPI accuracy, low priority:
+  - Query parameters read with `@Query('name')` show as required (listings `page`/`limit`, seller products, brand discoveries, API-key usage). Moving them into DTO classes fixes that.
+  - Only the auth routes declare bearer auth in the document, though every non-public route needs it.
 
 ## Handoff → other phases
 
+- **04 Security**
+  - Login answers an unknown e-mail faster than a wrong password (no dummy bcrypt compare), so timing reveals which e-mails have accounts.
+  - CORS lets requests without an `Origin` header through. That is right for server-to-server calls, but should be a conscious choice.
+  - The partner API is excluded from the OpenAPI document; its integrators need their own reference.
+- **08 Optimization**
+  - Reconciliation still filters categories after the GiST scan. A `(category_id, normalized_title)` GiST index needs `btree_gist`; measure on production row counts first.
+  - Search/suggest `LIKE` over an expression can't use an index; an expression index or stored column is the fix when volumes justify it.
+  - The seed generator writes normalized titles the current normalizer would change (611 of 5,000 products in the medium profile), so benchmarks on seeded data slightly misrepresent search. It should call `NormalizerService`.
+- **10 DevOps**
+  - The deploy script should wait for `/health/ready`, not `/health`, before switching traffic.
+  - `MaxListenersExceededWarning` on Commander in e2e runs: several apps boot in one process.
+  - `REDIS_QUEUE_DB` defaults to 1, so production is unchanged; set it explicitly in the prod env.
+
 ## Decisions for Baraa
+
+- **D-15 — Run the normalized-title backfill in production.** Products and listings stored before phase 02 keep the old normalization, so some Arabic-titled products miss English searches. The tool only rewrites derived search text, and writes a rollback file first. **Recommendation:** after this deploy, from `~/pricelens/apps/api` inside the API container, run:
+  - `npx ts-node scripts/ops/backfill-normalized-titles.ts` (dry run: counts and samples)
+  - `npx ts-node scripts/ops/backfill-normalized-titles.ts --apply`
+  - If needed: `npx ts-node scripts/ops/backfill-normalized-titles.ts --rollback <file>`
+- **D-16 — Drop `canonical_products.title_embedding` and its HNSW index.** Nothing reads or writes them since phase 02. Dropping them removes a 768-float column from every product row and an index that is maintained for nothing. It deletes data, which is why it is not done here. **Recommendation:** drop them in phase 08 with a migration, after confirming in production that the column is empty or unused.
+- **D-10 (update):** deployed after phase 03 instead of after phase 04, as the owner asked on 2026-09-26.
