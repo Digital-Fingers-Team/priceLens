@@ -50,9 +50,24 @@ const nextConfig = {
   // finds first, and the server has an unrelated one in the home directory.
   outputFileTracingRoot: path.join(__dirname, '../..'),
   reactStrictMode: true,
+  experimental: {
+    // Product pages are cached after their first visit (ISR, audit 08). Keep
+    // that cache in memory (an LRU, cacheMaxMemorySize = 50 MB by default)
+    // instead of writing every product page ever visited to the container's
+    // disk: 16,000+ products x 2 languages, visited by crawlers, is gigabytes.
+    isrFlushToDisk: false,
+  },
   poweredByHeader: false,
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders() }];
+  },
+  async rewrites() {
+    return {
+      // English product pages, un-prefixed (see middleware.ts). A config
+      // rewrite changes the path Next matches against its prerender manifest,
+      // so these pages are cached like /ar/products/... (ISR, audit 08).
+      beforeFiles: [{ source: '/products/:slug', destination: '/en/products/:slug' }],
+    };
   },
   images: {
     // The optimizer (/_next/image) decodes remote images with sharp/libheif;

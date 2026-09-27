@@ -4,13 +4,14 @@ import { renderWithI18n as render } from '@/test/i18n';
 import { OfferList } from './offer-list';
 import type { SourceListing } from '@/types/product.types';
 
-let query = '';
 const replace = vi.fn();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace }),
   usePathname: () => '/products/galaxy-a57',
-  useSearchParams: () => new URLSearchParams(query),
 }));
+
+/** The address the component reads its color from (after mount). */
+const setQuery = (query: string) => window.history.replaceState(null, '', `/products/galaxy-a57${query ? `?${query}` : ''}`);
 
 function store(id: string, name: string): SourceListing['platform'] {
   return { id, name, slug: name.toLowerCase(), logoUrl: null, baseUrl: `https://${name.toLowerCase()}.example` };
@@ -52,7 +53,7 @@ const rowNames = () => screen.getAllByRole('listitem').map((li) => within(li).ge
 
 describe('OfferList', () => {
   beforeEach(() => {
-    query = '';
+    setQuery('');
     replace.mockReset();
   });
   afterEach(cleanup);
@@ -92,10 +93,11 @@ describe('OfferList', () => {
     render(<OfferList listings={offers} />);
     fireEvent.click(screen.getByRole('button', { name: 'lilac' }));
     expect(replace).toHaveBeenCalledWith('/products/galaxy-a57?color=lilac', { scroll: false });
+    expect(rowNames()).toEqual(['Amazon']);
   });
 
   it('with a color in the URL, shows only that color and picks Best Deal among it', () => {
-    query = 'color=navy';
+    setQuery('color=navy');
     render(<OfferList listings={offers} />);
     expect(rowNames()).toEqual(['Jumia', 'Noon']);
     expect(within(screen.getAllByRole('listitem')[0]).getByText('Best deal')).toBeTruthy();
@@ -112,7 +114,7 @@ describe('OfferList in Arabic', () => {
   afterEach(cleanup);
 
   it('uses the Arabic copy and keeps the store names as they are', () => {
-    query = '';
+    setQuery('');
     render(<OfferList listings={offers} />, 'ar');
     expect(screen.getAllByText('أفضل صفقة').length).toBe(1);
     expect(screen.getByRole('link', { name: 'اذهب إلى Amazon (يفتح في علامة تبويب جديدة)' })).toBeTruthy();

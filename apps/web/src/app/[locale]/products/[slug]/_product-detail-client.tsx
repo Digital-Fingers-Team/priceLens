@@ -1,6 +1,6 @@
 'use client';
 import { ArrowLeft } from 'lucide-react';
-import { PriceChart } from '@/components/charts/price-chart';
+import dynamic from 'next/dynamic';
 import { PriceChartSkeleton } from '@/components/charts/price-chart-skeleton';
 import { IntelligencePanel } from '@/components/intelligence/intelligence-panel';
 import { ListingTableSkeleton } from '@/components/product/listing-table-skeleton';
@@ -21,13 +21,23 @@ interface ProductDetailClientProps {
   slug: string;
   /** Fetched on the server so the first paint is the product, not a skeleton. */
   initialProduct?: CanonicalProduct;
+  /** When the server fetched initialProduct (ms since epoch). */
+  fetchedAt?: number;
 }
 
 const PAGE = 'mx-auto flex max-w-page flex-col gap-12 px-4 py-8 sm:px-6';
 
-export function ProductDetailClient({ slug, initialProduct }: ProductDetailClientProps) {
+// Recharts is the page's heaviest dependency and the chart sits below the
+// offers; it loads after the page is interactive (audit 08, P-07). The chart
+// showed a skeleton on the server already (its colors come from the browser).
+const PriceChart = dynamic(() => import('@/components/charts/price-chart').then((m) => m.PriceChart), {
+  ssr: false,
+  loading: () => <PriceChartSkeleton />,
+});
+
+export function ProductDetailClient({ slug, initialProduct, fetchedAt }: ProductDetailClientProps) {
   const { t, tf, tp, fmt } = useI18n();
-  const { data: product, isLoading, isError, refetch } = useProduct(slug, initialProduct);
+  const { data: product, isLoading, isError, refetch } = useProduct(slug, initialProduct, fetchedAt);
   const { data: stats } = usePriceStats(product?.id ?? '');
 
   if (isLoading) {

@@ -29,5 +29,8 @@ export function middleware(request: NextRequest) {
 export const config = {
   // Not Next internals, the API proxy, or files (robots.txt, sitemap.xml,
   // images, the manifest): anything with a dot in its last segment.
-  matcher: ['/((?!_next/|api/|.*\\.[^/]*$).*)'],
+  // Not English product pages either: next.config.js rewrites those, because
+  // Next caches a page (ISR) only when the path it matches is the rewritten
+  // one, and a middleware rewrite keeps the original (audit 08, P-06).
+  matcher: ['/((?!_next/|api/|products/|.*\\.[^/]*$).*)'],
 };

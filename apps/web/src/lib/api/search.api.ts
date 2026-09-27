@@ -1,13 +1,14 @@
+import type { AxiosRequestConfig } from 'axios';
 import { apiClient } from './client';
 import type { SearchFilters, SearchResponse, SuggestionItem } from '@/types/search.types';
 import type { ApiResponse } from '@/types/api.types';
 
 export const searchApi = {
-  search: async (filters: SearchFilters): Promise<SearchResponse> => {
+  search: async (filters: SearchFilters, config?: Pick<AxiosRequestConfig, 'timeout'>): Promise<SearchResponse> => {
     const params = Object.fromEntries(
       Object.entries(filters).filter(([, v]) => v !== undefined && v !== ''),
     );
-    const res = await apiClient.get<ApiResponse<SearchResponse>>('/search', { params });
+    const res = await apiClient.get<ApiResponse<SearchResponse>>('/search', { params, ...config });
     return res.data.data;
   },
 

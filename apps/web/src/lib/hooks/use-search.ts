@@ -2,9 +2,18 @@ import { useQuery } from '@tanstack/react-query';
 import { categoriesApi } from '@/lib/api/categories.api';
 import { searchApi } from '@/lib/api/search.api';
 import { QUERY_KEYS } from '@/config/constants';
-import type { SearchFilters } from '@/types/search.types';
+import type { SearchFilters, SearchResponse } from '@/types/search.types';
 
-export function useSearch(filters: SearchFilters) {
+/**
+ * `initial` is the page the server rendered with (search/page.tsx). It only
+ * seeds the query for the filters it was fetched for: after a filter change
+ * or a new query the key differs and the browser fetches as usual.
+ */
+export function useSearch(
+  filters: SearchFilters,
+  initial?: { filters: SearchFilters; data: SearchResponse; fetchedAt: number } | null,
+) {
+  const seeded = initial && JSON.stringify(initial.filters) === JSON.stringify(filters) ? initial : null;
   return useQuery({
     queryKey: QUERY_KEYS.search(filters),
     queryFn: () => searchApi.search(filters),
@@ -12,6 +21,8 @@ export function useSearch(filters: SearchFilters) {
     // first) instead of leaving /search blank.
     placeholderData: (prev) => prev, // keep previous data while fetching new page
     staleTime: 5 * 1000,
+    initialData: seeded?.data,
+    initialDataUpdatedAt: seeded?.fetchedAt,
     // A zero-result search kicks off a background live-fetch job (see products.service.ts)
     // instead of blocking the request. Poll briefly so results appear once it lands.
     refetchInterval: (query) => {

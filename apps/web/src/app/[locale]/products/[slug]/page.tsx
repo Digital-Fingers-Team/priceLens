@@ -11,6 +11,17 @@ import { serializeJsonLd } from '@/lib/utils/json-ld';
 
 export const revalidate = 300;
 
+/**
+ * No product is built ahead of time, but every one is cached after its first
+ * visit and re-rendered in the background at most every 5 minutes (ISR,
+ * audit 08, P-06). Without this the route rendered on every request and
+ * `revalidate` never applied. The browser refetches the prices when the
+ * cached HTML is older than the query's stale time (see fetchedAt below).
+ */
+export function generateStaticParams() {
+  return [];
+}
+
 type PageProps = { params: Promise<{ slug: string; locale: string }> };
 
 /**
@@ -84,6 +95,9 @@ export default async function ProductPage({ params }: PageProps) {
   const { href } = getI18n(await resolveLocale(params));
   const product = await loadProduct(slug);
   if (!product) notFound();
+  // When this HTML was rendered: a cached copy can be minutes old, and the
+  // client query uses this to decide whether to refresh the prices at once.
+  const fetchedAt = Date.now();
 
   const { min, max, currency } = product.priceStats;
   const offerCount =
@@ -117,7 +131,7 @@ export default async function ProductPage({ params }: PageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
-      <ProductDetailClient slug={slug} initialProduct={product} />
+      <ProductDetailClient slug={slug} initialProduct={product} fetchedAt={fetchedAt} />
     </>
   );
 }

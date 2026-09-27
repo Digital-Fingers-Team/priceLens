@@ -1,5 +1,5 @@
 'use client';
-import { useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { EmptyState } from '@/components/ui/state';
 import { usePathname, useRouter } from '@/lib/i18n/navigation';
 import { useI18n } from '@/lib/i18n/provider';
@@ -20,22 +20,34 @@ interface OfferListProps {
  * Colors share one product (owner decision D-6), so when the offers name more
  * than one color a chip row filters them; the choice lives in the URL
  * (?color=navy) like the search filters, and "Best Deal" follows it (U-04).
+ *
+ * The color is read from the address after mount, not with useSearchParams:
+ * the product page is cached (ISR, audit 08), and useSearchParams there
+ * needs a Suspense boundary that would leave the offers out of the HTML.
+ * The server renders every color; a ?color link filters right after load.
  */
 export function OfferList({ listings }: OfferListProps) {
   const { t } = useI18n();
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const [requested, setRequested] = useState<string | null>(null);
+
+  useEffect(() => {
+    const read = () => setRequested(new URLSearchParams(window.location.search).get('color')?.toLowerCase() ?? null);
+    read();
+    window.addEventListener('popstate', read);
+    return () => window.removeEventListener('popstate', read);
+  }, []);
 
   const colors = offerColors(listings);
-  const requested = searchParams.get('color')?.toLowerCase() ?? null;
   const color = requested && colors.includes(requested) ? requested : null;
 
   const offers = sortOffers(filterByColor(listings, color));
   const bestDeals = bestDealIds(offers);
 
   function selectColor(next: string | null) {
-    const params = new URLSearchParams(searchParams.toString());
+    setRequested(next);
+    const params = new URLSearchParams(window.location.search);
     if (next) params.set('color', next);
     else params.delete('color');
     const qs = params.toString();
