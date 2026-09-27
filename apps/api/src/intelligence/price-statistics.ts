@@ -270,6 +270,31 @@ const MIN_SPAN_DAYS_FOR_VERDICT = 14;
 export type VerdictCode = 'GOOD_TIME_TO_BUY' | 'FAIR_PRICE' | 'WAIT' | 'INSUFFICIENT_DATA';
 export type ConfidenceCode = 'HIGH' | 'MEDIUM' | 'LOW';
 
+/**
+ * A reason as a code plus its numbers, so each interface language can word it
+ * (audit 11: the Arabic UI showed the English sentences). `reasons` keeps the
+ * English sentences for API clients.
+ */
+export type VerdictReasonCode =
+  | 'NO_HISTORY'
+  | 'TOO_LITTLE_HISTORY'
+  | 'CHEAPER_THAN_PCT'
+  | 'AT_LOWEST'
+  | 'WITHIN_PCT_OF_LOW'
+  | 'PRICIER_THAN_PCT'
+  | 'LOW_IN_PERIOD'
+  | 'TYPICAL_PRICE'
+  | 'ABOVE_LOW_PCT'
+  | 'BELOW_AVERAGE_PCT'
+  | 'ABOVE_AVERAGE_PCT'
+  | 'VOLATILE';
+
+export interface VerdictReason {
+  code: VerdictReasonCode;
+  /** Numbers the sentence needs: pct, days, span, needDays, needSpan, price. */
+  params: Record<string, number>;
+}
+
 export interface BuyVerdict {
   verdict: VerdictCode;
   confidence: ConfidenceCode | null;
@@ -279,8 +304,10 @@ export interface BuyVerdict {
   vsAverage: number | null;
   /** How far above the period low, as a percentage. 0 = at the low. */
   aboveLow: number | null;
-  /** Machine-readable reasons; the UI renders these as bullet points. */
+  /** The reasons as English sentences (API clients). */
   reasons: string[];
+  /** The same reasons as codes; the website words them in its language. */
+  reasonCodes: VerdictReason[];
   /** Populated only for INSUFFICIENT_DATA. */
   missing?: { dayCount: number; spanDays: number; needDays: number; needSpanDays: number };
 }
@@ -305,6 +332,7 @@ export function computeBuyVerdict(
       vsAverage: null,
       aboveLow: null,
       reasons: ['We have not recorded enough price history for this product yet.'],
+      reasonCodes: [{ code: 'NO_HISTORY', params: {} }],
       missing: {
         dayCount: stats?.dayCount ?? 0,
         spanDays: stats?.spanDays ?? 0,
@@ -325,6 +353,17 @@ export function computeBuyVerdict(
         `Only ${stats.dayCount} day(s) of price history over ${stats.spanDays} day(s). ` +
           `A verdict needs at least ${MIN_DAYS_FOR_VERDICT} days spanning ${MIN_SPAN_DAYS_FOR_VERDICT} days.`,
       ],
+      reasonCodes: [
+        {
+          code: 'TOO_LITTLE_HISTORY',
+          params: {
+            days: stats.dayCount,
+            span: stats.spanDays,
+            needDays: MIN_DAYS_FOR_VERDICT,
+            needSpan: MIN_SPAN_DAYS_FOR_VERDICT,
+          },
+        },
+      ],
       missing: {
         dayCount: stats.dayCount,
         spanDays: stats.spanDays,
@@ -340,25 +379,40 @@ export function computeBuyVerdict(
   const aboveLow = stats.low > 0 ? ((currentPrice - stats.low) / stats.low) * 100 : 0;
 
   const reasons: string[] = [];
+  const reasonCodes: VerdictReason[] = [];
+  const say = (code: VerdictReasonCode, params: Record<string, number>, text: string) => {
+    reasonCodes.push({ code, params });
+    reasons.push(text);
+  };
+  const pct1 = (value: number) => Math.round(value * 10) / 10;
+  const days = stats.dayCount;
+  const low = Math.round(stats.low);
   let verdict: VerdictCode;
 
   if (rank <= 25) {
     verdict = 'GOOD_TIME_TO_BUY';
-    reasons.push(`Cheaper than ${Math.round(100 - rank)}% of the last ${stats.dayCount} days we recorded.`);
-    if (aboveLow <= 2) reasons.push('Effectively at its lowest recorded price.');
-    else reasons.push(`Within ${aboveLow.toFixed(1)}% of its lowest recorded price.`);
+    const pct = Math.round(100 - rank);
+    say('CHEAPER_THAN_PCT', { pct, days }, `Cheaper than ${pct}% of the last ${days} days we recorded.`);
+    if (aboveLow <= 2) say('AT_LOWEST', {}, 'Effectively at its lowest recorded price.');
+    else say('WITHIN_PCT_OF_LOW', { pct: pct1(aboveLow) }, `Within ${aboveLow.toFixed(1)}% of its lowest recorded price.`);
   } else if (rank >= 70) {
     verdict = 'WAIT';
-    reasons.push(`More expensive than ${Math.round(rank)}% of the last ${stats.dayCount} days we recorded.`);
-    reasons.push(`It has been as low as ${stats.low.toFixed(0)} in this period.`);
+    const pct = Math.round(rank);
+    say('PRICIER_THAN_PCT', { pct, days }, `More expensive than ${pct}% of the last ${days} days we recorded.`);
+    say('LOW_IN_PERIOD', { price: low }, `It has been as low as ${low} in this period.`);
   } else {
     verdict = 'FAIR_PRICE';
-    reasons.push(`Around its typical price for the last ${stats.dayCount} days we recorded.`);
-    if (aboveLow > 5) reasons.push(`${aboveLow.toFixed(1)}% above its recorded low of ${stats.low.toFixed(0)}.`);
+    say('TYPICAL_PRICE', { days }, `Around its typical price for the last ${days} days we recorded.`);
+    if (aboveLow > 5) {
+      say('ABOVE_LOW_PCT', { pct: pct1(aboveLow), price: low }, `${aboveLow.toFixed(1)}% above its recorded low of ${low}.`);
+    }
   }
 
-  if (vsAverage > 0) reasons.push(`${vsAverage.toFixed(1)}% below the period average.`);
-  else if (vsAverage < 0) reasons.push(`${Math.abs(vsAverage).toFixed(1)}% above the period average.`);
+  if (vsAverage > 0) {
+    say('BELOW_AVERAGE_PCT', { pct: pct1(vsAverage) }, `${vsAverage.toFixed(1)}% below the period average.`);
+  } else if (vsAverage < 0) {
+    say('ABOVE_AVERAGE_PCT', { pct: pct1(Math.abs(vsAverage)) }, `${Math.abs(vsAverage).toFixed(1)}% above the period average.`);
+  }
 
   // A wildly volatile price makes any single reading less meaningful; say so
   // rather than quietly presenting a confident-looking verdict.
@@ -368,10 +422,10 @@ export function computeBuyVerdict(
   else confidence = 'LOW';
 
   if (confidence === 'LOW' && stats.volatility >= 0.25) {
-    reasons.push('This price moves a lot, so treat the verdict as a weak signal.');
+    say('VOLATILE', {}, 'This price moves a lot, so treat the verdict as a weak signal.');
   }
 
-  return { verdict, confidence, percentile: rank, vsAverage, aboveLow, reasons };
+  return { verdict, confidence, percentile: rank, vsAverage, aboveLow, reasons, reasonCodes };
 }
 
 // ─── Fake / misleading discount detection ──────────────────────────────────

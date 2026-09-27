@@ -8,8 +8,30 @@ export interface BuyVerdict {
   percentile: number | null;
   vsAverage: number | null;
   aboveLow: number | null;
+  /** English sentences (API clients). */
   reasons: string[];
+  /** The same reasons as codes, worded by the dictionary (audit 11). */
+  reasonCodes?: VerdictReason[];
   missing?: { dayCount: number; spanDays: number; needDays: number; needSpanDays: number };
+}
+
+export type VerdictReasonCode =
+  | 'NO_HISTORY'
+  | 'TOO_LITTLE_HISTORY'
+  | 'CHEAPER_THAN_PCT'
+  | 'AT_LOWEST'
+  | 'WITHIN_PCT_OF_LOW'
+  | 'PRICIER_THAN_PCT'
+  | 'LOW_IN_PERIOD'
+  | 'TYPICAL_PRICE'
+  | 'ABOVE_LOW_PCT'
+  | 'BELOW_AVERAGE_PCT'
+  | 'ABOVE_AVERAGE_PCT'
+  | 'VOLATILE';
+
+export interface VerdictReason {
+  code: VerdictReasonCode;
+  params: Partial<Record<'pct' | 'days' | 'span' | 'needDays' | 'needSpan' | 'price', number>>;
 }
 
 export interface DealSignal {

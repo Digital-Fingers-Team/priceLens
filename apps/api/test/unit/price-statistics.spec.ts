@@ -121,6 +121,20 @@ describe('buy/wait verdict', () => {
     expect(result.reasons.join(' ')).toMatch(/moves a lot/i);
   });
 
+  it('gives every reason as a code with its numbers, one per sentence (audit 11)', () => {
+    const prices = Array.from({ length: 40 }, (_, i) => 20_000 + i * 50);
+    const points = series(prices);
+    const wait = computeBuyVerdict(21_950, points, computeHistoryStats(points));
+    expect(wait.reasonCodes).toHaveLength(wait.reasons.length);
+    expect(wait.reasonCodes[0]).toEqual({ code: 'PRICIER_THAN_PCT', params: { pct: expect.any(Number), days: 40 } });
+    expect(wait.reasonCodes[1]).toEqual({ code: 'LOW_IN_PERIOD', params: { price: 20_000 } });
+
+    const few = series([100, 101, 102]);
+    expect(computeBuyVerdict(100, few, computeHistoryStats(few)).reasonCodes).toEqual([
+      { code: 'TOO_LITTLE_HISTORY', params: { days: 3, span: 2, needDays: MIN_DAYS_FOR_VERDICT, needSpan: 14 } },
+    ]);
+  });
+
   it('gives high confidence only with a long, stable history', () => {
     const result = computeBuyVerdict(20_000, longFlat, computeHistoryStats(longFlat));
     expect(result.confidence).toBe('MEDIUM');

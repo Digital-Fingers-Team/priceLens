@@ -23,8 +23,24 @@ interface BuyVerdictCardProps {
 }
 
 export function BuyVerdictCard({ verdict, market, history, currency, windowDays }: BuyVerdictCardProps) {
-  const { t, tf, fmt } = useI18n();
+  const { t, tf, tp, fmt } = useI18n();
   const tone = TONE[verdict.verdict];
+
+  // Worded in the page's language from the API's codes; the API's English
+  // sentences only if an older API sends no codes.
+  const days = (n?: number) => (n == null ? '' : tp(t.chart.days, n));
+  const reasons = verdict.reasonCodes
+    ? verdict.reasonCodes.map(({ code, params }) =>
+        tf(t.intel.reasons[code], {
+          pct: fmt.percent(params.pct),
+          price: fmt.currency(params.price, currency),
+          days: days(params.days),
+          span: days(params.span),
+          needDays: days(params.needDays),
+          needSpan: days(params.needSpan),
+        }),
+      )
+    : verdict.reasons;
 
   return (
     <div className={cn('flex flex-col gap-4 rounded border border-border border-s-4 bg-surface p-4 sm:p-6', tone.border)}>
@@ -45,9 +61,8 @@ export function BuyVerdictCard({ verdict, market, history, currency, windowDays 
         </dl>
       )}
 
-      {/* Reasons are written by the API (English in both UIs for now). */}
-      <ul className="flex list-disc flex-col gap-1 ps-4 text-sm text-muted marker:text-border-strong" dir="auto">
-        {verdict.reasons.map((reason) => (
+      <ul className="flex list-disc flex-col gap-1 ps-4 text-sm text-muted marker:text-border-strong">
+        {reasons.map((reason) => (
           <li key={reason}>{reason}</li>
         ))}
       </ul>

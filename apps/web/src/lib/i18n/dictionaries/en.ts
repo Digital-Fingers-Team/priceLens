@@ -242,6 +242,22 @@ export const en = {
   },
   intel: {
     heading: 'Should you buy now?',
+    // Why the verdict is what it is ({days} and {span} are already worded,
+    // e.g. "40 days"; {pct} and {price} are formatted numbers).
+    reasons: {
+      NO_HISTORY: 'We have not recorded enough price history for this product yet.',
+      TOO_LITTLE_HISTORY: 'Only {days} of price history over {span}. A verdict needs at least {needDays} spanning {needSpan}.',
+      CHEAPER_THAN_PCT: 'Cheaper than {pct} of the last {days} we recorded.',
+      AT_LOWEST: 'Effectively at its lowest recorded price.',
+      WITHIN_PCT_OF_LOW: 'Within {pct} of its lowest recorded price.',
+      PRICIER_THAN_PCT: 'More expensive than {pct} of the last {days} we recorded.',
+      LOW_IN_PERIOD: 'It has been as low as {price} in this period.',
+      TYPICAL_PRICE: 'Around its typical price for the last {days} we recorded.',
+      ABOVE_LOW_PCT: '{pct} above its recorded low of {price}.',
+      BELOW_AVERAGE_PCT: '{pct} below the period average.',
+      ABOVE_AVERAGE_PCT: '{pct} above the period average.',
+      VOLATILE: 'This price moves a lot, so treat the verdict as a weak signal.',
+    },
     signInTitle: 'Sign in to see whether now is a good time to buy',
     signInBody:
       'Pricelens compares this price with the history we recorded ourselves and tells you whether to buy or wait. Free with an account.',
