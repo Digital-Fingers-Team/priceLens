@@ -1,13 +1,15 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { cache } from 'react';
 import { isAxiosError } from 'axios';
 import { ProductDetailClient } from './_product-detail-client';
 import { productApi } from '@/lib/api/product.api';
 import { getI18n, resolveLocale } from '@/lib/i18n/server';
-import { absoluteUrl } from '@/lib/seo';
+import { absoluteUrl, localizedAlternates } from '@/lib/seo';
 import type { CanonicalProduct } from '@/types/product.types';
 import { serializeJsonLd } from '@/lib/utils/json-ld';
+import { breadcrumbJsonLd } from '@/lib/structured-data';
+import { RelatedProducts } from './_related-products';
 
 export const revalidate = 300;
 
@@ -42,7 +44,8 @@ const loadProduct = cache(async (slug: string): Promise<CanonicalProduct | null>
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const { t, tf, tp, fmt, href } = getI18n(await resolveLocale(params));
+  const locale = await resolveLocale(params);
+  const { t, tf, tp, fmt, href } = getI18n(locale);
   const product = await loadProduct(slug);
   if (!product) {
     return {
@@ -67,21 +70,18 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title,
     description,
-    alternates: {
-      canonical: path,
-    },
+    alternates: localizedAlternates(locale, `/products/${slug}`),
     openGraph: {
       title,
       description,
       url: absoluteUrl(path),
       type: 'article',
-      images: product.imageUrl ? [{ url: product.imageUrl, alt: product.title }] : undefined,
+      // The image is opengraph-image.tsx (a generated 1200x630 card).
     },
     twitter: {
-      card: product.imageUrl ? 'summary_large_image' : 'summary',
+      card: 'summary_large_image',
       title,
       description,
-      images: product.imageUrl ? [product.imageUrl] : undefined,
     },
   };
 }
@@ -92,16 +92,23 @@ export default async function ProductPage({ params }: PageProps) {
   // the prices and the listings. It also feeds the structured data below --
   // without which a price comparison result cannot show a price in Google.
   const { slug } = await params;
-  const { href } = getI18n(await resolveLocale(params));
+  const locale = await resolveLocale(params);
+  const { t, href } = getI18n(locale);
   const product = await loadProduct(slug);
   if (!product) notFound();
+  // The API answers an old slug (a product merged into another) with the
+  // product it lives on now: move the URL there for good (audit 09, SEO-09).
+  if (product.slug !== slug) permanentRedirect(href(`/products/${product.slug}`));
   // When this HTML was rendered: a cached copy can be minutes old, and the
   // client query uses this to decide whether to refresh the prices at once.
   const fetchedAt = Date.now();
 
   const { min, max, currency } = product.priceStats;
-  const offerCount =
-    product._count?.sourceListings ?? product.sourceListings?.length ?? 0;
+  // The offers the page shows (live, deduplicated), not every listing ever
+  // matched: structured data has to match the visible page (SEO-07).
+  const offerCount = product.sourceListings?.length ?? 0;
+  const categoryName =
+    (t.categories as Record<string, string>)[product.category.slug] ?? product.category.name;
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -111,6 +118,8 @@ export default async function ProductPage({ params }: PageProps) {
     ...(product.imageUrl ? { image: product.imageUrl } : {}),
     ...(product.brand ? { brand: { '@type': 'Brand', name: product.brand } } : {}),
     ...(product.model ? { model: product.model } : {}),
+    ...(product.gtin ? { gtin: product.gtin } : {}),
+    ...(product.mpn ? { mpn: product.mpn } : {}),
     ...(min != null
       ? {
           offers: {
@@ -131,7 +140,26 @@ export default async function ProductPage({ params }: PageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: serializeJsonLd(
+            breadcrumbJsonLd([
+              { name: t.seo.home, path: href('/') },
+              { name: categoryName, path: href(`/categories/${product.category.slug}`) },
+              { name: product.title, path: href(`/products/${slug}`) },
+            ]),
+          ),
+        }}
+      />
       <ProductDetailClient slug={slug} initialProduct={product} fetchedAt={fetchedAt} />
+      <RelatedProducts
+        productId={product.id}
+        categoryId={product.categoryId}
+        categoryName={categoryName}
+        categorySlug={product.category.slug}
+        locale={locale}
+      />
     </>
   );
 }

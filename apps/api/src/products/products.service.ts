@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { MatchStatus } from '@prisma/client';
+import { MatchStatus, Prisma } from '@prisma/client';
 import type { CanonicalProduct, SourceListing } from '@prisma/client';
 import type { CurrentPricesResponse, PriceHistoryResponse } from '@pricelens/contracts';
 import { PrismaService } from '../database/prisma.service';
@@ -143,16 +143,22 @@ export class ProductsService {
   }
 
   async getBySlug(slug: string) {
-    const product = await this.prisma.canonicalProduct.findUnique({
-      where: { slug },
-      include: {
-        category: true,
-        sourceListings: {
-          include: { platform: true },
-          orderBy: [{ priceUsd: 'asc' }, { lastSeenAt: 'desc' }],
-        },
+    const include = {
+      category: true,
+      sourceListings: {
+        include: { platform: true },
+        orderBy: [{ priceUsd: 'asc' as const }, { lastSeenAt: 'desc' as const }],
       },
-    });
+    };
+    let product = await this.prisma.canonicalProduct.findUnique({ where: { slug }, include });
+
+    // A product merged into another keeps working at its old URL: this
+    // returns the product it lives on now (with its own slug), and the web
+    // page answers with a permanent redirect (audit 09, SEO-09).
+    if (!product) {
+      const movedTo = await this.resolveMergedProductId(slug);
+      if (movedTo) product = await this.prisma.canonicalProduct.findUnique({ where: { id: movedTo }, include });
+    }
 
     if (!product) {
       throw new NotFoundException(`Product with slug "${slug}" not found`);
@@ -169,6 +175,32 @@ export class ProductsService {
     }
 
     return this.mapProduct(product as ProductWithRelations, true);
+  }
+
+  /**
+   * The product an old slug was merged into by reconciliation, following a
+   * chain of merges a few hops; undone merges do not count. Null when the
+   * slug never belonged to a merged product.
+   */
+  private async resolveMergedProductId(slug: string): Promise<string | null> {
+    const [merge] = await this.prisma.$queryRaw<Array<{ keptProductId: string }>>(Prisma.sql`
+      SELECT kept_product_id AS "keptProductId" FROM product_merges
+      WHERE merged_snapshot->>'slug' = ${slug} AND undone_at IS NULL
+      ORDER BY created_at DESC
+      LIMIT 1
+    `);
+    let id: string | null = merge?.keptProductId ?? null;
+    for (let hop = 0; id && hop < 5; hop += 1) {
+      const exists = await this.prisma.canonicalProduct.findUnique({ where: { id }, select: { id: true } });
+      if (exists) return id;
+      const next: { keptProductId: string } | null = await this.prisma.productMerge.findFirst({
+        where: { mergedProductId: id, undoneAt: null },
+        orderBy: { createdAt: 'desc' },
+        select: { keptProductId: true },
+      });
+      id = next?.keptProductId ?? null;
+    }
+    return null;
   }
 
   async getListings(productId: string, page = 1, limit = 50) {

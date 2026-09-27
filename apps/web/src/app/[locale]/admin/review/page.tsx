@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
+import { NOINDEX } from '@/lib/seo';
 import { ReviewQueue } from '@/components/admin/review-queue';
 
-export const metadata: Metadata = { title: 'Review Queue — Admin' };
+export const metadata: Metadata = { title: 'Review Queue — Admin', robots: NOINDEX };
 
 export default function AdminReviewPage() {
   return (

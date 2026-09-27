@@ -66,7 +66,12 @@ const nextConfig = {
       // English product pages, un-prefixed (see middleware.ts). A config
       // rewrite changes the path Next matches against its prerender manifest,
       // so these pages are cached like /ar/products/... (ISR, audit 08).
-      beforeFiles: [{ source: '/products/:slug', destination: '/en/products/:slug' }],
+      // The share images too: their URL is /en/products/<slug>/opengraph-image,
+      // which redirects here (audit 09, SEO-10).
+      beforeFiles: [
+        { source: '/products/:slug', destination: '/en/products/:slug' },
+        { source: '/products/:slug/:image(opengraph-image|twitter-image)', destination: '/en/products/:slug/:image' },
+      ],
     };
   },
   images: {

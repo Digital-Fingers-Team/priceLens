@@ -23,6 +23,9 @@ describe('locale paths', () => {
     expect(splitLocale('/ar/products/x')).toEqual({ locale: 'ar', path: '/products/x' });
     expect(splitLocale('/ar')).toEqual({ locale: 'ar', path: '/' });
     expect(splitLocale('/search')).toEqual({ locale: 'en', path: '/search' });
+    // A page built ahead of time reports its route path (audit 09).
+    expect(splitLocale('/en/pricing')).toEqual({ locale: 'en', path: '/pricing' });
+    expect(splitLocale('/en')).toEqual({ locale: 'en', path: '/' });
     // Not a locale: "/area" starts with "ar" but is a path.
     expect(splitLocale('/area')).toEqual({ locale: 'en', path: '/area' });
   });

@@ -1,4 +1,5 @@
 'use client';
+import { SearchBar } from '@/components/search/search-bar';
 import { buttonClassName } from '@/components/ui/button-styles';
 import { Link } from '@/lib/i18n/navigation';
 import { useI18n } from '@/lib/i18n/provider';
@@ -14,6 +15,8 @@ export default function NotFound() {
         <h1 className="text-2xl font-semibold text-fg">{t.errors.notFoundTitle}</h1>
         <p className="text-base text-muted">{t.errors.notFoundBody}</p>
       </div>
+      {/* Search right here: most 404s are an old product link (audit 09, SEO-13). */}
+      <SearchBar className="w-full max-w-xl" />
       <div className="flex flex-wrap gap-2">
         <Link href="/search" className={buttonClassName({ variant: 'primary' })}>
           {t.errors.searchProducts}

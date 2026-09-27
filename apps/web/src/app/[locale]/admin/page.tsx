@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
+import { NOINDEX } from '@/lib/seo';
 import { DashboardStats } from '@/components/admin/dashboard-stats';
 import { RecentJobsTable } from './_components/recent-jobs-table';
 import { QuickActions } from './_components/quick-actions';
 
-export const metadata: Metadata = { title: 'Admin Dashboard' };
+export const metadata: Metadata = { title: 'Admin Dashboard', robots: NOINDEX };
 
 export default function AdminPage() {
   return (

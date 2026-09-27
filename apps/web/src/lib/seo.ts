@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { localizePath, type Locale } from './i18n/config';
 
 const SITE_NAME = 'Pricelens';
 
@@ -35,9 +36,9 @@ export const baseMetadata: Metadata = {
   authors: [{ name: SITE_NAME }],
   creator: SITE_NAME,
   publisher: SITE_NAME,
-  alternates: {
-    canonical: '/',
-  },
+  // No canonical here: this object is spread into the layout, and every page
+  // that did not set its own inherited '/', naming the home page as its
+  // canonical (audit 09, SEO-01). Pages set theirs with localizedAlternates.
   // Search Console ownership. The same token also works as a DNS TXT record;
   // that form survives a deploy that loses this file, so it is worth having
   // both rather than either.
@@ -47,7 +48,6 @@ export const baseMetadata: Metadata = {
   openGraph: {
     type: 'website',
     siteName: SITE_NAME,
-    url: siteUrl,
     title: 'Pricelens',
     description:
       'Compare live product prices, retailer listings, and price history in one place.',
@@ -76,3 +76,22 @@ export const baseMetadata: Metadata = {
 export function absoluteUrl(pathname: string) {
   return new URL(pathname.startsWith('/') ? pathname : `/${pathname}`, siteUrl).toString();
 }
+
+/**
+ * Canonical and hreflang for a page that exists in both languages (audit 09,
+ * SEO-01, SEO-03). `path` is the English path; relative URLs resolve
+ * against metadataBase. x-default is English, the un-prefixed site.
+ */
+export function localizedAlternates(locale: Locale, path: string): NonNullable<Metadata['alternates']> {
+  return {
+    canonical: localizePath(locale, path),
+    languages: {
+      en: localizePath('en', path),
+      ar: localizePath('ar', path),
+      'x-default': localizePath('en', path),
+    },
+  };
+}
+
+/** Private and utility pages: out of the index, links still followed (SEO-04). */
+export const NOINDEX: NonNullable<Metadata['robots']> = { index: false, follow: true };

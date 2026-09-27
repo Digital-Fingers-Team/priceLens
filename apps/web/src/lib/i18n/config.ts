@@ -23,10 +23,15 @@ export function intlLocale(locale: Locale): string {
   return locale === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US';
 }
 
-/** `/ar/search` -> { locale: 'ar', path: '/search' }; `/search` -> en. */
+/**
+ * `/ar/search` -> { locale: 'ar', path: '/search' }; `/search` -> en. `/en/...` is
+ * English too: pages built ahead of time report their route path
+ * (`/en/pricing`), and the language switch then linked to `/ar/en/pricing`
+ * (a 404, found by the audit 09 crawl).
+ */
 export function splitLocale(pathname: string): { locale: Locale; path: string } {
   const match = /^\/([a-z]{2})(?=\/|$)(.*)$/.exec(pathname);
-  if (match && isLocale(match[1]) && match[1] !== defaultLocale) {
+  if (match && isLocale(match[1])) {
     return { locale: match[1], path: match[2] || '/' };
   }
   return { locale: defaultLocale, path: pathname || '/' };

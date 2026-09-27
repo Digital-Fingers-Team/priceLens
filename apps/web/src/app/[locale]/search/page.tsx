@@ -1,9 +1,46 @@
+import type { Metadata } from 'next';
 import { headers } from 'next/headers';
+import { getI18n, resolveLocale } from '@/lib/i18n/server';
+import { localizedAlternates, NOINDEX } from '@/lib/seo';
 import { searchApi } from '@/lib/api/search.api';
 import { parseSearchParams } from '@/lib/search-url';
 import { SearchPageClient, type InitialSearch } from './_search-client';
 
-type PageProps = { searchParams: Promise<Record<string, string | string[] | undefined>> };
+type PageProps = {
+  params: Promise<{ locale: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+function filtersFrom(raw: Record<string, string | string[] | undefined>) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(raw)) {
+    const first = Array.isArray(value) ? value[0] : value;
+    if (first != null) params.set(key, first);
+  }
+  return parseSearchParams(params);
+}
+
+/**
+ * Only the plain browse page is indexable. A query, a filter, a sort or a
+ * later page is one of endless near-duplicate URLs: `noindex, follow`, with
+ * the clean /search as canonical (audit 09, SEO-05). Category listings have
+ * their own indexable pages (/categories/...).
+ */
+export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {
+  const locale = await resolveLocale(params);
+  const { t, tf } = getI18n(locale);
+  const filters = filtersFrom(await searchParams);
+  const plain =
+    !filters.q && !filters.brand && !filters.categoryId && !filters.tier &&
+    filters.minPrice == null && filters.maxPrice == null &&
+    filters.sortBy === 'relevance' && filters.sortDir === 'desc' && (filters.page ?? 1) === 1;
+  return {
+    title: filters.q ? tf(t.seo.searchResultsTitle, { q: filters.q }) : t.seo.searchTitle,
+    description: t.seo.searchDescription,
+    alternates: localizedAlternates(locale, '/search'),
+    ...(plain ? {} : { robots: NOINDEX }),
+  };
+}
 
 /**
  * The first page of results is fetched here, so it arrives in the HTML with
@@ -18,13 +55,7 @@ type PageProps = { searchParams: Promise<Record<string, string | string[] | unde
  * shows the previous results dimmed meanwhile instead of waiting on the server.
  */
 export default async function SearchPage({ searchParams }: PageProps) {
-  const raw = await searchParams;
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(raw)) {
-    const first = Array.isArray(value) ? value[0] : value;
-    if (first != null) params.set(key, first);
-  }
-  const filters = parseSearchParams(params);
+  const filters = filtersFrom(await searchParams);
 
   let initial: InitialSearch | null = null;
   const clientNavigation = (await headers()).get('rsc') === '1';

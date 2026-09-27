@@ -40,7 +40,13 @@ const RULES: Array<{ name: string; pattern: RegExp; allow?: string[] }> = [
   { name: 'off-scale weight', pattern: /\bfont-(?:thin|extralight|light|bold|extrabold|black)\b/ },
   { name: 'off-scale radius', pattern: /\brounded-(?:lg|xl|2xl|3xl)\b/ },
   { name: 'off-grid spacing', pattern: /(?<![\w.])-?[a-z-]+-[0-3]\.5\b/ },
-  { name: 'inline color style', pattern: /style=\{\{[^}]*\b(?:color|background)/ },
+  // The Open Graph card is drawn by satori, which has no stylesheet: inline
+  // styles, with the colors read from design-tokens.js.
+  {
+    name: 'inline color style',
+    pattern: /style=\{\{[^}]*\b(?:color|background)/,
+    allow: ['app/[locale]/products/[slug]/opengraph-image.tsx'],
+  },
 ];
 
 describe('design system rules', () => {

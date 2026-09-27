@@ -1,5 +1,4 @@
 'use client';
-import { ArrowLeft } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { PriceChartSkeleton } from '@/components/charts/price-chart-skeleton';
 import { IntelligencePanel } from '@/components/intelligence/intelligence-panel';
@@ -8,6 +7,7 @@ import { OfferList } from '@/components/product/offer-list';
 import { ProductHeader } from '@/components/product/product-header';
 import { ProductHeaderSkeleton } from '@/components/product/product-header-skeleton';
 import { ShareActions } from '@/components/product/share-actions';
+import { Breadcrumbs } from '@/components/seo/breadcrumbs';
 import { Button } from '@/components/ui/button';
 import { buttonClassName } from '@/components/ui/button-styles';
 import { ErrorState } from '@/components/ui/state';
@@ -74,6 +74,7 @@ export function ProductDetailClient({ slug, initialProduct, fetchedAt }: Product
   const week52 = stats?.week52;
   const currency = product.priceStats.currency;
   const storeCount = new Set(listings.map((l) => l.platform.id)).size;
+  const categoryName = (t.categories as Record<string, string>)[product.category.slug] ?? product.category.name;
 
   // Order follows what a visitor came for (audit 06, U-01): which store is
   // cheapest and a way to go there, then whether to buy now, then the history
@@ -81,10 +82,15 @@ export function ProductDetailClient({ slug, initialProduct, fetchedAt }: Product
   return (
     <div className={PAGE}>
       <div className="flex flex-col gap-6">
-        <Link href="/search" className="inline-flex items-center gap-1 self-start text-sm text-muted transition-colors hover:text-fg">
-          <ArrowLeft className="flip-rtl h-4 w-4" aria-hidden />
-          {t.product.backToSearch}
-        </Link>
+        {/* Where the product sits, and the way to its category (audit 09). */}
+        <Breadcrumbs
+          label={t.seo.breadcrumbs}
+          items={[
+            { label: t.seo.home, href: '/' },
+            { label: categoryName, href: `/categories/${product.category.slug}` },
+            { label: product.title },
+          ]}
+        />
         <ProductHeader product={product} />
       </div>
 
