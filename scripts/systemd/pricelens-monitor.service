@@ -1,0 +1,6 @@
+[Unit]
+Description=PriceLens production checks and alerts (scripts/monitor.sh)
+
+[Service]
+Type=oneshot
+ExecStart=%h/pricelens/scripts/monitor.sh
