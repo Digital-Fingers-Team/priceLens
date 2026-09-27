@@ -40,19 +40,23 @@ const RAM_AFTER = /(?<![\w.])(\d{1,3})\s*gb?\s*(?:of\s+)?(?:ram|lpddr\d*x?|ddr\d
  * with " - " ("8GB RAM - 128GB"), and the next field is not the RAM.
  */
 const RAM_BEFORE = /(?<![a-z])(?:ram|memory)\s*:?\s*(\d{1,3})\s*gb(?![a-z])/gi;
-/** "256GB SSD", "256 GB ROM", "256GB storage", "256GB internal memory". */
+/**
+ * "256GB SSD", "256 GB ROM", "256GB storage", "256GB internal memory". Not
+ * when the word runs into a number: in "16GB SSD512GB" the 512GB is the SSD.
+ */
 const STORAGE_AFTER =
-  /(?<![\w.])(\d+(?:\.\d+)?)\s*(tb?|gb?)\s*(?:ssd|hdd|emmc|ufs|rom|nvme|storage|internal(?:\s+(?:storage|memory))?|hard\s+drive)(?![a-z])/gi;
+  /(?<![\w.])(\d+(?:\.\d+)?)\s*(tb?|gb?)\s*(?:ssd|hdd|emmc|ufs|rom|nvme|storage|internal(?:\s+(?:storage|memory))?|hard\s+drive)(?![a-z\d])/gi;
 /** "Storage 256GB", "ROM: 256 GB", "SSD 512GB". */
 const STORAGE_BEFORE = /(?<![a-z])(?:storage|rom|ssd)\s*:?\s*(\d+(?:\.\d+)?)\s*(tb|gb)(?![a-z])/gi;
 /** Unit-less pairs: "8+256", "(8+256)", "8/256GB", "8GB+256GB", "12+1TB", "8 * 256GB". */
 const PAIR = /(?<![\w.])(\d{1,3})\s*(gb)?\s*([+/*×])\s*(\d{1,4})\s*(gb|tb)?(?![a-z\d])/gi;
 
 /**
- * A graphics card's memory: "RTX 5060 8GB", "8GB GDDR7", "RX 7600 8GB Graphics".
+ * A graphics card's memory: "RTX 5060 8GB", "8GB GDDR7", "RX 7600 8GB Graphics",
+ * "12GB NVIDIA GeForce RTX 3060".
  * On a card it is the variant; on a laptop it is neither RAM nor storage.
  */
-const GPU_MEMORY_AFTER = /^\s*(?:gddr\d*x?|vram|graphics|video\s+memory)(?![a-z])/i;
+const GPU_MEMORY_AFTER = /^\s*(?:gddr\d*x?|vram|graphics|video\s+memory|nvidia|geforce|radeon|rtx|gtx)(?![a-z])/i;
 const GPU_MEMORY_BEFORE = /(?:rtx|gtx|rx|arc|radeon|geforce|quadro)\s*(?:[a-z]\d{3,4}|\d{3,4})\s*(?:ti|super|xt|xtx)?\s*$/i;
 
 /** "32G", "1T": a unit without the B, accepted only for plausible sizes. */

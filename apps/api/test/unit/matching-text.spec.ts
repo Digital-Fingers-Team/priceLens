@@ -64,6 +64,11 @@ describe('matching text', () => {
       ],
       ['Gaming Laptop Core i7 16GB RAM RTX 4060 8GB GDDR6', '16GB', undefined],
       ['Dell G15 Gaming Laptop 16GB DDR5 GeForce RTX 4050 6GB', '16GB', undefined],
+      // Seen in production (audit 11): "SSD512GB" is the storage, and GPU
+      // memory named before the card.
+      ['DELL Desktop PC Optiplex 3060 SFF Core i5-8500 16GB SSD512GB Windows11 Pro', undefined, '512GB'],
+      ['Gaming PC Core i5-12400F 16GB DDR4 3200MHz 1TB NVMe SSD 12GB NVIDIA GeForce RTX 3060', '16GB', '1TB'],
+      ['Gaming PC Core i5-12400F 16GB DDR4 3200MHz 12GB NVIDIA GeForce RTX 3060', '16GB', undefined],
       // Nothing to read.
       ['Nokia 105 Feature Phone Dual SIM', undefined, undefined],
       ['Samsung Galaxy A57 5G Awesome Navy', undefined, undefined],
