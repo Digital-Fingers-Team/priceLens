@@ -1,4 +1,5 @@
 'use client';
+import { useTransition } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ProductList } from '@/components/product/product-list';
 import { SearchBar } from '@/components/search/search-bar';
@@ -35,9 +36,14 @@ export function SearchPageClient({ initial }: { initial: InitialSearch | null })
   // previous search, so a failed new search still says so.
   const failed = isError && (!data || isPlaceholderData);
 
+  // A new search, filter, sort or page is a navigation: the server renders
+  // the results (page.tsx) and the page swaps them in when they arrive. Until
+  // then the current results stay, dimmed and marked busy (audit 11).
+  const [navigating, startNavigation] = useTransition();
   function navigate(changes: Partial<SearchFiltersType>) {
-    router.push(searchHref(withChanges(filters, changes)), { scroll: false });
+    startNavigation(() => router.push(searchHref(withChanges(filters, changes)), { scroll: false }));
   }
+  const busy = isFetching || navigating;
 
   function handleSearch(q: string) {
     const trimmed = q.trim();
@@ -96,8 +102,8 @@ export function SearchPageClient({ initial }: { initial: InitialSearch | null })
           ) : (
             <>
               <div
-                aria-busy={isFetching || undefined}
-                className={cn(isFetching && !isLoading && 'pointer-events-none opacity-60 transition-opacity')}
+                aria-busy={busy || undefined}
+                className={cn(busy && !isLoading && 'pointer-events-none opacity-60 transition-opacity')}
               >
                 <ProductList products={data?.hits ?? []} isLoading={isLoading} skeletonCount={filters.limit ?? 20} />
               </div>

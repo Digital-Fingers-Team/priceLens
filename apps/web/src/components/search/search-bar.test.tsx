@@ -10,13 +10,15 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 const suggest = vi.fn();
 vi.mock('@/lib/api/search.api', () => ({ searchApi: { suggest: (q: string) => suggest(q) } }));
 
-function renderSearchBar() {
+function renderSearchBar(initialValue?: string) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  const tree = (value?: string) => (
     <QueryClientProvider client={client}>
-      <SearchBar />
-    </QueryClientProvider>,
+      <SearchBar initialValue={value} />
+    </QueryClientProvider>
   );
+  const view = render(tree(initialValue));
+  return { ...view, setInitialValue: (value: string) => view.rerender(tree(value)) };
 }
 
 const input = () => screen.getByPlaceholderText('Search products, brands, models...');
@@ -52,5 +54,18 @@ describe('SearchBar', () => {
     fireEvent.click(await screen.findByText('Samsung Galaxy A57 256GB'));
     expect(suggest).toHaveBeenCalledWith('galaxy');
     expect(push).toHaveBeenCalledWith('/products/samsung-galaxy-a57-256gb');
+  });
+
+  it('follows the URL (back/forward) while the box is untouched', () => {
+    const { setInitialValue } = renderSearchBar('galaxy');
+    setInitialValue('iphone');
+    expect(input()).toHaveProperty('value', 'iphone');
+  });
+
+  it('keeps what the user typed when an earlier search lands late', () => {
+    const { setInitialValue } = renderSearchBar('galaxy');
+    fireEvent.change(input(), { target: { value: 'galaxy a57' } });
+    setInitialValue('xiaomi');
+    expect(input()).toHaveProperty('value', 'galaxy a57');
   });
 });

@@ -152,49 +152,50 @@ test('quick repeated searches end on the last one', async ({ page }) => {
   await expect(box).toHaveValue('galaxy a57');
 });
 
-test('a slow API shows the search in progress, then the results', async ({ page }) => {
+test('a slow search keeps the current results on screen, marked busy, until the new ones arrive', async ({ page }) => {
   await openHydrated(page, '/search?q=galaxy');
-  await page.route('**/api/v1/search?**', async (route) => {
+  // A search is a navigation the server renders (search/page.tsx); slow it down.
+  await page.route(/\/search\?.*_rsc=/, async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 3_000));
     await route.continue();
   });
   const box = page.getByRole('main').getByRole('searchbox', { name: 'Search products' });
   await box.fill('iphone');
   await box.press('Enter');
+  const busy = page.getByRole('main').locator('[aria-busy="true"]');
+  await expect(busy.first()).toBeVisible();
+  await expect(busy.first().locator('a[href^="/products/"]').first()).toBeVisible();
   await expect(page).toHaveURL(/[?&]q=iphone/, NAV);
-  await expect(page.getByRole('main').locator('[aria-busy="true"]').first()).toBeVisible();
-  await expect(page.getByRole('main').locator('a[href^="/products/"]').first()).toBeVisible(NAV);
-  await expect(page.getByRole('main').locator('[aria-busy="true"]')).toHaveCount(0, NAV);
+  await expect(busy).toHaveCount(0, NAV);
+  await expect(page.getByRole('main').locator('a[href^="/products/"]').first()).toBeVisible();
 });
 
-test('offline: a failed search says so instead of spinning forever', async ({ page, context }) => {
+test('searching again while the API is down keeps the results on screen', async ({ page }) => {
   await openHydrated(page, '/search?q=galaxy');
-  await context.setOffline(true);
-  const box = page.getByRole('main').getByRole('searchbox', { name: 'Search products' });
-  await box.fill('iphone');
-  await box.press('Enter');
-  await expect(page.getByRole('alert').first()).toBeVisible(NAV);
-  await context.setOffline(false);
+  const failed = page.waitForEvent('requestfailed', {
+    predicate: (r) => /\/api\/v1\/search\?/.test(r.url()),
+    ...NAV,
+  });
+  await page.route('**/api/v1/search?**', (route) => route.abort('internetdisconnected'));
+  // The same query again is a refetch in the browser, not a navigation.
+  await page.getByRole('main').getByRole('searchbox', { name: 'Search products' }).press('Enter');
+  await failed;
+  await page.waitForTimeout(8_000); // past the retries
+  await expect(page.getByRole('main').locator('a[href^="/products/"]').first()).toBeVisible();
+  await expect(page.getByRole('main').getByRole('alert')).toHaveCount(0);
 });
 
 test('a failed background price refresh keeps the product on screen', async ({ page }) => {
   const product = await firstProductPath(page);
-  await page.clock.install();
-  await openHydrated(page, product);
-  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-
-  // The browser refreshes the product once the page's data is older than two
-  // minutes; make that refresh fail the way a 429 or an API restart would.
+  // The browser refreshes a product whose page data is over two minutes old
+  // (cached HTML). Start the page's clock three minutes ahead so that refresh
+  // happens on load, and make it fail the way a 429 or an API restart would.
+  await page.clock.install({ time: Date.now() + 3 * 60_000 });
   await page.route('**/api/v1/products/**', (route) => route.fulfill({ status: 503, body: '{}' }));
   const refresh = page.waitForResponse((r) => /\/api\/v1\/products\//.test(r.url()) && r.status() === 503, NAV);
-  await page.clock.fastForward('03:00');
-  // TanStack Query refetches stale data when the tab becomes visible again.
-  await page.evaluate(() => {
-    document.dispatchEvent(new Event('visibilitychange'));
-    window.dispatchEvent(new Event('focus'));
-  });
+  await page.goto(product);
   await refresh;
-
+  await page.clock.runFor(10_000); // past the retries
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   await expect(page.getByRole('main').getByRole('alert')).toHaveCount(0);
 });

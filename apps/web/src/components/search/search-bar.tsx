@@ -26,11 +26,14 @@ export function SearchBar({ initialValue = '', size = 'default', onSearch, class
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Back/forward on /search changes the query in the URL without remounting
-  // this component; keep the box showing what the results are for.
+  // this component; keep the box showing what the results are for -- unless
+  // the user has typed since. An earlier search that lands late must not
+  // overwrite the next one being typed or just submitted (audit 11: three
+  // quick searches ended on the second).
   const [syncedValue, setSyncedValue] = useState(initialValue);
   if (initialValue !== syncedValue) {
     setSyncedValue(initialValue);
-    setQuery(initialValue);
+    if (query.trim() === syncedValue.trim()) setQuery(initialValue);
   }
 
   const debouncedQuery = useDebounce(query, 220);

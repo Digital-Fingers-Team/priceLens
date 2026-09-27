@@ -52,27 +52,26 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
  * rate-limits the search -- which can start live scrapes -- per visitor, not
  * per web server (OPS-14). Best effort: on any failure or a slow API the page
  * renders as before and the browser fetches.
- * Only for a document load: a client navigation (a filter, a sort, the next
- * page) carries the RSC header and keeps fetching in the browser, which
- * shows the previous results dimmed meanwhile instead of waiting on the server.
+ *
+ * Client navigations (a new search, a filter, a sort, the next page) land
+ * here too, as RSC requests. This used to skip them by checking the "rsc"
+ * request header, but Next does not pass that header to headers(), so the
+ * check never fired (audit 11). They are fetched here like a document load;
+ * the client keeps the previous results dimmed while the navigation runs.
  */
 export default async function SearchPage({ searchParams }: PageProps) {
   const filters = filtersFrom(await searchParams);
 
   let initial: InitialSearch | null = null;
-  const requestHeaders = await headers();
-  const clientNavigation = requestHeaders.get('rsc') === '1';
-  if (!clientNavigation) {
-    const visitor = requestHeaders.get('x-real-ip');
-    try {
-      const data = await searchApi.search(filters, {
-        timeout: SERVER_FETCH_TIMEOUT_MS,
-        headers: visitor ? { 'X-PriceLens-Client-IP': visitor } : undefined,
-      });
-      initial = { filters, data, fetchedAt: Date.now() };
-    } catch {
-      initial = null;
-    }
+  const visitor = (await headers()).get('x-real-ip');
+  try {
+    const data = await searchApi.search(filters, {
+      timeout: SERVER_FETCH_TIMEOUT_MS,
+      headers: visitor ? { 'X-PriceLens-Client-IP': visitor } : undefined,
+    });
+    initial = { filters, data, fetchedAt: Date.now() };
+  } catch {
+    initial = null;
   }
 
   return <SearchPageClient initial={initial} />;
