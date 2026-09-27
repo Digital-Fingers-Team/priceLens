@@ -1,0 +1,162 @@
+# Every push and pull request: install -> secrets scan -> dependency audit ->
+# typecheck -> lint -> unit (incl. the matching golden set) -> integration ->
+# build -> API e2e, then browser e2e against a seeded stack.
+#
+# Postgres and Redis are started with `docker run` rather than job services:
+# the test database and its extensions come from scripts/init-db.sql (mounted
+# like docker-compose.yml does), and Redis needs --requirepass, which service
+# containers cannot pass. Values are the committed local ones (.env.test,
+# .env.development); nothing here reaches a real store or paid API.
+name: CI
+
+on:
+  push:
+    branches: [main, 'feat/**', 'fix/**']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NEXT_TELEMETRY_DISABLED: '1'
+  TURBO_TELEMETRY_DISABLED: '1'
+
+jobs:
+  checks:
+    name: Typecheck, lint, test, build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the secrets scan reads history
+
+      - name: Secrets scan (gitleaks)
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo ghcr.io/gitleaks/gitleaks:v8.28.0 \
+            git --redact --no-banner /repo
+
+      - uses: pnpm/action-setup@v4 # version from package.json "packageManager"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Start Postgres (pgvector) and Redis
+        run: |
+          docker run -d --name pg -p 5432:5432 \
+            -e POSTGRES_USER=pricelens -e POSTGRES_PASSWORD=pricelens_dev_password -e POSTGRES_DB=pricelens_dev \
+            -v "$PWD/scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro" \
+            pgvector/pgvector:pg16
+          docker run -d --name redis -p 6379:6379 redis:7-alpine redis-server --requirepass pricelens_redis_dev
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Dependency audit (production deps, high and above)
+        run: pnpm audit --prod --audit-level high
+
+      - name: Contracts typecheck
+        run: pnpm --filter @pricelens/contracts typecheck
+
+      - name: API typecheck
+        working-directory: apps/api
+        run: pnpm exec prisma generate && pnpm exec tsc --noEmit
+      - name: API lint
+        working-directory: apps/api
+        run: pnpm run lint
+
+      - name: Wait for Postgres, apply migrations to the test database
+        run: |
+          for _ in $(seq 1 60); do docker exec pg pg_isready -U pricelens -d pricelens_test >/dev/null 2>&1 && break; sleep 2; done
+          pnpm test:db:migrate
+      - name: API unit tests (incl. matching golden set)
+        working-directory: apps/api
+        run: pnpm run test:unit
+      - name: API integration tests
+        working-directory: apps/api
+        run: pnpm run test:integration
+      - name: API build
+        working-directory: apps/api
+        run: pnpm exec nest build
+      - name: API e2e tests
+        working-directory: apps/api
+        run: pnpm run test:e2e
+
+      - uses: actions/cache@v4
+        with:
+          path: apps/web/.next/cache
+          key: next-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/web/src/**') }}
+          restore-keys: next-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+      # next-env.d.ts references .next/types/routes.d.ts, which only a build
+      # (or `next typegen`) writes, so the build runs before the typecheck.
+      - name: Web build
+        working-directory: apps/web
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3001/api/v1
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000
+        run: pnpm exec next build
+      - name: Web typecheck
+        working-directory: apps/web
+        run: pnpm exec tsc --noEmit
+      - name: Web lint
+        working-directory: apps/web
+        run: pnpm run lint
+      - name: Web unit tests
+        working-directory: apps/web
+        run: pnpm exec vitest run
+
+  browser-e2e:
+    name: Browser e2e (Playwright)
+    runs-on: ubuntu-24.04
+    needs: checks
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Start Postgres (pgvector) and Redis
+        run: |
+          docker run -d --name pg -p 5432:5432 \
+            -e POSTGRES_USER=pricelens -e POSTGRES_PASSWORD=pricelens_dev_password -e POSTGRES_DB=pricelens_dev \
+            -v "$PWD/scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro" \
+            pgvector/pgvector:pg16
+          docker run -d --name redis -p 6379:6379 redis:7-alpine redis-server --requirepass pricelens_redis_dev
+      - run: pnpm install --frozen-lockfile
+      - name: Migrate and seed the demo catalog (what `pnpm dev:up` does)
+        run: |
+          for _ in $(seq 1 60); do docker exec pg pg_isready -U pricelens -d pricelens_dev >/dev/null 2>&1 && break; sleep 2; done
+          pnpm exec dotenv -e .env.development -- pnpm --dir apps/api exec prisma migrate deploy
+          SEED_GENERATE_PRODUCTS=true SEED_PROFILE=demo \
+            pnpm exec dotenv -e .env.development -- pnpm --dir apps/api exec ts-node prisma/seed.ts
+      - name: Build API and web
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3001/api/v1
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000
+        run: |
+          (cd apps/api && pnpm exec prisma generate && pnpm exec nest build)
+          (cd apps/web && pnpm exec next build)
+      - name: Start API and web
+        run: |
+          (cd apps/api && PORT=3001 FRONTEND_URL=http://localhost:3000 \
+            pnpm exec dotenv -e ../../.env.development -- node dist/src/main > /tmp/api.log 2>&1 &)
+          (cd apps/web && API_INTERNAL_URL=http://127.0.0.1:3001/api/v1 pnpm exec next start -p 3000 > /tmp/web.log 2>&1 &)
+          for _ in $(seq 1 60); do curl -sf -o /dev/null localhost:3001/health && curl -sf -o /dev/null localhost:3000 && exit 0; sleep 2; done
+          tail -50 /tmp/api.log /tmp/web.log; exit 1
+      - name: Playwright
+        working-directory: apps/web
+        env:
+          E2E_BASE_URL: http://localhost:3000
+          E2E_API_URL: http://localhost:3001/api/v1
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          pnpm exec playwright test
+      - name: Server logs on failure
+        if: failure()
+        run: tail -100 /tmp/api.log /tmp/web.log

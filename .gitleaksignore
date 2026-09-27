@@ -1,0 +1,5 @@
+# False positives, checked 2026-09-27 (audit/10-devops.md): empty example
+# values in .env.example ("STRIPE_WEBHOOK_SECRET=", "BESTBUY_API_KEY=") that
+# the generic-api-key rule reads together with the next line's variable name.
+3bd5a7896705f22fab37e613a280431074e65b59:.env.example:generic-api-key:156
+01b97cd1d2bfd9a03375ffc6847affdef460273a:.env.example:generic-api-key:37
