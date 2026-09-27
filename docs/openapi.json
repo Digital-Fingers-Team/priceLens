@@ -4,7 +4,6 @@
     "/api/v1/auth/register": {
       "post": {
         "operationId": "AuthController_register",
-        "summary": "Register a new account",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -28,6 +27,7 @@
             }
           }
         },
+        "summary": "Register a new account",
         "tags": [
           "auth"
         ]
@@ -36,8 +36,6 @@
     "/api/v1/auth/login": {
       "post": {
         "operationId": "AuthController_login",
-        "summary": "Login with email and password",
-        "description": "The body is validated like every other one (LoginDto) and checked here.\nIt used to go through passport-local, whose guard runs before pipes, so\nthe body was never validated and unknown fields were accepted (B-04).",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -61,6 +59,7 @@
             }
           }
         },
+        "summary": "Login with email and password",
         "tags": [
           "auth"
         ]
@@ -69,7 +68,6 @@
     "/api/v1/auth/refresh": {
       "post": {
         "operationId": "AuthController_refresh",
-        "summary": "Refresh access token using a refresh token",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -93,6 +91,7 @@
             }
           }
         },
+        "summary": "Refresh access token using a refresh token",
         "tags": [
           "auth"
         ]
@@ -101,7 +100,6 @@
     "/api/v1/auth/logout": {
       "post": {
         "operationId": "AuthController_logout",
-        "summary": "Revoke current session",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -118,40 +116,40 @@
             "description": ""
           }
         },
-        "tags": [
-          "auth"
-        ],
         "security": [
           {
             "access-token": []
           }
+        ],
+        "summary": "Revoke current session",
+        "tags": [
+          "auth"
         ]
       }
     },
     "/api/v1/auth/sessions": {
       "delete": {
         "operationId": "AuthController_logoutAll",
-        "summary": "Revoke all sessions (logout everywhere)",
         "parameters": [],
         "responses": {
           "204": {
             "description": ""
           }
         },
-        "tags": [
-          "auth"
-        ],
         "security": [
           {
             "access-token": []
           }
+        ],
+        "summary": "Revoke all sessions (logout everywhere)",
+        "tags": [
+          "auth"
         ]
       }
     },
     "/api/v1/auth/me": {
       "get": {
         "operationId": "AuthController_me",
-        "summary": "Get current user profile",
         "parameters": [],
         "responses": {
           "200": {
@@ -165,13 +163,14 @@
             }
           }
         },
-        "tags": [
-          "auth"
-        ],
         "security": [
           {
             "access-token": []
           }
+        ],
+        "summary": "Get current user profile",
+        "tags": [
+          "auth"
         ]
       }
     },
@@ -212,7 +211,7 @@
           },
           {
             "name": "page",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"
@@ -220,7 +219,7 @@
           },
           {
             "name": "limit",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"
@@ -264,7 +263,6 @@
     "/api/v1/search": {
       "get": {
         "operationId": "SearchController_search",
-        "summary": "Search products; a query also queues a live scrape of it",
         "parameters": [
           {
             "name": "q",
@@ -291,7 +289,22 @@
             "required": false,
             "in": "query",
             "schema": {
+              "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "tier",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "BUDGET",
+                "MID_RANGE",
+                "PREMIUM",
+                "ULTRA_PREMIUM"
+              ]
             }
           },
           {
@@ -319,14 +332,14 @@
             "required": false,
             "in": "query",
             "schema": {
+              "type": "string",
               "enum": [
                 "relevance",
                 "minPriceUsd",
                 "maxPriceUsd",
                 "listingCount",
                 "updatedAt"
-              ],
-              "type": "string"
+              ]
             }
           },
           {
@@ -334,11 +347,11 @@
             "required": false,
             "in": "query",
             "schema": {
+              "type": "string",
               "enum": [
                 "asc",
                 "desc"
-              ],
-              "type": "string"
+              ]
             }
           },
           {
@@ -367,6 +380,7 @@
             "description": ""
           }
         },
+        "summary": "Search products; a query also queues a live scrape of it",
         "tags": [
           "search"
         ]
@@ -375,7 +389,6 @@
     "/api/v1/search/suggest": {
       "get": {
         "operationId": "SearchController_suggest",
-        "summary": "Type-ahead suggestions (2+ characters)",
         "parameters": [
           {
             "name": "q",
@@ -413,6 +426,7 @@
             }
           }
         },
+        "summary": "Type-ahead suggestions (2+ characters)",
         "tags": [
           "search"
         ]
@@ -694,8 +708,6 @@
     "/api/v1/watchlist/alerts/{alertId}/reactivate": {
       "post": {
         "operationId": "WatchlistController_reactivateAlert",
-        "summary": "",
-        "description": "Re-arm an alert that has already fired.",
         "parameters": [
           {
             "name": "alertId",
@@ -711,6 +723,7 @@
             "description": ""
           }
         },
+        "summary": "Re-arm an alert that has already fired.",
         "tags": [
           "watchlist"
         ]
@@ -742,8 +755,6 @@
     "/api/v1/prices/{productId}/history": {
       "get": {
         "operationId": "PricesController_getHistory",
-        "summary": "",
-        "description": "Price history, clamped to the caller's plan window.\n\nDeliberately still @Public: an anonymous visitor gets the free-tier window\nof *real* data rather than a login wall, which is what makes the product\nindexable and worth sharing. The response states the window it actually\ncovered and whether it was truncated, so the UI can offer the upgrade\nhonestly instead of silently showing a short chart.",
         "parameters": [
           {
             "name": "productId",
@@ -755,7 +766,7 @@
           },
           {
             "name": "days",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"
@@ -767,6 +778,7 @@
             "description": ""
           }
         },
+        "summary": "Price history, clamped to the caller's plan window.\n\nDeliberately still @Public: an anonymous visitor gets the free-tier window\nof *real* data rather than a login wall, which is what makes the product\nindexable and worth sharing. The response states the window it actually\ncovered and whether it was truncated, so the UI can offer the upgrade\nhonestly instead of silently showing a short chart.",
         "tags": [
           "prices"
         ]
@@ -908,8 +920,6 @@
       },
       "post": {
         "operationId": "SellerController_addMember",
-        "summary": "",
-        "description": "Not gated on a feature flag: the seat *count* is the limit, and\nOrganizationsService.addMember already refuses when they are used up.\nRequiring FEATURES.TEAM_SEATS here locked the Seller plan out of the\nthree seats it pays for, because that flag only exists on Enterprise.",
         "parameters": [
           {
             "name": "orgId",
@@ -935,6 +945,7 @@
             "description": ""
           }
         },
+        "summary": "Not gated on a feature flag: the seat *count* is the limit, and\nOrganizationsService.addMember already refuses when they are used up.\nRequiring FEATURES.TEAM_SEATS here locked the Seller plan out of the\nthree seats it pays for, because that flag only exists on Enterprise.",
         "tags": [
           "seller"
         ]
@@ -985,7 +996,7 @@
           },
           {
             "name": "search",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"
@@ -993,7 +1004,7 @@
           },
           {
             "name": "limit",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"
@@ -1111,8 +1122,6 @@
     "/api/v1/seller/workspaces/{orgId}/products/{productId}/match-suggestions": {
       "get": {
         "operationId": "SellerController_suggestMatches",
-        "summary": "",
-        "description": "Catalogue products this SKU might be. Mapping unlocks everything else.",
         "parameters": [
           {
             "name": "orgId",
@@ -1136,6 +1145,7 @@
             "description": ""
           }
         },
+        "summary": "Catalogue products this SKU might be. Mapping unlocks everything else.",
         "tags": [
           "seller"
         ]
@@ -1154,10 +1164,30 @@
             }
           },
           {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "UNDERCUT",
+                "PRICE_INCREASE",
+                "PRICE_DROP",
+                "OUT_OF_STOCK",
+                "BACK_IN_STOCK",
+                "NEW_ENTRANT",
+                "NEW_PRODUCT",
+                "UNUSUAL_MOVEMENT",
+                "MAP_VIOLATION"
+              ]
+            }
+          },
+          {
             "name": "sellerProductId",
             "required": false,
             "in": "query",
             "schema": {
+              "format": "uuid",
               "type": "string"
             }
           },
@@ -1184,6 +1214,7 @@
             "required": false,
             "in": "query",
             "schema": {
+              "format": "uuid",
               "type": "string"
             }
           }
@@ -1351,7 +1382,7 @@
           },
           {
             "name": "unacknowledgedOnly",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"
@@ -1359,7 +1390,7 @@
           },
           {
             "name": "limit",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"
@@ -1443,6 +1474,7 @@
             "required": false,
             "in": "query",
             "schema": {
+              "format": "uuid",
               "type": "string"
             }
           },
@@ -1537,8 +1569,6 @@
     "/api/v1/brand/workspaces/{orgId}/distribution/lapsed": {
       "get": {
         "operationId": "BrandController_listLapsed",
-        "summary": "",
-        "description": "Listings we have stopped seeing — reported as \"not seen since\", not \"delisted\".",
         "parameters": [
           {
             "name": "orgId",
@@ -1554,6 +1584,7 @@
             "description": ""
           }
         },
+        "summary": "Listings we have stopped seeing — reported as \"not seen since\", not \"delisted\".",
         "tags": [
           "brand"
         ]
@@ -1658,7 +1689,7 @@
           },
           {
             "name": "limit",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"
@@ -1699,8 +1730,6 @@
       },
       "post": {
         "operationId": "BrandController_generateReport",
-        "summary": "",
-        "description": "Generate on demand. Idempotent for a given period.",
         "parameters": [
           {
             "name": "orgId",
@@ -1726,6 +1755,7 @@
             "description": ""
           }
         },
+        "summary": "Generate on demand. Idempotent for a given period.",
         "tags": [
           "brand"
         ]
@@ -1765,8 +1795,6 @@
     "/api/v1/affiliate/go/{listingId}": {
       "get": {
         "operationId": "AffiliateController_goToStore",
-        "summary": "",
-        "description": "The only way out to a retailer's site. Always records a click and\nalways redirects through the generated affiliate URL -- never the raw\nSourceListing.externalUrl directly. Public: anonymous visitors can\nclick \"Go to Store\" too, so auth here is best-effort (see\nextractOptionalUserId), not required.",
         "parameters": [
           {
             "name": "listingId",
@@ -1782,6 +1810,7 @@
             "description": ""
           }
         },
+        "summary": "The only way out to a retailer's site. Always records a click and\nalways redirects through the generated affiliate URL -- never the raw\nSourceListing.externalUrl directly. Public: anonymous visitors can\nclick \"Go to Store\" too, so auth here is best-effort (see\nextractOptionalUserId), not required.",
         "tags": [
           "affiliate"
         ]
@@ -1854,8 +1883,6 @@
     "/api/v1/affiliate/conversions/webhook/{networkKey}": {
       "post": {
         "operationId": "AffiliateConversionsController_handleWebhook",
-        "summary": "",
-        "description": "Inbound postback target: register this URL (with ?secret=... baked in)\nas the network's Action Tracker / postback callback. Public route, but\nthe shared secret stands in for real request auth since the network\ncalls this anonymously.",
         "parameters": [
           {
             "name": "networkKey",
@@ -1864,6 +1891,12 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "secret",
+            "required": false,
+            "in": "query",
+            "schema": {}
           }
         ],
         "responses": {
@@ -1871,6 +1904,7 @@
             "description": ""
           }
         },
+        "summary": "Inbound postback target: register this URL (with ?secret=... baked in)\nas the network's Action Tracker / postback callback. Public route, but\nthe shared secret stands in for real request auth since the network\ncalls this anonymously.",
         "tags": [
           "affiliate"
         ]
@@ -1896,7 +1930,7 @@
         "parameters": [
           {
             "name": "status",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"
@@ -1950,14 +1984,13 @@
     "/api/v1/billing/plans": {
       "get": {
         "operationId": "BillingController_listPlans",
-        "summary": "",
-        "description": "Pricing page. Public on purpose.",
         "parameters": [],
         "responses": {
           "200": {
             "description": ""
           }
         },
+        "summary": "Pricing page. Public on purpose.",
         "tags": [
           "billing"
         ]
@@ -1966,14 +1999,13 @@
     "/api/v1/billing/me": {
       "get": {
         "operationId": "BillingController_getMyBilling",
-        "summary": "",
-        "description": "Everything the client needs to decide what to show: the resolved plan,\nthe limits, and live usage counts so the UI can render \"7 of 10 tracked\"\nwithout a second round trip.",
         "parameters": [],
         "responses": {
           "200": {
             "description": ""
           }
         },
+        "summary": "Everything the client needs to decide what to show: the resolved plan,\nthe limits, and live usage counts so the UI can render \"7 of 10 tracked\"\nwithout a second round trip.",
         "tags": [
           "billing"
         ]
@@ -2006,14 +2038,13 @@
     "/api/v1/billing/portal": {
       "post": {
         "operationId": "BillingController_createPortal",
-        "summary": "",
-        "description": "Stripe-hosted billing portal: card updates, invoices, self-cancel.",
         "parameters": [],
         "responses": {
           "201": {
             "description": ""
           }
         },
+        "summary": "Stripe-hosted billing portal: card updates, invoices, self-cancel.",
         "tags": [
           "billing"
         ]
@@ -2110,6 +2141,7 @@
             "required": false,
             "in": "query",
             "schema": {
+              "format": "uuid",
               "type": "string"
             }
           },
@@ -2135,14 +2167,13 @@
     "/api/v1/notifications/unread-count": {
       "get": {
         "operationId": "NotificationsController_unreadCount",
-        "summary": "",
-        "description": "Polled by the navbar bell; deliberately tiny.",
         "parameters": [],
         "responses": {
           "200": {
             "description": ""
           }
         },
+        "summary": "Polled by the navbar bell; deliberately tiny.",
         "tags": [
           "notifications"
         ]
@@ -2278,6 +2309,11 @@
             "required": true,
             "in": "path",
             "schema": {
+              "enum": [
+                "EMAIL",
+                "IN_APP",
+                "TELEGRAM"
+              ],
               "type": "string"
             }
           }
@@ -2295,8 +2331,6 @@
     "/api/v1/intelligence/products/{productId}": {
       "get": {
         "operationId": "IntelligenceController_getProductIntelligence",
-        "summary": "",
-        "description": "The full intelligence panel for a product.\n\nAuthenticated but not feature-gated: the history window is already\nclamped per plan inside the service, so a free user gets a real (shorter)\nanswer rather than a locked panel. That is the funnel — showing a genuine\n30-day verdict is what makes the 365-day one worth paying for.",
         "parameters": [
           {
             "name": "productId",
@@ -2308,7 +2342,7 @@
           },
           {
             "name": "days",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"
@@ -2327,6 +2361,7 @@
             }
           }
         },
+        "summary": "The full intelligence panel for a product.\n\nAuthenticated but not feature-gated: the history window is already\nclamped per plan inside the service, so a free user gets a real (shorter)\nanswer rather than a locked panel. That is the funnel — showing a genuine\n30-day verdict is what makes the 365-day one worth paying for.",
         "tags": [
           "intelligence"
         ]
@@ -2335,8 +2370,6 @@
     "/api/v1/intelligence/products/{productId}/verdict": {
       "get": {
         "operationId": "IntelligenceController_getVerdict",
-        "summary": "",
-        "description": "The Buy/Wait call on its own, for compact placements like cards.",
         "parameters": [
           {
             "name": "productId",
@@ -2352,6 +2385,7 @@
             "description": ""
           }
         },
+        "summary": "The Buy/Wait call on its own, for compact placements like cards.",
         "tags": [
           "intelligence"
         ]
@@ -2383,8 +2417,6 @@
     "/api/v1/deal-hunter": {
       "get": {
         "operationId": "DealHunterController_hunt",
-        "summary": "",
-        "description": "The Deal Hunter itself.\n\nA paid feature: it is the single most expensive read in the consumer\nproduct (a history series per candidate), and it is the clearest\nexpression of what the subscription is for.\n\nThrottled more tightly than the default because each call fans out to\ndozens of per-product history queries.",
         "parameters": [
           {
             "name": "q",
@@ -2420,6 +2452,7 @@
             }
           }
         },
+        "summary": "The Deal Hunter itself.\n\nA paid feature: it is the single most expensive read in the consumer\nproduct (a history series per candidate), and it is the clearest\nexpression of what the subscription is for.\n\nThrottled more tightly than the default because each call fans out to\ndozens of per-product history queries.",
         "tags": [
           "deal-hunter"
         ]
@@ -2428,14 +2461,20 @@
     "/api/v1/deal-hunter/interpret": {
       "get": {
         "operationId": "DealHunterController_interpret",
-        "summary": "",
-        "description": "Shows what the parser understood, without running a search.\n\nPublic and cheap: it powers live \"we read this as ...\" feedback as the\nuser types, which is what makes a natural-language box trustworthy rather\nthan a black box. It reveals nothing about pricing.",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
         "responses": {
           "200": {
             "description": ""
           }
         },
+        "summary": "Shows what the parser understood, without running a search.\n\nPublic and cheap: it powers live \"we read this as ...\" feedback as the\nuser types, which is what makes a natural-language box trustworthy rather\nthan a black box. It reveals nothing about pricing.",
         "tags": [
           "deal-hunter"
         ]
@@ -2465,8 +2504,6 @@
       },
       "post": {
         "operationId": "ApiKeysController_issue",
-        "summary": "",
-        "description": "The plaintext key is in this response and nowhere else, ever again.",
         "parameters": [
           {
             "name": "orgId",
@@ -2499,6 +2536,7 @@
             }
           }
         },
+        "summary": "The plaintext key is in this response and nowhere else, ever again.",
         "tags": [
           "api-keys"
         ]
@@ -2549,7 +2587,7 @@
           },
           {
             "name": "days",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"
@@ -2569,14 +2607,13 @@
     "/health": {
       "get": {
         "operationId": "HealthController_live",
-        "summary": "Liveness: the process answers HTTP",
-        "description": "Liveness: the process is up and serving HTTP. Checks no dependency on purpose.",
         "parameters": [],
         "responses": {
           "200": {
             "description": ""
           }
         },
+        "summary": "Liveness: the process answers HTTP",
         "tags": [
           "health"
         ]
@@ -2585,8 +2622,6 @@
     "/health/ready": {
       "get": {
         "operationId": "HealthController_ready",
-        "summary": "Readiness: Postgres, cache Redis and queue Redis all answer",
-        "description": "Readiness: Postgres and both Redis connections answer. 503 with per-dependency detail otherwise.",
         "parameters": [],
         "responses": {
           "200": {
@@ -2600,6 +2635,7 @@
             }
           }
         },
+        "summary": "Readiness: Postgres, cache Redis and queue Redis all answer",
         "tags": [
           "health"
         ]
@@ -2608,8 +2644,6 @@
     "/health/ops": {
       "get": {
         "operationId": "HealthController_ops",
-        "summary": "Operational metrics for the host monitor (internal)",
-        "description": "Operational numbers for the host monitor (queue backlog, per-store\nfreshness, memory). Not routed by nginx: only /api/ reaches the API from\noutside, so this answers on the container port (127.0.0.1:3002) alone.",
         "parameters": [],
         "responses": {
           "200": {
@@ -2623,6 +2657,7 @@
             }
           }
         },
+        "summary": "Operational metrics for the host monitor (internal)",
         "tags": [
           "health"
         ]
@@ -2713,13 +2748,14 @@
           "email": {
             "type": "string",
             "maxLength": 254,
+            "format": "email",
             "example": "user@example.com"
           },
           "username": {
             "type": "string",
             "minLength": 3,
             "maxLength": 32,
-            "pattern": "/^[a-z0-9_]+$/i",
+            "pattern": "^[a-z0-9_]+$",
             "example": "john_doe",
             "description": "3-32 chars, alphanumeric + underscores"
           },
@@ -2727,7 +2763,7 @@
             "type": "string",
             "minLength": 8,
             "maxLength": 128,
-            "pattern": "/^(?=.*[a-zA-Z])(?=.*\\d)/",
+            "pattern": "^(?=.*[a-zA-Z])(?=.*\\d)",
             "description": "Min 8 chars, must contain letter and number"
           },
           "displayName": {
@@ -2748,6 +2784,7 @@
           "email": {
             "type": "string",
             "maxLength": 254,
+            "format": "email",
             "example": "user@example.com"
           },
           "password": {
@@ -2782,7 +2819,8 @@
           },
           "canonicalProductId": {
             "type": "string",
-            "description": "The product to attach the listing to. Required to accept an item that proposed none."
+            "description": "The product to attach the listing to. Required to accept an item that proposed none.",
+            "format": "uuid"
           },
           "notes": {
             "type": "string",
@@ -2798,10 +2836,11 @@
         "properties": {
           "platformSlugs": {
             "description": "Store slugs to sweep; all enabled stores when omitted.",
+            "maxItems": 20,
             "type": "array",
             "items": {
               "type": "string",
-              "pattern": "/^[a-z0-9-]{1,64}$/"
+              "pattern": "^[a-z0-9-]{1,64}$"
             }
           },
           "limitPerQuery": {
@@ -2839,7 +2878,8 @@
         "type": "object",
         "properties": {
           "productId": {
-            "type": "string"
+            "type": "string",
+            "format": "uuid"
           },
           "note": {
             "type": "string",
@@ -2854,7 +2894,16 @@
         "type": "object",
         "properties": {
           "alertType": {
-            "type": "object"
+            "type": "string",
+            "enum": [
+              "PRICE_TARGET",
+              "RESTOCK",
+              "PRICE_DROP_ABSOLUTE",
+              "PRICE_DROP_PERCENT",
+              "LOWEST_EVER",
+              "PRICE_INCREASE",
+              "MAJOR_DISCOUNT"
+            ]
           },
           "thresholdValue": {
             "type": "number",
@@ -2886,11 +2935,16 @@
             "maxLength": 128
           },
           "type": {
-            "type": "object"
+            "type": "string",
+            "enum": [
+              "SELLER",
+              "BRAND"
+            ]
           },
           "platformId": {
             "type": "string",
-            "description": "The tracked store that is this seller's own, when we crawl it."
+            "description": "The tracked store that is this seller's own, when we crawl it.",
+            "format": "uuid"
           }
         },
         "required": [
@@ -2907,7 +2961,12 @@
             "maxLength": 255
           },
           "role": {
-            "type": "object"
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "MEMBER",
+              "OWNER"
+            ]
           }
         },
         "required": [
@@ -2919,7 +2978,8 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "format": "uuid"
           },
           "sku": {
             "type": "string",
@@ -2933,7 +2993,8 @@
           },
           "canonicalProductId": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "format": "uuid"
           },
           "cost": {
             "type": "number",
@@ -2976,7 +3037,18 @@
         "type": "object",
         "properties": {
           "type": {
-            "type": "object"
+            "type": "string",
+            "enum": [
+              "UNDERCUT",
+              "PRICE_INCREASE",
+              "PRICE_DROP",
+              "OUT_OF_STOCK",
+              "BACK_IN_STOCK",
+              "NEW_ENTRANT",
+              "NEW_PRODUCT",
+              "UNUSUAL_MOVEMENT",
+              "MAP_VIOLATION"
+            ]
           },
           "thresholdPct": {
             "type": "number",
@@ -2985,7 +3057,8 @@
           },
           "sellerProductId": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "format": "uuid"
           },
           "isActive": {
             "type": "boolean"
@@ -3010,7 +3083,8 @@
           },
           "categoryId": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "format": "uuid"
           },
           "isOwnBrand": {
             "type": "boolean"
@@ -3027,7 +3101,11 @@
         "type": "object",
         "properties": {
           "period": {
-            "type": "object"
+            "type": "string",
+            "enum": [
+              "WEEKLY",
+              "MONTHLY"
+            ]
           }
         }
       },
@@ -3045,6 +3123,9 @@
           },
           "trackingParams": {
             "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
             "description": "Extra query parameters added to every outbound link."
           },
           "isActive": {
@@ -3082,7 +3163,8 @@
         "type": "object",
         "properties": {
           "userId": {
-            "type": "string"
+            "type": "string",
+            "format": "uuid"
           },
           "planKey": {
             "type": "string",
@@ -3104,7 +3186,12 @@
         "type": "object",
         "properties": {
           "type": {
-            "type": "object"
+            "type": "string",
+            "enum": [
+              "EMAIL",
+              "IN_APP",
+              "TELEGRAM"
+            ]
           },
           "destination": {
             "type": "string",
@@ -3121,7 +3208,12 @@
         "type": "object",
         "properties": {
           "type": {
-            "type": "object"
+            "type": "string",
+            "enum": [
+              "EMAIL",
+              "IN_APP",
+              "TELEGRAM"
+            ]
           },
           "code": {
             "type": "string",
@@ -3138,7 +3230,12 @@
         "type": "object",
         "properties": {
           "type": {
-            "type": "object"
+            "type": "string",
+            "enum": [
+              "EMAIL",
+              "IN_APP",
+              "TELEGRAM"
+            ]
           },
           "isActive": {
             "type": "boolean"

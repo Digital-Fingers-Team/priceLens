@@ -600,7 +600,7 @@ describe('Every endpoint (e2e)', () => {
     interface Layer {
       route?: { path: string; methods: Record<string, boolean> };
     }
-    const stack = (app.getHttpAdapter().getInstance() as { _router: { stack: Layer[] } })._router.stack;
+    const stack = (app.getHttpAdapter().getInstance() as { router: { stack: Layer[] } }).router.stack; // Express 5 (was _router)
     const registered = stack
       .filter((layer) => layer.route)
       .flatMap((layer) =>

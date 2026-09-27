@@ -32,7 +32,7 @@ interface ExpressLayer {
 }
 
 function registeredRoutes(app: NestExpressApplication): string[] {
-  const stack = (app.getHttpAdapter().getInstance() as { _router: { stack: ExpressLayer[] } })._router.stack;
+  const stack = (app.getHttpAdapter().getInstance() as { router: { stack: ExpressLayer[] } }).router.stack; // Express 5 (was _router)
   return stack
     .filter((layer) => layer.route)
     .flatMap((layer) =>
