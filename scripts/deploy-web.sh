@@ -8,9 +8,9 @@
 # to it. The old container is removed after the switch, so a failed boot costs
 # nothing: the site keeps being served by the container that already works.
 #
-# Two things about this setup are not obvious and both have caused outages:
+# Three things about this setup are not obvious and all have caused outages:
 #
-#  1. The live address is written to docker/nginx-upstreams/web.conf, which is
+#  1. The live upstream is written to docker/nginx-upstreams/web.conf, which is
 #     UNTRACKED and lives in a bind-mounted DIRECTORY. It used to be a literal
 #     address inside the tracked nginx.prod.conf, which is bind-mounted as a
 #     single FILE -- and that combination failed twice: a git operation on the
@@ -20,11 +20,19 @@
 #     neither problem. Writes still truncate in place, and the result is still
 #     read back from inside the container before anything is reloaded.
 #
-#  2. nginx resolves an upstream hostname once, when the config is loaded, and
-#     on this host it has answered pricelens-web-* with 127.0.53.53 even while
-#     the same lookup from inside the same container succeeded. So the switch
-#     writes the container's IP address and keeps the name only in a comment,
-#     which is also how the active container is identified on the next run.
+#  2. Each colour publishes a FIXED loopback port (blue 127.0.0.1:3010, green
+#     127.0.0.1:3011) and nginx proxies to that port. The proxy runs in the
+#     host's network namespace (D-31, audit 10/11) so that it sees visitors'
+#     real addresses; container names and container IPs are not reachable from
+#     there. Before D-31 the upstream was the container's IP, because nginx on
+#     this host once answered pricelens-web-* with 127.0.53.53; a fixed port
+#     has neither that problem nor the "restarted on a new IP" one.
+#
+#  3. Server-side rendering calls the API directly over the podman network
+#     (API_INTERNAL_URL). Without it every render went out to the public URL
+#     and back in through the proxy, and all of them counted as one visitor
+#     against the API's rate limit. WEB_INTERNAL_TOKEN (the same value the API
+#     reads from .env) marks those calls as the website's own (OPS-14).
 #
 #   ./scripts/deploy-web.sh            # build from the working tree, then swap
 #   ./scripts/deploy-web.sh --no-build # swap to the current :latest image
@@ -39,11 +47,24 @@ PROXY="pricelens-proxy"
 CONF="$ROOT/docker/nginx-upstreams/web.conf"
 CONF_IN_PROXY="/etc/nginx/conf.d/upstreams/web.conf"
 IMAGE="localhost/pricelens_web:latest"
+API_INTERNAL_URL="http://api:3001/api/v1"
 BOOT_TIMEOUT=180   # seconds to let Next.js come up before giving up
 
 log()  { printf '\033[32m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[33m!\033[0m %s\n' "$*"; }
 die()  { printf '\033[31mfailed:\033[0m %s\n' "$*" >&2; exit 1; }
+
+port_of() {
+  case "$1" in
+    pricelens-web-blue)  echo 3010 ;;
+    pricelens-web-green) echo 3011 ;;
+    *) return 1 ;;
+  esac
+}
+
+upstream_line() {
+  printf 'upstream pricelens_web { server 127.0.0.1:%s; } # %s\n' "$(port_of "$1")" "$1"
+}
 
 # NEXT_PUBLIC_* are compiled into the client bundle at build time, so they are
 # build args, not runtime environment.
@@ -56,16 +77,12 @@ env_value() {
 }
 
 # The marker comment the switch leaves behind, e.g.
-#     proxy_pass http://10.89.1.60:3000; # web -> pricelens-web-blue
-# The IP is what nginx uses; this name is what tells the next deploy which
-# container is live and therefore which colour to build into.
+#     upstream pricelens_web { server 127.0.0.1:3010; } # pricelens-web-blue
+# It tells the next deploy which container is live and therefore which colour
+# to build into.
 current_target() {
   [[ -f "$CONF" ]] || return 0
   sed -n 's|.*# \(pricelens-web-[a-z]*\).*|\1|p' "$CONF" | head -1
-}
-
-container_ip() {
-  podman inspect "$1" --format "{{.NetworkSettings.Networks.${NETWORK}.IPAddress}}" 2>/dev/null
 }
 
 # Truncate-in-place, never rename -- see note 1 at the top.
@@ -75,22 +92,25 @@ write_conf() {
   cat "$src" > "$CONF"
 }
 
+serves() {
+  curl -s -o /dev/null -m 3 "http://127.0.0.1:$1/"
+}
+
 # The upstream file is untracked, so a fresh clone or a wiped checkout will not
-# have it and nginx would refuse to start on an unknown upstream name. Create a
-# placeholder pointing at whatever is currently running.
+# have it and nginx would refuse to start on an unknown upstream name. Create
+# one pointing at whichever colour is serving.
 ensure_conf() {
   [[ -f "$CONF" ]] && return 0
   warn "$CONF is missing; recreating it"
-  local existing ip
-  for existing in pricelens-web-green pricelens-web-blue pricelens-web; do
-    ip="$(container_ip "$existing" || true)"
-    if [[ -n "$ip" ]]; then
+  local existing
+  for existing in pricelens-web-green pricelens-web-blue; do
+    if serves "$(port_of "$existing")"; then
       mkdir -p "$(dirname "$CONF")"
-      printf 'upstream pricelens_web { server %s:3000; } # %s\n' "$ip" "$existing" > "$CONF"
+      upstream_line "$existing" > "$CONF"
       return 0
     fi
   done
-  die "no web container is running and $CONF is missing -- nothing to point nginx at"
+  die "no web container is serving and $CONF is missing -- nothing to point nginx at"
 }
 
 API_URL="$(env_value NEXT_PUBLIC_API_URL)"
@@ -113,39 +133,26 @@ active="$(current_target || true)"
 case "$active" in
   pricelens-web-blue)  idle="pricelens-web-green" ;;
   pricelens-web-green) idle="pricelens-web-blue"  ;;
-  *) active=""; idle="pricelens-web-blue" ;;   # first run, or still on compose
+  *) die "$CONF names no live colour (# pricelens-web-blue|green); fix it before deploying" ;;
 esac
-log "active: ${active:-<none>}  ->  starting: $idle"
-
-# If the config carries no marker but the colour we are about to build into is
-# the one nginx is actually pointed at, removing it would take the site down --
-# which is the whole thing this script exists to prevent. Refuse instead.
-if [[ -z "$active" ]] && podman container exists "$idle"; then
-  live_ip="$(sed -n 's|.*proxy_pass http://\([0-9.]*\):3000;.*|\1|p' "$CONF" | head -1)"
-  if [[ -n "$live_ip" && "$live_ip" == "$(container_ip "$idle")" ]]; then
-    die "$idle is the container nginx is currently serving, and the config has
-     no '# web -> <colour>' marker saying so. Append one to the web upstream
-     line in $CONF (truncating in place, not with sed -i), then run again."
-  fi
-fi
+idle_port="$(port_of "$idle")"
+log "active: $active  ->  starting: $idle (127.0.0.1:$idle_port)"
 
 podman rm -f "$idle" >/dev/null 2>&1 || true
 
 podman run -d --name "$idle" \
   --network "$NETWORK" --network-alias "$idle" \
+  -p "127.0.0.1:$idle_port:3000" \
   --restart always \
   -e "NEXT_PUBLIC_API_URL=$API_URL" \
+  -e "API_INTERNAL_URL=$API_INTERNAL_URL" \
+  -e "WEB_INTERNAL_TOKEN=$(env_value WEB_INTERNAL_TOKEN)" \
   "$IMAGE" >/dev/null || die "could not start $idle"
 
-idle_ip="$(container_ip "$idle")"
-[[ -n "$idle_ip" ]] || { podman rm -f "$idle" >/dev/null 2>&1 || true; die "$idle has no address on $NETWORK"; }
-
-log "waiting for $idle ($idle_ip) to serve"
+log "waiting for $idle to serve on 127.0.0.1:$idle_port"
 ready=0
 for _ in $(seq 1 $((BOOT_TIMEOUT / 3))); do
-  # Asked from inside the proxy, by the address nginx will actually use -- so a
-  # pass here means the switch will work, not merely that a process started.
-  if docker exec "$PROXY" wget -q -T 3 -O /dev/null "http://$idle_ip:3000/" 2>/dev/null; then
+  if serves "$idle_port"; then
     ready=1; break
   fi
   sleep 3
@@ -154,31 +161,30 @@ done
 if [[ "$ready" != 1 ]]; then
   podman logs --tail 30 "$idle" 2>&1 | sed 's/^/    /' || true
   podman rm -f "$idle" >/dev/null 2>&1 || true
-  die "$idle never served a page; left ${active:-the running container} serving"
+  die "$idle never served a page; left $active serving"
 fi
 
-log "pointing nginx at $idle_ip"
-tmp="$(mktemp)"; trap 'rm -f "$tmp"' EXIT
+log "pointing nginx at 127.0.0.1:$idle_port"
+tmp="$(mktemp)"; trap 'rm -f "$tmp" "$tmp.prev"' EXIT
 cp "$CONF" "$tmp.prev"
 
 # The whole file is one upstream block, so it is rewritten rather than patched.
-printf 'upstream pricelens_web { server %s:3000; } # %s\n' "$idle_ip" "$idle" > "$tmp"
-
+upstream_line "$idle" > "$tmp"
 write_conf "$tmp"
 
 # Read it back from inside the container: if the bind mount has come adrift
 # (note 1), nginx is about to reload a config nobody edited, and the deploy
 # would report success while serving the old container -- or nothing at all.
 if ! docker exec "$PROXY" grep -q "# $idle" "$CONF_IN_PROXY" 2>/dev/null; then
-  write_conf "$tmp.prev"; rm -f "$tmp.prev"
+  write_conf "$tmp.prev"
   podman rm -f "$idle" >/dev/null 2>&1 || true
   die "the proxy cannot see edits to $CONF (stale bind mount).
      Recreate it once -- docker compose -f docker-compose.server.yml up -d --force-recreate proxy --
-     then run this again. ${active:-The running container} is still serving."
+     then run this again. $active is still serving."
 fi
 
 if ! docker exec "$PROXY" nginx -t >/dev/null 2>&1; then
-  write_conf "$tmp.prev"; rm -f "$tmp.prev"
+  write_conf "$tmp.prev"
   docker exec "$PROXY" nginx -s reload >/dev/null 2>&1 || true
   podman rm -f "$idle" >/dev/null 2>&1 || true
   die "nginx rejected the new config; rolled back, nothing changed"
@@ -203,41 +209,25 @@ if [[ "$served" != 1 ]]; then
   # Only roll back if there is something alive to roll back TO. Restoring a
   # config that names a removed container points nginx at nothing and turns a
   # failed deploy into an outage -- which is precisely what happened once.
-  prev_ip="$(sed -n 's|.*server \([0-9.]*\):3000.*|\1|p' "$tmp.prev" | head -1)"
-  prev_alive=0
-  if [[ -n "$prev_ip" ]] && docker exec "$PROXY" wget -q -T 3 -O /dev/null "http://$prev_ip:3000/" 2>/dev/null; then
-    prev_alive=1
-  fi
-
-  if [[ "$prev_alive" == 1 ]]; then
+  if serves "$(port_of "$active")"; then
     warn "site did not answer 200 through $idle; rolling back"
     write_conf "$tmp.prev"
     docker exec "$PROXY" nginx -s reload || true
-    rm -f "$tmp.prev"
     podman rm -f "$idle" >/dev/null 2>&1 || true
-    die "rolled back to ${active:-the previous upstream}"
+    die "rolled back to $active"
   fi
 
   # Nothing alive to fall back to: keep the new container serving and say so.
   # A half-working site beats a config pointing at a container that is gone.
-  rm -f "$tmp.prev"
-  die "site did not answer 200 through $idle, and the previous upstream is no
-     longer running -- so the config was NOT rolled back. $idle is still
-     serving on $idle_ip. Check: podman logs --tail 50 $idle"
+  die "site did not answer 200 through $idle, and $active is no longer
+     serving -- so the config was NOT rolled back. $idle is still serving on
+     127.0.0.1:$idle_port. Check: podman logs --tail 50 $idle"
 fi
-rm -f "$tmp.prev"
 
 # Only now is the old container unnecessary. The pause lets requests that were
 # already on it finish.
 sleep 3
-if [[ -n "$active" ]]; then
-  log "removing $active"
-  podman rm -f "$active" >/dev/null 2>&1 || true
-fi
-# The compose-managed container, if this is the first blue/green deploy. It is
-# stopped rather than removed: podman refuses to remove it while the proxy
-# declares a dependency on it, and removing that dependency means removing the
-# proxy -- the exact outage this script exists to avoid.
-podman stop pricelens-web >/dev/null 2>&1 || true
+log "removing $active"
+podman rm -f "$active" >/dev/null 2>&1 || true
 
-log "live on $idle ($idle_ip)"
+log "live on $idle (127.0.0.1:$idle_port)"

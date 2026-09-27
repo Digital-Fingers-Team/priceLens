@@ -124,9 +124,14 @@ services:
     image: docker.io/library/nginx:1.27-alpine
     container_name: pricelens-proxy
     restart: always
-    ports:
-      - "80:80"
-      - "443:443"
+    # The host's network namespace (D-31): rootless port forwarding into a
+    # podman network hid every visitor behind one address (10.89.1.7), so the
+    # API's per-IP rate limits and records saw one client for the whole site.
+    # Here nginx binds 80/443 itself (net.ipv4.ip_unprivileged_port_start=80
+    # on this host) and sees the real peer. Upstreams are fixed loopback ports:
+    # the API 127.0.0.1:3002, the web colours 127.0.0.1:3010/3011
+    # (deploy-web.sh), SLI 127.0.0.1:3020. Container names do not resolve here.
+    network_mode: host
     volumes:
       - ./docker/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro,z
       # Generated at deploy time, never tracked. Mounted as a DIRECTORY so
@@ -137,8 +142,6 @@ services:
       # writes. Renewal is therefore a reload, never a restart.
       - ./docker/certbot/www:/var/www/certbot:ro,z
       - ./docker/certbot/conf:/etc/letsencrypt:ro,z
-    networks:
-      - external
     depends_on:
       - web
       - api
