@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { buttonClassName } from '@/components/ui/button-styles';
 import { PriceTag } from '@/components/ui/price-tag';
 import { useI18n } from '@/lib/i18n/provider';
+import { useNow } from '@/lib/hooks/use-now';
 import { cn } from '@/lib/utils/cn';
 import { storeGoHref } from '@/lib/utils/safe-href';
 import type { SourceListing } from '@/types/product.types';
@@ -30,6 +31,7 @@ function StockLabel({ inStock }: { inStock: boolean | null }) {
  */
 export function OfferRow({ listing, isBest }: { listing: SourceListing; isBest: boolean }) {
   const { t, tf, fmt } = useI18n();
+  const now = useNow();
   const href = storeGoHref(listing);
   const store = listing.platform.name;
 
@@ -61,7 +63,7 @@ export function OfferRow({ listing, isBest }: { listing: SourceListing; isBest: 
               {listing.reviewCount != null && ` (${fmt.number(listing.reviewCount)})`}
             </span>
           )}
-          <span>{tf(t.product.checked, { when: fmt.relative(listing.lastSeenAt) })}</span>
+          <span>{tf(t.product.checked, { when: fmt.relative(listing.lastSeenAt, now) })}</span>
         </p>
       </div>
 

@@ -28,10 +28,17 @@ export function formatDate(iso: string | null | undefined, locale: Locale = defa
   }).format(new Date(iso));
 }
 
-/** "5m ago" / "قبل 5 دقائق"; older than 30 days, the date. */
-export function formatRelativeTime(iso: string | null | undefined, locale: Locale = defaultLocale): string {
+/**
+ * "5m ago" / "قبل 5 دقائق"; older than 30 days, the date. `now` defaults to the
+ * clock; server-rendered pages pass useNow() so hydration sees the same text.
+ */
+export function formatRelativeTime(
+  iso: string | null | undefined,
+  locale: Locale = defaultLocale,
+  now: number = Date.now(),
+): string {
   if (!iso) return EMPTY;
-  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  const mins = Math.floor((now - new Date(iso).getTime()) / 60000);
   const rtf = new Intl.RelativeTimeFormat(intlLocale(locale), { numeric: 'auto', style: 'narrow' });
   if (mins < 1) return rtf.format(0, 'minute');
   if (mins < 60) return rtf.format(-mins, 'minute');
@@ -68,7 +75,7 @@ export function formattersFor(locale: Locale) {
   return {
     currency: (value: number | null | undefined, currency?: string | null) => formatCurrency(value, currency, locale),
     date: (iso: string | null | undefined) => formatDate(iso, locale),
-    relative: (iso: string | null | undefined) => formatRelativeTime(iso, locale),
+    relative: (iso: string | null | undefined, now?: number) => formatRelativeTime(iso, locale, now),
     number: (value: number | null | undefined) => formatNumber(value, locale),
     percent: (value: number | null | undefined) => formatPercent(value, locale),
     rating: formatRating,

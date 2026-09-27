@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { buttonClassName } from '@/components/ui/button-styles';
 import { PriceTag } from '@/components/ui/price-tag';
 import { useI18n } from '@/lib/i18n/provider';
+import { useNow } from '@/lib/hooks/use-now';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { useIsWatched, useToggleWatchlist } from '@/lib/hooks/use-watchlist';
 import { useUiStore } from '@/lib/store/ui.store';
@@ -23,6 +24,7 @@ function attributeKey(key: string) {
 
 export function ProductHeader({ product }: { product: CanonicalProduct }) {
   const { t, tf, tp, fmt } = useI18n();
+  const now = useNow();
   const categoryName = useCategoryName(product.category);
   const { isAuthenticated } = useAuthStore();
   const isWatched = useIsWatched(product.id);
@@ -132,7 +134,7 @@ export function ProductHeader({ product }: { product: CanonicalProduct }) {
                 {priceStats.avg != null && (
                   <span>{tf(t.product.average, { price: fmt.currency(priceStats.avg, priceStats.currency) })}</span>
                 )}
-                {lastChecked && <span>{tf(t.product.pricesChecked, { when: fmt.relative(lastChecked) })}</span>}
+                {lastChecked && <span>{tf(t.product.pricesChecked, { when: fmt.relative(lastChecked, now) })}</span>}
               </p>
               {cheapest && cheapestHref && (
                 <a
