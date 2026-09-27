@@ -133,6 +133,7 @@ test('back and refresh in the middle of a flow keep the user where they were', a
   await firstResult.click();
   await expect(page).toHaveURL(/\/products\//, NAV);
   await page.reload();
+  await page.waitForLoadState('networkidle'); // hydrated, as a person would be
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   await page.goBack();
   await expect(page).toHaveURL(/\/search\?q=galaxy/, NAV);
