@@ -8,8 +8,8 @@ import { PrismaClient } from '@prisma/client';
  * `prisma migrate diff` used to propose dropping six hot indexes that only
  * the raw-SQL migrations knew about, so the next `prisma migrate dev` would
  * have generated a migration deleting the search and price-history indexes.
- * They are declared in the schema now. The one index Prisma cannot express
- * -- HNSW on the Unsupported("vector") column -- is the only allowed line.
+ * They are declared in the schema now, so no drift at all is allowed (the one
+ * exception, the HNSW index on title_embedding, went with the column, D-16).
  *
  * Requires DATABASE_URL pointing at a migrated local *_test database; the
  * shadow database is created next to it and dropped afterwards.
@@ -20,7 +20,7 @@ const PRISMA_CLI = require.resolve('prisma/build/index.js', { paths: [API_DIR] }
 const SCHEMA = path.join(API_DIR, 'prisma/schema.prisma');
 const MIGRATIONS = path.join(API_DIR, 'prisma/migrations');
 
-const ALLOWED_DRIFT = ['DROP INDEX "canonical_products_title_embedding_hnsw_idx";'];
+const ALLOWED_DRIFT: string[] = [];
 
 function statements(script: string): string[] {
   return script

@@ -5,7 +5,7 @@ import { PrismaService } from '../database/prisma.service';
 import { OfferPolicy, liveOfferSql } from '../prices/offer-rules';
 import { IngestionQueue } from '../workers/ingestion-queue.service';
 import { ProductsService } from '../products/products.service';
-import { escapeLike, normalizedTextSql, searchPhrase, searchTermGroups } from './search-text';
+import { escapeLike, searchPhrase, searchTermGroups } from './search-text';
 import { SearchQueryDto, SearchSortBy, SearchSortDir, SuggestQueryDto } from './dto/search.dto';
 
 export interface SuggestionItem {
@@ -68,33 +68,34 @@ export class SearchService {
     const orderBySql = this.buildOrderBySql(sortBy, sortDir, relevanceSql, normalizedQuery);
 
     // Sort, filter and paginate in the database; only the current page's
-    // products get their listings loaded.
-    const [pageRows, countRows] = await Promise.all([
-      this.prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
-        SELECT cp.id
-        FROM canonical_products cp
-        JOIN categories c ON c.id = cp.category_id
-        JOIN source_listings sl ON sl.canonical_product_id = cp.id
-        WHERE ${whereClause}
-        GROUP BY cp.id
-        ${havingClause}
-        ORDER BY ${orderBySql}
-        LIMIT ${limit} OFFSET ${offset}
-      `),
-      this.prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
+    // products get their listings loaded. The total rides along as a window
+    // count over the same matches, so the search runs once (audit 08, P-02);
+    // only a page past the end, which returns no rows, needs a separate count.
+    const pageRows = await this.prisma.$queryRaw<Array<{ id: string; total: bigint }>>(Prisma.sql`
+      SELECT cp.id, COUNT(*) OVER ()::bigint AS total
+      FROM canonical_products cp
+      JOIN source_listings sl ON sl.canonical_product_id = cp.id
+      WHERE ${whereClause}
+      GROUP BY cp.id
+      ${havingClause}
+      ORDER BY ${orderBySql}
+      LIMIT ${limit} OFFSET ${offset}
+    `);
+
+    let total = Number(pageRows[0]?.total ?? 0);
+    if (pageRows.length === 0 && offset > 0) {
+      const countRows = await this.prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
         SELECT COUNT(*)::bigint as count FROM (
           SELECT cp.id
           FROM canonical_products cp
-          JOIN categories c ON c.id = cp.category_id
           JOIN source_listings sl ON sl.canonical_product_id = cp.id
           WHERE ${whereClause}
           GROUP BY cp.id
           ${havingClause}
         ) matched
-      `),
-    ]);
-
-    const total = Number(countRows[0]?.count ?? 0);
+      `);
+      total = Number(countRows[0]?.count ?? 0);
+    }
     const totalPages = Math.max(1, Math.ceil(total / limit));
 
     let liveFetchTriggered = false;
@@ -129,16 +130,16 @@ export class SearchService {
     const termGroups = searchTermGroups(query);
     if (termGroups.length === 0) return [];
 
-    const haystack = normalizedTextSql(
-      Prisma.sql`concat_ws(' ', cp.title, cp.brand, cp.model, cp.slug)`,
-    );
+    // search_text is title, brand, model and slug, normalized when the row
+    // was written (generated column), so a keystroke no longer normalizes
+    // every product (audit 08, P-01).
     const termMatches = termGroups.map(
       (alternatives) =>
         Prisma.sql`(${Prisma.join(
           alternatives.map(
             (term) => Prisma.sql`(
-              ${haystack} LIKE ${`%${escapeLike(term)}%`}
-              OR ${term} = ANY (string_to_array(lower(c.name), ' '))
+              cp.search_text LIKE ${`%${escapeLike(term)}%`}
+              OR ${SearchService.categoryNameHasWord(term)}
             )`,
           ),
           ' OR ',
@@ -148,7 +149,6 @@ export class SearchService {
     return this.prisma.$queryRaw<SuggestionItem[]>(Prisma.sql`
       SELECT cp.id, cp.slug, cp.title, cp.brand
       FROM canonical_products cp
-      JOIN categories c ON c.id = cp.category_id
       WHERE EXISTS (
           SELECT 1 FROM source_listings sl
           WHERE sl.canonical_product_id = cp.id AND sl.price_usd IS NOT NULL
@@ -157,6 +157,25 @@ export class SearchService {
       ORDER BY (lower(cp.title) LIKE ${`${escapeLike(query)}%`}) DESC, cp.title ASC
       LIMIT ${limit}
     `);
+  }
+
+  /**
+   * The product's category has `term` as a whole word of its name. The
+   * categories are looked up once per query (an InitPlan over a dozen rows),
+   * not once per product row, and `= ANY (ARRAY(...))` lets the category
+   * index join the other conditions in one bitmap scan (P-03).
+   */
+  private static categoryNameHasWord(term: string): Prisma.Sql {
+    return Prisma.sql`cp.category_id = ANY (ARRAY(
+      SELECT id FROM categories WHERE ${term} = ANY (string_to_array(lower(name), ' '))
+    ))`;
+  }
+
+  /** The product's category lists a search term matching `pattern` (ILIKE). */
+  private static categorySearchTermsMatch(pattern: string): Prisma.Sql {
+    return Prisma.sql`cp.category_id = ANY (ARRAY(
+      SELECT id FROM categories WHERE EXISTS (SELECT 1 FROM unnest(search_terms) st WHERE st ILIKE ${pattern})
+    ))`;
   }
 
   private buildSearchWhereSql(
@@ -168,21 +187,20 @@ export class SearchService {
     // Only live offers count: a product's price filter, price sort and
     // listing count use the same offers its card and page show (L-15).
     const conditions: Prisma.Sql[] = [liveOfferSql('sl', this.offerPolicy())];
-    const title = normalizedTextSql(Prisma.sql`cp.title`);
 
     // Every term must match; a term matches through any of its alternatives
     // (the Arabic-normalized word or an English spelling of it).
     for (const alternatives of termGroups) {
+      // search_text is title, brand, model and slug, normalized (generated
+      // column with a trigram index), so one LIKE covers what took four and
+      // Postgres can answer it from the index (P-04).
       const matches = alternatives.map((term) => {
         const pattern = `%${escapeLike(term)}%`;
         return Prisma.sql`(
-          ${title} LIKE ${pattern} OR
+          cp.search_text LIKE ${pattern} OR
           cp.normalized_title LIKE ${pattern} OR
-          cp.brand ILIKE ${pattern} OR
-          cp.model ILIKE ${pattern} OR
-          cp.slug ILIKE ${pattern} OR
-          EXISTS (SELECT 1 FROM unnest(string_to_array(lower(c.name), ' ')) tok WHERE tok = ${term}) OR
-          EXISTS (SELECT 1 FROM unnest(c.search_terms) st WHERE st ILIKE ${pattern})
+          ${SearchService.categoryNameHasWord(term)} OR
+          ${SearchService.categorySearchTermsMatch(pattern)}
         )`;
       });
       conditions.push(Prisma.sql`(${Prisma.join(matches, ' OR ')})`);
@@ -266,7 +284,7 @@ export class SearchService {
     if (termGroups.length === 0) {
       return Prisma.sql`0`;
     }
-    const title = normalizedTextSql(Prisma.sql`cp.title`);
+    const title = Prisma.sql`cp.search_title`;
 
     // A term scores through its best alternative, so an Arabic word and its
     // English spelling never count twice.
@@ -303,7 +321,10 @@ export class SearchService {
     const accessoryPenalty = queryAsksForAccessory
       ? Prisma.sql`0`
       : Prisma.sql`(CASE WHEN ${Prisma.join(
-          SearchService.ACCESSORY_KEYWORDS.map((keyword) => Prisma.sql`cp.title ILIKE ${`%${keyword}%`}`),
+          // search_title is lower-cased already and the keywords are ASCII, so a
+          // plain LIKE matches what ILIKE on the title did, at a fraction of the
+          // cost: this runs for every matched row (P-05).
+          SearchService.ACCESSORY_KEYWORDS.map((keyword) => Prisma.sql`cp.search_title LIKE ${`%${keyword}%`}`),
           ' OR ',
         )} THEN -20 ELSE 0 END)`;
 
@@ -325,14 +346,8 @@ export class SearchService {
           ELSE 0
         END +
         CASE WHEN cp.model ILIKE ${contains} THEN 6 ELSE 0 END +
-        CASE
-          WHEN EXISTS (SELECT 1 FROM unnest(string_to_array(lower(c.name), ' ')) tok WHERE tok = ${term}) THEN 5
-          ELSE 0
-        END +
-        CASE
-          WHEN EXISTS (SELECT 1 FROM unnest(c.search_terms) st WHERE st ILIKE ${contains}) THEN 2
-          ELSE 0
-        END
+        CASE WHEN ${SearchService.categoryNameHasWord(term)} THEN 5 ELSE 0 END +
+        CASE WHEN ${SearchService.categorySearchTermsMatch(contains)} THEN 2 ELSE 0 END
       )`;
   }
 

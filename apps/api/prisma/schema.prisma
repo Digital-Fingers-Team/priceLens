@@ -213,7 +213,14 @@ model CanonicalProduct {
   imageUrl     String? @map("image_url")
   thumbnailUrl String? @map("thumbnail_url")
 
-  titleEmbedding Unsupported("vector(768)")? @map("title_embedding")
+  // Written by Postgres (generated columns, migration 20260927000000): the
+  // title, and title + brand + model + slug, normalized like normalizedTextSql()
+  // so search compares stored text instead of normalizing every row per query.
+  // @ignore keeps them out of Prisma Client (a generated column cannot be
+  // written); only raw SQL reads them. The defaults are the generation
+  // expressions as Prisma introspects them, so migrate diff reports no drift.
+  searchTitle String? @default(dbgenerated("regexp_replace(translate(lower(title), 'أإآٱىةؤئ٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹'::text, 'اااايهوي01234567890123456789'::text), '[ً-ٰٟـ]'::text, ''::text, 'g'::text)")) @map("search_title") @ignore
+  searchText  String? @default(dbgenerated("regexp_replace(translate(lower(((((title || COALESCE((' '::text || brand), ''::text)) || COALESCE((' '::text || model), ''::text)) || ' '::text) || slug)), 'أإآٱىةؤئ٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹'::text, 'اااايهوي01234567890123456789'::text), '[ً-ٰٟـ]'::text, ''::text, 'g'::text)")) @map("search_text") @ignore
 
   tier        ProductTier @default(MID_RANGE)
   isVerified  Boolean     @default(false) @map("is_verified")
@@ -248,10 +255,10 @@ model CanonicalProduct {
   // created by migrations 20260605000000 and 20260926100000. Search matches
   // titles with LIKE through the GIN index; reconciliation orders neighbours
   // by trigram distance (<->), which only a GiST index can serve (B-22).
-  // The HNSW index on title_embedding cannot be expressed here (Unsupported
-  // column); the schema drift test allows exactly that one.
   @@index([normalizedTitle(ops: raw("gin_trgm_ops"))], map: "canonical_products_title_trgm_idx", type: Gin)
   @@index([normalizedTitle(ops: raw("gist_trgm_ops"))], map: "canonical_products_title_trgm_gist_idx", type: Gist)
+  // Search and type-ahead: LIKE '%term%' on the generated search_text (audit 08, P-04).
+  @@index([searchText(ops: raw("gin_trgm_ops"))], map: "canonical_products_search_text_trgm_idx", type: Gin)
   @@map("canonical_products")
 }
 
