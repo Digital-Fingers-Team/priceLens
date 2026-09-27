@@ -30,7 +30,10 @@ read-only production data checks; security re-checks; the grep sweep.
 | QA-11 | category pages | `/categories/[slug]` renders per request (reads `searchParams` for `?page`); 200–360 ms TTFB vs ~50 ms for cached product pages. | curl ×5 against production. | P2 | **Deferred**: needs `?page` moved into the path (URL change, SEO) or a client-side page param. |
 | QA-12 | offline | Fully offline, a client navigation falls back to a full page load and the browser shows its own offline page. | Playwright `setOffline`. | – | Accepted: standard app-router behaviour. An unreachable **API** shows the app's error state with a retry (tested). |
 | QA-13 | product images | Images are hot-linked from store CDNs; one failed to load (`ERR_CONNECTION_CLOSED`) in one run, passing on rerun. | flows console test, desktop. | – | Observation (FYI in the release report). |
-| QA-14 | disk | 77% after today's builds; `podman system df`: 52.6 GB of images reclaimable, mostly dangling build layers. | – | P2 | **Needs the owner** (D-38): pruning also removes other projects' dangling images. |
+| QA-15 | variant parser (my a887b43) | "8G DDR6" on a graphics card read as 8 GB RAM (short unit + `ddr\d`), and a laptop whose cut-short title states no RAM took its GPU memory as storage. | Production dry run of the variant repair (read-only): it would have split one graphics card. | P1 | **Fixed and live** 6e9b928 (23:00): DDR6/7 is never RAM; GPU memory is skipped whenever the title names a computer. |
+| QA-16 | matcher | No CPU-model guard: an AMD Ryzen 15AHP10 and an Intel i7 model, and an i7-13700HX / i7-14700HX pair, were merged (their RAM was unreadable then). | Read-only listing titles of the two products in D-37. | P2 | **Handoff**: a CPU family/model conflict guard next to the chip guard (matching work, needs the characterization suite). |
+| QA-17 | image permissions | The first non-root deploy stopped itself: a source file with mode 600 in the checkout was unreadable to uid 1000 (in-image unit tests failed; nothing swapped). | `/tmp/deploy-p11-api3.log`. | P2 | **Fixed** 22a6496: the build stage makes the API sources world-readable. |
+| QA-14 | disk | 77% after today's builds; `podman system df`: 52.6 GB of images reclaimable, mostly dangling build layers. | – | P2 | **Partly fixed**: removed this session's check images and 17 dangling build images (82% → 73%). The rest (older dangling images, incl. other projects') is D-38. |
 
 ## Re-verified from earlier phases
 
@@ -49,10 +52,6 @@ Live production (read-only), after the 20:16/20:30/20:54 deploys:
 - IDOR: API e2e `endpoints` "another user cannot read or change what is not theirs (S-07, S-19)" and workspace membership checks, green in every gate run.
 - Handoffs: every "Handoff → phase 11" item is handled above (Lenovo parser QA-05; 9,126 → 9,860 products without an accepted listing D-39; 18% bot-wall failures noted; TBT P-13 remeasured below; English server text QA-06).
 
-## Evidence (commands and results)
-
-(See "Verification" below; numbers filled in as runs complete.)
-
 ## Verification
 
 - API gate at a887b43: tsc, eslint, nest build; unit 563, integration 54, e2e 80.
@@ -62,3 +61,37 @@ Live production (read-only), after the 20:16/20:30/20:54 deploys:
 - Non-root image (b276872, `pricelens_api:p11check`): `id -un` = node; the deploy's in-image unit tests 567 passed / 2 skipped; a root-owned profile volume handed to uid 1000 by the deploy's find/chown; patchright persistent context, headful under Xvfb, **sandbox on** (no `--no-sandbox`) as uid 1000 → page title read.
 - Brotli (e0fb3cc, `pricelens_proxy:check`): `nginx -t` with the full production config; a throwaway proxy in front of the live web: home HTML 118,157 B identity, 30,356 B gzip, 21,941 B Brotli.
 - Playwright, first full run (54 tests ×3 widths): 45 passed, 8 failed, 1 skipped (theme toggle on mobile, by design). Failures: the new QA tests at every width (3 test bugs + QA-03), and one third-party image load (passes on rerun).
+- Playwright, full run after the fixes (969b825): 51 passed, 2 failed, 1 skipped. Both failures were navigation timeouts on a loaded box: the sort test passed 2/2 on rerun; back-after-reload passed 9/9 across all widths once the test waited for the reloaded page to settle (5005656). The key-page matrix (8 pages × en/ar × light/dark, status, `dir`, one `<h1>`, no sideways scroll, background) passed at 375, 768 and 1440.
+- Full API gate on the release tree (Nest 11, dd1acec): tsc, eslint, nest build; unit 573, integration 54, e2e 83 (queue board ×3). After 6e9b928: unit 576, characterization snapshots 5/5 unchanged.
+- Deploys: proxy (Brotli) 22:28 (~2 s); API/worker 22:43 (21 s; first attempt stopped itself, QA-17); web green 22:51 (blue/green on fixed ports, no downtime); API/worker 23:00 (25 s, parser fix). Checked: both API containers run as `node`, JSON logs, 60 Chromium processes, store expansions finishing, no sandbox/permission/X errors; queue board 404 unauthenticated; outside request logged with its real address; `content-encoding: br`; SLI 200.
+- Variant repair dry run in production (read-only, current parser): 3 products; 2 genuine (D-37), 1 a multi-variant wholesale listing (skip).
+- Lighthouse 12.8.2 mobile, production, median of 3 (box load ~4): home 67 / LCP 2,669 / TBT 2,392 / CLS 0; search "galaxy" 59 / 3,817 / 2,701 / 0; product 63 / 3,044 / 3,642 / 0; category 74 / 2,266 / 1,387 / 0. Phase 08 production before: home 68 / 1,959 / 3,335 / 0; search 49 / 4,081 / 5,341 / 0.159; product 68 / 2,593 / 2,810 / 0. Search improved clearly (CLS 0.159 → 0, TBT halved); the other timings move within this host's noise (phase 08 measured at load 13-15, this at ~4).
+- Security: `pnpm audit --prod` 0 high, 4 moderate, 1 low before Nest 11 (the moderate ones are express/body-parser, upgraded with Nest 11); gitleaks runs in CI on every push. Grep sweep: no TODO/FIXME, no `$queryRawUnsafe`/`$executeRawUnsafe`, `console.log` only in CLI scripts under `scripts/ops` and the seed, "demo"/"fake" only as the seed profile name and the fake-discount feature, 10 `any` (Express request/adapter types in `auth.controller`, `app.setup`, Prisma event hooks).
+
+## Summary
+
+- Production now runs the whole overhaul: API/worker 6e9b928 (Nest 11, non-root with Chrome's sandbox, JSON logs, queue dashboard), web dd1acec (green), proxy on the host network with Brotli; backups and the upstream watchdog run on timers.
+- D-31 is done: the site sees real visitor addresses, and the web's own renders are rate-limited per visitor (OPS-14).
+- QA found and fixed four user-facing bugs: product pages turning into an error after a failed background refresh (QA-01), lost typed searches (QA-03), missing busy state on search navigation (QA-04), and English advice text in the Arabic UI (QA-06); plus parser misreads seen in production data (QA-05, QA-15).
+- Everything earlier phases marked Fixed that can be checked from outside was re-verified live (list above).
+- Open: the worker heap growth (OPS-01; the snapshot arrives ~4-6 h after the 23:00 restart), two real variant mixes to split (D-37), and owner settings/decisions below.
+
+## Remaining items
+
+- OPS-01 / D-33: analyse `/tmp/heap/worker-*.heapsnapshot` from the worker's first recycle (expected ~03:00-05:00 UTC 2026-09-28; the sampler log is `/tmp/worker-rss.log`).
+- QA-11 category pages per request; QA-16 CPU-model guard; plan names and some API error texts still English in the Arabic UI (API sends English names; the dictionary covers the error codes the forms use).
+- Deal Hunter reasons are English only (its parser understands English only; audit 07).
+- Dates: remove prod volume `pricelens_meili_data` on/after 2026-10-03; recheck unused indexes on/after 2026-10-04.
+
+## Handoff → other phases
+
+None: this is the last phase. Follow-ups are in RELEASE_REPORT.md.
+
+## Decisions for Baraa
+
+- **D-37: split the two mixed Lenovo LOQ products** (a 24 GB listing each; one is an AMD model merged with an Intel one). Recommended: yes: `repair-variant-mixes.ts --product <slug> --apply` for the two LOQ slugs only, rollback file copied out; skip the GTX 1060 wholesale listing. Dry run: `~/pricelens-work/d37-dryrun.txt`.
+- **D-38: prune old dangling images** (~35 GB reclaimable, including other projects'). Recommended: `podman image prune` when you are fine with rebuilding caches; disk is 73%, the monitor alerts at 85%.
+- **D-39: products with no accepted listing** (9,860 of 19,489). Recommended: keep them reachable by URL but out of search, browse and the sitemap until a store lists them.
+- **D-34** alert channel (Telegram recommended), **D-36** error tracking (Sentry recommended, needs a DSN): open.
+- **CI required on main**: needs a repo admin (the server's gh account is read-only).
+- **SEO-16**: Search Console soft-404 cleanup and sitemap submission (owner action).
