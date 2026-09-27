@@ -4,7 +4,10 @@ import type { SearchFilters, SearchResponse, SuggestionItem } from '@/types/sear
 import type { ApiResponse } from '@/types/api.types';
 
 export const searchApi = {
-  search: async (filters: SearchFilters, config?: Pick<AxiosRequestConfig, 'timeout'>): Promise<SearchResponse> => {
+  search: async (
+    filters: SearchFilters,
+    config?: Pick<AxiosRequestConfig, 'timeout' | 'headers'>,
+  ): Promise<SearchResponse> => {
     const params = Object.fromEntries(
       Object.entries(filters).filter(([, v]) => v !== undefined && v !== ''),
     );

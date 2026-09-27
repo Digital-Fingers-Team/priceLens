@@ -47,6 +47,11 @@ const apiClient: AxiosInstance = axios.create({
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const csrf = readCookie(CSRF_COOKIE);
   if (csrf && config.headers) config.headers['X-CSRF-Token'] = csrf;
+  // Server rendering only (a server-only variable, never in the bundle): tells
+  // the API this is the website's own render, which it rate-limits by the
+  // visitor the page forwards, or not at all for cached pages (OPS-14).
+  const webToken = typeof window === 'undefined' ? process.env.WEB_INTERNAL_TOKEN : undefined;
+  if (webToken && config.headers) config.headers['X-PriceLens-Web'] = webToken;
   return config;
 });
 

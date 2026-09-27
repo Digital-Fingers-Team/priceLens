@@ -2,7 +2,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { CacheModule } from '@nestjs/cache-manager';
 import { BullModule } from '@nestjs/bull';
 
@@ -38,6 +38,7 @@ import notificationsConfig from './config/notifications.config';
 import { resolveEnvFiles } from './config/env-files';
 import { validateEnv } from './config/env.validation';
 import { RedisCacheLifecycle } from './common/redis-cache-lifecycle';
+import { WebAwareThrottlerGuard } from './common/guards/web-aware-throttler.guard';
 import { reconnectDelay } from './common/redis-resilience';
 import { processRole, runsWorkers } from './config/process-role';
 
@@ -148,7 +149,8 @@ export const ENV_FILES = resolveEnvFiles();
     // ThrottlerModule only supplies configuration — without the guard actually
     // registered, every @Throttle decorator in the app is inert and endpoints
     // like login and the scrape-triggering search are unthrottled.
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // The web's own server-side renders are told apart by a shared token.
+    { provide: APP_GUARD, useClass: WebAwareThrottlerGuard },
     RedisCacheLifecycle,
     // FeatureGuard (@RequiresFeature) is registered in AuthModule, directly
     // after JwtAuthGuard -- it needs request.user, so it must not run before
