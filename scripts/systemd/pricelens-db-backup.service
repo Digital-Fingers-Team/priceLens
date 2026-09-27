@@ -1,0 +1,6 @@
+[Unit]
+Description=PriceLens Postgres backup (pg_dump, checked, with retention)
+
+[Service]
+Type=oneshot
+ExecStart=%h/pricelens/scripts/backup-db.sh
