@@ -3,6 +3,13 @@ set -e
 
 export DISPLAY=:99
 
+# A container restarted in place (restart=always after a crash) keeps its /tmp,
+# and Xvfb refuses to start while the previous run's lock is there ("Server is
+# already active for display 99"). Every browser launch then fails with
+# "Missing X server" until the container is recreated (2026-09-27 outage).
+# Nothing else in this container owns display 99, so the lock is always stale.
+rm -f /tmp/.X99-lock /tmp/.X11-unix/X99
+
 Xvfb :99 -screen 0 1366x850x24 -nolisten tcp &
 XVFB_PID=$!
 
