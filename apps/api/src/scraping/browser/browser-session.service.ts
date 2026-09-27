@@ -18,6 +18,9 @@ export class BrowserSessionService implements OnModuleDestroy {
   /** Pages a persistent profile launched with, awaiting disposal by getPage(). */
   private readonly pendingStrayPages = new Map<string, Page[]>();
   private loggedBrowserChoice = false;
+  /** When each store's last browser launch failed; cleared by a successful launch. */
+  private readonly launchFailedAt = new Map<string, number>();
+  static readonly LAUNCH_RETRY_MS = 60_000;
 
   constructor(private readonly configService: ConfigService) {}
 
@@ -84,14 +87,32 @@ export class BrowserSessionService implements OnModuleDestroy {
   private getContext(storeSlug: string): Promise<BrowserContext> {
     let context = this.contexts.get(storeSlug);
     if (!context) {
+      // A launch that fails usually fails the same way on the next try (no X
+      // display, a missing binary). Without a pause every queued search
+      // relaunched Chrome at once: 875 failed launches in 20 minutes on
+      // 2026-09-27, each a new Chrome process that exited again.
+      const failedAt = this.launchFailedAt.get(storeSlug);
+      if (failedAt !== undefined && Date.now() - failedAt < BrowserSessionService.LAUNCH_RETRY_MS) {
+        const waitS = Math.ceil((failedAt + BrowserSessionService.LAUNCH_RETRY_MS - Date.now()) / 1000);
+        return Promise.reject(
+          new Error(`Browser for "${storeSlug}" failed to launch recently; next attempt in ${waitS}s`),
+        );
+      }
       const launching = this.launchContext(storeSlug);
       context = launching;
       this.contexts.set(storeSlug, launching);
       launching.then(
         // A browser that dies later must not stay cached as if it were alive.
-        (live) => live.on('close', () => this.evict(storeSlug, launching)),
-        // Nor may a failed launch: the next search should try again.
-        () => this.evict(storeSlug, launching),
+        (live) => {
+          this.launchFailedAt.delete(storeSlug);
+          live.on('close', () => this.evict(storeSlug, launching));
+        },
+        // Nor may a failed launch: the next search should try again, after
+        // LAUNCH_RETRY_MS.
+        () => {
+          this.launchFailedAt.set(storeSlug, Date.now());
+          this.evict(storeSlug, launching);
+        },
       );
     }
     return context;
@@ -177,6 +198,13 @@ export class BrowserSessionService implements OnModuleDestroy {
       args,
       headless,
       viewport: { width: 1366, height: 850 },
+      // A store's service worker outlives the page that registered it, and
+      // the driver keeps a record of every request that worker handles for
+      // as long as the context lives -- which here is the whole process. That
+      // grew the API heap by ~1.25 MB per search page until it ran out of
+      // memory every ~6 h (2026-09-27; reproduced in audit/10-devops.md,
+      // flat with this). Search pages work without one.
+      serviceWorkers: 'block',
     });
 
     // A persistent context opens with pages already present: the blank page
