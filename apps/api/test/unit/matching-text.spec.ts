@@ -69,6 +69,11 @@ describe('matching text', () => {
       ['DELL Desktop PC Optiplex 3060 SFF Core i5-8500 16GB SSD512GB Windows11 Pro', undefined, '512GB'],
       ['Gaming PC Core i5-12400F 16GB DDR4 3200MHz 1TB NVMe SSD 12GB NVIDIA GeForce RTX 3060', '16GB', '1TB'],
       ['Gaming PC Core i5-12400F 16GB DDR4 3200MHz 12GB NVIDIA GeForce RTX 3060', '16GB', undefined],
+      // "DDR6"/"DDR7" is a card's GDDR memory misspelled, never system RAM; and a
+      // laptop's GPU memory is not storage even when the title (cut short) states no RAM.
+      ['Hot Selling MS-I RTX 3050 GAMING X 8G DDR6 Graphics Card RTX 3050 Gpu', undefined, undefined],
+      ['MSI RTX 3050 Gaming X 12GB DDR6 Graphics Card', undefined, '12GB'],
+      ['Lenovo LOQ 15IRX9 Gaming Laptop - 13th Intel Core i7-13650HX 14 Cores, NVIDIA GeForce RTX 4050 6GB GDDR6 Gra...', undefined, undefined],
       // Nothing to read.
       ['Nokia 105 Feature Phone Dual SIM', undefined, undefined],
       ['Samsung Galaxy A57 5G Awesome Navy', undefined, undefined],

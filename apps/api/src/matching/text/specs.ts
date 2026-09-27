@@ -33,8 +33,12 @@ const STORAGE_SIZES = new Set([16, 32, 64, 128, 256, 512, 1000, 2000, 4000]);
 
 const CAPACITY = /(?<![\w.])(\d+(?:\.\d+)?)\s*(tb|gb)(?![a-z])/gi;
 
-/** "8GB RAM", "8 GB of RAM", "8GB LPDDR5X", "16GB Unified Memory", "8GB DDR4". */
-const RAM_AFTER = /(?<![\w.])(\d{1,3})\s*gb?\s*(?:of\s+)?(?:ram|lpddr\d*x?|ddr\d*|unified\s+memory|memory)(?![a-z])/gi;
+/**
+ * "8GB RAM", "8 GB of RAM", "8GB LPDDR5X", "16GB Unified Memory", "8GB DDR4".
+ * System RAM is DDR2-DDR5; "DDR6"/"DDR7" in a title is a graphics card's
+ * GDDR memory misspelled.
+ */
+const RAM_AFTER = /(?<![\w.])(\d{1,3})\s*gb?\s*(?:of\s+)?(?:ram|lpddr\d*x?|ddr[2-5]?|unified\s+memory|memory)(?![a-z\d])/gi;
 /**
  * "RAM 8GB", "RAM: 8 GB", "Memory 16GB". No dash: stores separate fields
  * with " - " ("8GB RAM - 128GB"), and the next field is not the RAM.
@@ -65,6 +69,9 @@ const SHORT_UNIT = /\d\s*[gt](?!b)/i;
 function toGb(amount: number, unit: string): number {
   return unit.toLowerCase().startsWith('t') ? amount * 1000 : amount;
 }
+
+/** A whole computer, where GPU memory is never the storage. */
+const MACHINE = /\b(?:laptop|notebook|desktop|pc|computer|all[\s-]?in[\s-]?one|core\s+(?:i[3579]|ultra)|ryzen)\b/i;
 
 function isGpuMemory(text: string, capacity: Capacity): boolean {
   return GPU_MEMORY_AFTER.test(text.slice(capacity.end)) || GPU_MEMORY_BEFORE.test(text.slice(0, capacity.index));
@@ -139,10 +146,12 @@ export function extractMemorySpec(matchingText: string): MemorySpec {
   }
 
   // 4. Otherwise storage is the largest capacity not already read as RAM. A title
-  // that states RAM describes a whole machine, so its GPU memory is not storage.
+  // that states RAM, or names a computer, describes a whole machine, so its GPU
+  // memory is not storage.
   if (spec.storage === undefined) {
     const others = capacities(text).filter(
-      (capacity) => !insideRam(capacity.index) && !(spec.ram !== undefined && isGpuMemory(text, capacity)),
+      (capacity) =>
+        !insideRam(capacity.index) && !((spec.ram !== undefined || MACHINE.test(text)) && isGpuMemory(text, capacity)),
     );
     if (others.length > 0) {
       spec.storage = others.reduce((best, next) => (next.gb > best.gb ? next : best)).gb;
