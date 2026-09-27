@@ -24,6 +24,7 @@ export type ApiErrorCode =
   | 'UPGRADE_REQUIRED'
   | 'QUOTA_EXCEEDED'
   | 'CORS_ORIGIN_NOT_ALLOWED'
+  | 'CSRF_TOKEN_INVALID'
   // Database (Prisma)
   | 'DUPLICATE_RECORD'
   | 'INVALID_REFERENCE'

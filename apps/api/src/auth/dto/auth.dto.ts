@@ -52,7 +52,8 @@ export class LoginDto {
 }
 
 export class RefreshDto {
-  @ApiProperty({ description: 'JWT refresh token' })
+  @ApiPropertyOptional({ description: 'JWT refresh token. Omit in cookie mode: the pl_rt cookie is used.' })
+  @IsOptional()
   @IsString()
-  refreshToken: string;
+  refreshToken?: string;
 }

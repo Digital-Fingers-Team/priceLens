@@ -2766,12 +2766,9 @@
         "properties": {
           "refreshToken": {
             "type": "string",
-            "description": "JWT refresh token"
+            "description": "JWT refresh token. Omit in cookie mode: the pl_rt cookie is used."
           }
-        },
-        "required": [
-          "refreshToken"
-        ]
+        }
       },
       "ResolveReviewItemDto": {
         "type": "object",

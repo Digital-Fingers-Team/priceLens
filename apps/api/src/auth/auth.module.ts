@@ -10,6 +10,7 @@ import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { CsrfGuard } from '../common/guards/csrf.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { FeatureGuard } from '../billing/feature.guard';
 
@@ -37,6 +38,9 @@ import { FeatureGuard } from '../billing/feature.guard';
     // AppModule instead put it AHEAD of this one, so a signed-in user on a
     // feature-gated route was rejected with 401 "sign in" instead of being
     // offered an upgrade -- which broke every paywall's upgrade path.
+    // CSRF first: a forged cookie-authenticated write is refused before any
+    // session lookup (auth/auth-cookies.ts, D-17).
+    { provide: APP_GUARD, useClass: CsrfGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: FeatureGuard },

@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
 import { AuthService } from '../auth.service';
 import { TokenPayload } from '../interfaces/auth.interfaces';
+import { ACCESS_COOKIE, requestCookies } from '../auth-cookies';
 
 /** Set on the request for authenticated calls: the session the access token belongs to. */
 export const AUTH_SESSION_ID = 'authSessionId';
@@ -16,7 +17,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     private readonly authService: AuthService,
   ) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      // A bearer header (partner API, scripts) wins; the website sends the
+      // httpOnly session cookie instead (D-17).
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+        (req: Request) => requestCookies(req)[ACCESS_COOKIE] ?? null,
+      ]),
       ignoreExpiration: false,
       secretOrKey: config.get<string>('auth.jwtAccessSecret'),
       passReqToCallback: true,

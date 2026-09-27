@@ -236,7 +236,9 @@ describe('Every endpoint (e2e)', () => {
     const refreshed = await call('POST', '/api/v1/auth/refresh', 200, { body: { refreshToken: pro.refreshToken } });
     pro.token = refreshed.body.data.accessToken;
     pro.refreshToken = refreshed.body.data.refreshToken;
-    await call('POST', '/api/v1/auth/refresh', 400, { body: {} });
+    // No token in the body and no pl_rt cookie: unauthenticated (the body is
+    // optional since D-17, so this is no longer a validation error).
+    await call('POST', '/api/v1/auth/refresh', 401, { body: {} });
 
     // A throwaway session to log out of, and one more for "log out everywhere".
     const spare = await login(free.email, free.password);

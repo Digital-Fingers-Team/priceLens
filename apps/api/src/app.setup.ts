@@ -79,7 +79,8 @@ export function configureApp(app: NestExpressApplication): void {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', REQUEST_ID_HEADER],
+    // X-Auth-Mode and X-CSRF-Token: the website's cookie session (D-17).
+    allowedHeaders: ['Content-Type', 'Authorization', REQUEST_ID_HEADER, 'X-Auth-Mode', 'X-CSRF-Token'],
     exposedHeaders: [REQUEST_ID_HEADER],
   });
 
