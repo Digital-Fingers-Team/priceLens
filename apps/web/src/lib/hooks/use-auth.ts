@@ -19,7 +19,7 @@ export function useLogin() {
   return useMutation({
     mutationFn: (creds: LoginCredentials) => authApi.login(creds),
     onSuccess: (data) => {
-      setAuth(data.user, data.accessToken, data.refreshToken);
+      setAuth(data.user);
       addToast(tf(t.toast.welcomeBack, { name: data.user.displayName ?? data.user.username }), 'success');
       // Back to the page that asked for sign-in (?next=), else home.
       router.push(nextFromLocation());
@@ -40,7 +40,7 @@ export function useRegister() {
   return useMutation({
     mutationFn: (creds: RegisterCredentials) => authApi.register(creds),
     onSuccess: (data) => {
-      setAuth(data.user, data.accessToken, data.refreshToken);
+      setAuth(data.user);
       addToast(t.toast.accountCreated, 'success');
       // Back to the page that asked for sign-in (?next=), else home.
       router.push(nextFromLocation());
@@ -52,13 +52,13 @@ export function useRegister() {
 }
 
 export function useLogout() {
-  const { refreshToken, clearAuth } = useAuthStore();
+  const clearAuth = useAuthStore((s) => s.clearAuth);
   const addToast = useUiStore((s) => s.addToast);
   const { t } = useI18n();
   const router = useRouter();
 
   return useMutation({
-    mutationFn: () => authApi.logout(refreshToken ?? ''),
+    mutationFn: () => authApi.logout(),
     onSettled: () => {
       clearAuth();
       addToast(t.toast.signedOut, 'info');

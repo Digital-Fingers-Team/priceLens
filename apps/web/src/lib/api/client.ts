@@ -7,125 +7,109 @@ import { API_BASE_URL } from '@/config/constants';
 import { localizePath, splitLocale } from '@/lib/i18n/config';
 import { loginHref } from '@/lib/utils/next-path';
 
-// Token refresh queue — prevents multiple simultaneous refresh calls
-let isRefreshing = false;
-let failedQueue: Array<{
-  resolve: (token: string) => void;
-  reject: (error: unknown) => void;
-}> = [];
+/**
+ * The session lives in httpOnly cookies the API sets (D-17): script on the
+ * page cannot read the tokens, so an injected script cannot steal them. The
+ * browser sends them by itself; this client only
+ *   - asks for cookie mode (X-Auth-Mode) on every call,
+ *   - copies the readable pl_csrf cookie into X-CSRF-Token (double submit),
+ *   - on a 401, refreshes once through the refresh cookie and retries.
+ * Tokens used to be kept in localStorage; moveLegacySession() converts such a
+ * session to cookies once and removes the stored tokens.
+ */
 
-function processQueue(error: unknown, token: string | null) {
-  failedQueue.forEach((p) => {
-    if (error) p.reject(error);
-    else p.resolve(token!);
-  });
-  failedQueue = [];
+const CSRF_COOKIE = 'pl_csrf';
+const LEGACY_ACCESS = 'pl_access_token';
+const LEGACY_REFRESH = 'pl_refresh_token';
+
+function readCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  for (const part of document.cookie.split(';')) {
+    const [key, ...rest] = part.trim().split('=');
+    if (key === name) return decodeURIComponent(rest.join('='));
+  }
+  return null;
 }
 
-function getStoredTokens() {
-  if (typeof window === 'undefined') return { access: null, refresh: null };
-  return {
-    access: localStorage.getItem('pl_access_token'),
-    refresh: localStorage.getItem('pl_refresh_token'),
-  };
-}
-
-function setStoredTokens(access: string, refresh: string) {
-  localStorage.setItem('pl_access_token', access);
-  localStorage.setItem('pl_refresh_token', refresh);
-}
-
-function clearStoredTokens() {
-  localStorage.removeItem('pl_access_token');
-  localStorage.removeItem('pl_refresh_token');
+/** True while the API's session cookies exist (pl_csrf lives as long as the refresh cookie). */
+export function hasSessionCookie(): boolean {
+  return readCookie(CSRF_COOKIE) != null;
 }
 
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 15000,
-  headers: { 'Content-Type': 'application/json' },
-  withCredentials: false,
+  headers: { 'Content-Type': 'application/json', 'X-Auth-Mode': 'cookie' },
+  // Same origin in production; in development the API is on another port.
+  withCredentials: true,
 });
 
-// ── Request interceptor: attach access token ───────────────────────────────
-apiClient.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    const { access } = getStoredTokens();
-    if (access && config.headers) {
-      config.headers.Authorization = `Bearer ${access}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error),
-);
+apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  const csrf = readCookie(CSRF_COOKIE);
+  if (csrf && config.headers) config.headers['X-CSRF-Token'] = csrf;
+  return config;
+});
 
-// ── Response interceptor: refresh on 401 ──────────────────────────────────
+/** One refresh at a time; concurrent 401s wait for it. */
+let refreshing: Promise<void> | null = null;
+
+function refreshSession(): Promise<void> {
+  refreshing ??= apiClient
+    .post('/auth/refresh', {})
+    .then(() => undefined)
+    .finally(() => {
+      refreshing = null;
+    });
+  return refreshing;
+}
+
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const original = error.config as InternalAxiosRequestConfig & {
-      _retry?: boolean;
-    };
-
+    const original = error.config as (InternalAxiosRequestConfig & { _retry?: boolean }) | undefined;
     const isUnauthorized = error.response?.status === 401;
-    const isAuthEndpoint = original.url?.includes('/auth/');
-    const hasRefreshToken = !!getStoredTokens().refresh;
+    const isAuthEndpoint = original?.url?.includes('/auth/');
 
-    if (isUnauthorized && !original._retry && !isAuthEndpoint && hasRefreshToken) {
-      original._retry = true;
-
-      if (isRefreshing) {
-        // Queue this request until refresh completes
-        return new Promise((resolve, reject) => {
-          failedQueue.push({
-            resolve: (token) => {
-              original.headers.Authorization = `Bearer ${token}`;
-              resolve(apiClient(original));
-            },
-            reject,
-          });
-        });
-      }
-
-      isRefreshing = true;
-      const { refresh } = getStoredTokens();
-
-      try {
-        const res = await axios.post(`${API_BASE_URL}/auth/refresh`, {
-          refreshToken: refresh,
-        });
-
-        const { accessToken, refreshToken } = res.data.data;
-        setStoredTokens(accessToken, refreshToken);
-        processQueue(null, accessToken);
-        original.headers.Authorization = `Bearer ${accessToken}`;
-        return apiClient(original);
-      } catch (refreshError) {
-        // Another tab may have rotated the shared refresh token first; the
-        // API then rejects ours. Use what that tab stored instead of logging
-        // this tab (and, through shared storage, every tab) out.
-        const latest = getStoredTokens();
-        if (latest.refresh && latest.refresh !== refresh && latest.access) {
-          processQueue(null, latest.access);
-          original.headers.Authorization = `Bearer ${latest.access}`;
-          return apiClient(original);
-        }
-        processQueue(refreshError, null);
-        clearStoredTokens();
-        // Session over: sign in again, then come back to this page.
-        if (typeof window !== 'undefined') {
-          // In the same language; `next` is the locale-free path.
-          const { locale, path } = splitLocale(window.location.pathname);
-          window.location.href = localizePath(locale, loginHref(path + window.location.search));
-        }
-        return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
-      }
+    if (!original || !isUnauthorized || original._retry || isAuthEndpoint || !hasSessionCookie()) {
+      return Promise.reject(error);
     }
-
-    return Promise.reject(error);
+    original._retry = true;
+    try {
+      await refreshSession();
+      return apiClient(original);
+    } catch (refreshError) {
+      // Session over: sign in again, then come back to this page.
+      if (typeof window !== 'undefined') {
+        const { locale, path } = splitLocale(window.location.pathname);
+        window.location.href = localizePath(locale, loginHref(path + window.location.search));
+      }
+      return Promise.reject(refreshError);
+    }
   },
 );
 
-export { apiClient, setStoredTokens, clearStoredTokens, getStoredTokens };
+/**
+ * Before D-17 the tokens were in localStorage. If they still are, trade the
+ * refresh token for session cookies once and delete both, so nobody who was
+ * signed in is signed out by the change. Returns whether a session now exists.
+ */
+export async function moveLegacySession(): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  let refreshToken: string | null = null;
+  try {
+    refreshToken = localStorage.getItem(LEGACY_REFRESH);
+    localStorage.removeItem(LEGACY_ACCESS);
+    localStorage.removeItem(LEGACY_REFRESH);
+  } catch {
+    return hasSessionCookie();
+  }
+  if (!refreshToken) return hasSessionCookie();
+  try {
+    await apiClient.post('/auth/refresh', { refreshToken });
+    return true;
+  } catch {
+    return hasSessionCookie();
+  }
+}
+
+export { apiClient };

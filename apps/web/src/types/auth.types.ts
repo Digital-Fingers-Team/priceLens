@@ -10,9 +10,8 @@ export interface AuthUser {
   avatarUrl: string | null;
 }
 
-export interface AuthTokens {
-  accessToken: string;
-  refreshToken: string;
+/** What login, register and refresh return to the website: the tokens are httpOnly cookies (D-17). */
+export interface AuthSession {
   user: AuthUser;
 }
 

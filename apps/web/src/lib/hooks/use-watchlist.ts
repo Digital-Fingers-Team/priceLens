@@ -5,18 +5,18 @@ import { useUiStore } from '@/lib/store/ui.store';
 import { useI18n } from '@/lib/i18n/provider';
 import { useApiErrorMessage } from '@/lib/hooks/use-api-error';
 import { useAuthStore } from '@/lib/store/auth.store';
-import { getStoredTokens } from '@/lib/api/client';
+import { hasSessionCookie } from '@/lib/api/client';
 import type { CreateAlertPayload } from '@/lib/api/watchlist.api';
 import { isGuestWatched, toggleGuestWatchlist } from '@/lib/utils/guest-watchlist';
 
 export function useWatchlist() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const hasAccessToken = !!getStoredTokens().access;
+  const hasSession = hasSessionCookie();
 
   return useQuery({
     queryKey: QUERY_KEYS.watchlist(),
     queryFn: watchlistApi.getWatchlist,
-    enabled: isAuthenticated && hasAccessToken,
+    enabled: isAuthenticated && hasSession,
     staleTime: 2 * 60 * 1000,
   });
 }
@@ -95,12 +95,12 @@ export function useToggleWatchlist() {
  */
 export function useAlerts() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const hasAccessToken = !!getStoredTokens().access;
+  const hasSession = hasSessionCookie();
 
   return useQuery({
     queryKey: QUERY_KEYS.alerts(),
     queryFn: () => watchlistApi.getAlerts(),
-    enabled: isAuthenticated && hasAccessToken,
+    enabled: isAuthenticated && hasSession,
     staleTime: 30 * 1000,
   });
 }

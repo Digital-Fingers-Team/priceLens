@@ -1,33 +1,32 @@
 import { apiClient } from './client';
-import type { AuthTokens, LoginCredentials, RegisterCredentials } from '@/types/auth.types';
+import type { AuthSession, LoginCredentials, RegisterCredentials } from '@/types/auth.types';
 import type { ApiResponse } from '@/types/api.types';
 
 export const authApi = {
-  login: async (credentials: LoginCredentials): Promise<AuthTokens> => {
-    const res = await apiClient.post<ApiResponse<AuthTokens>>(
+  login: async (credentials: LoginCredentials): Promise<AuthSession> => {
+    const res = await apiClient.post<ApiResponse<AuthSession>>(
       '/auth/login',
       credentials,
     );
     return res.data.data;
   },
 
-  register: async (credentials: RegisterCredentials): Promise<AuthTokens> => {
-    const res = await apiClient.post<ApiResponse<AuthTokens>>(
+  register: async (credentials: RegisterCredentials): Promise<AuthSession> => {
+    const res = await apiClient.post<ApiResponse<AuthSession>>(
       '/auth/register',
       credentials,
     );
     return res.data.data;
   },
 
-  refresh: async (refreshToken: string): Promise<AuthTokens> => {
-    const res = await apiClient.post<ApiResponse<AuthTokens>>('/auth/refresh', {
-      refreshToken,
-    });
+  // The refresh token is an httpOnly cookie the browser sends itself (D-17).
+  refresh: async (): Promise<AuthSession> => {
+    const res = await apiClient.post<ApiResponse<AuthSession>>('/auth/refresh', {});
     return res.data.data;
   },
 
-  logout: async (refreshToken: string): Promise<void> => {
-    await apiClient.post('/auth/logout', { refreshToken });
+  logout: async (): Promise<void> => {
+    await apiClient.post('/auth/logout', {});
   },
 
   me: async () => {

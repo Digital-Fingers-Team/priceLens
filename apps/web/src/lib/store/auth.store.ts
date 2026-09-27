@@ -2,71 +2,50 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { AuthUser } from '@/types/auth.types';
-import { setStoredTokens, clearStoredTokens, getStoredTokens } from '@/lib/api/client';
+import { hasSessionCookie, moveLegacySession } from '@/lib/api/client';
 
 interface AuthState {
   user: AuthUser | null;
-  accessToken: string | null;
-  refreshToken: string | null;
   isAuthenticated: boolean;
   hasHydrated: boolean;
-  setAuth: (user: AuthUser, accessToken: string, refreshToken: string) => void;
+  setAuth: (user: AuthUser) => void;
   clearAuth: () => void;
 }
 
+/**
+ * Who is signed in, for the UI. The session itself is in httpOnly cookies the
+ * API manages (D-17, lib/api/client.ts); this store keeps only the public user
+ * profile, and a stored profile counts only while the session cookie exists.
+ */
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set): AuthState => ({
       user: null,
-      accessToken: null,
-      refreshToken: null,
       isAuthenticated: false,
       hasHydrated: false,
 
-      setAuth: (user, accessToken, refreshToken) => {
-        setStoredTokens(accessToken, refreshToken);
-        set({ user, accessToken, refreshToken, isAuthenticated: true });
-      },
+      setAuth: (user) => set({ user, isAuthenticated: true }),
 
-      clearAuth: () => {
-        clearStoredTokens();
-        set({
-          user: null,
-          accessToken: null,
-          refreshToken: null,
-          isAuthenticated: false,
-        });
-      },
+      clearAuth: () => set({ user: null, isAuthenticated: false }),
     }),
     {
       name: 'pl-auth',
       // Rehydrated by <Providers> after mount, not at module load. Reading
-      // localStorage during the first client render made signed-in pages
-      // differ from the (always signed-out) server HTML: a hydration error on
-      // every page view (audit 05, FE-02). Auth-dependent UI waits for
-      // hasHydrated instead.
+      // storage during the first client render made signed-in pages differ
+      // from the (always signed-out) server HTML: a hydration error on every
+      // page view (audit 05, FE-02). Auth-dependent UI waits for hasHydrated.
       skipHydration: true,
-      partialize: (state) => ({
-        user: state.user,
-        isAuthenticated: state.isAuthenticated,
-      }),
+      partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
       onRehydrateStorage: () => (state) => {
-        // Tokens live in localStorage (they are deliberately not persisted by
-        // this store), so re-attach them after rehydration. Without this the
-        // store reports isAuthenticated with null tokens, and logout posts an
-        // empty refreshToken — leaving the session live on the server.
-        // setState, not mutation: rehydration now runs after the first render,
-        // so subscribers must be notified.
-        const { access, refresh } = getStoredTokens();
-        // Tokens are the source of truth: if they are gone, so is the session.
-        const signedIn = Boolean(state?.user && access && refresh);
-        useAuthStore.setState({
-          accessToken: access,
-          refreshToken: refresh,
-          user: signedIn ? state!.user : null,
-          isAuthenticated: signedIn,
-          hasHydrated: true,
-        });
+        const user = state?.user ?? null;
+        const finish = (signedIn: boolean) =>
+          // setState, not mutation: rehydration runs after the first render,
+          // so subscribers must be notified.
+          useAuthStore.setState({ user: signedIn ? user : null, isAuthenticated: signedIn, hasHydrated: true });
+        if (!user) return finish(false);
+        if (hasSessionCookie()) return finish(true);
+        // A session from before the cookies may still be in localStorage.
+        void moveLegacySession().then(finish);
       },
     },
   ),

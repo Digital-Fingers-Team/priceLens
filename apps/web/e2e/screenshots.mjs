@@ -109,7 +109,8 @@ async function main() {
     }
     await settle(page, at('/'));
 
-    // Sign in by seeding the same storage the app writes on login.
+    // Sign in the old way (tokens in localStorage): the app moves such a
+    // session into its httpOnly cookies on load (D-17), which this exercises.
     await page.evaluate((a) => {
       localStorage.setItem('pl_access_token', a.accessToken);
       localStorage.setItem('pl_refresh_token', a.refreshToken);
