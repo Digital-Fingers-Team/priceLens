@@ -211,6 +211,7 @@ describe('Every endpoint (e2e)', () => {
     await call('GET', '/', 200);
     await call('GET', '/health', 200);
     await call('GET', '/health/ready', 200);
+    await call('GET', '/health/ops', 200);
     expectNoProblems();
   });
 

@@ -4,6 +4,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { Public } from '../common/decorators';
 import { AppException } from '../common/errors/app.exception';
 import { HealthService } from './health.service';
+import { processRole } from '../config/process-role';
 
 /**
  * Served outside the /api/v1 prefix (see configureApp), so the container
@@ -32,5 +33,16 @@ export class HealthController {
       throw new AppException(503, 'SERVICE_UNAVAILABLE', 'A dependency is unavailable', { checks: report.checks });
     }
     return report;
+  }
+
+  /**
+   * Operational numbers for the host monitor (queue backlog, per-store
+   * freshness, memory). Not routed by nginx: only /api/ reaches the API from
+   * outside, so this answers on the container port (127.0.0.1:3002) alone.
+   */
+  @Get('ops')
+  @ApiOperation({ summary: 'Operational metrics for the host monitor (internal)' })
+  ops() {
+    return this.health.ops(processRole());
   }
 }

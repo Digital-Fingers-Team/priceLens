@@ -2604,6 +2604,29 @@
           "health"
         ]
       }
+    },
+    "/health/ops": {
+      "get": {
+        "operationId": "HealthController_ops",
+        "summary": "Operational metrics for the host monitor (internal)",
+        "description": "Operational numbers for the host monitor (queue backlog, per-store\nfreshness, memory). Not routed by nginx: only /api/ reaches the API from\noutside, so this answers on the container port (127.0.0.1:3002) alone.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "health"
+        ]
+      }
     }
   },
   "info": {

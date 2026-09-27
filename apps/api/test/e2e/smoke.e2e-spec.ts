@@ -96,6 +96,30 @@ describe('Smoke (e2e)', () => {
     }
   });
 
+  it('GET /health/ops reports queue backlog, per-store freshness and memory (phase 10 monitor)', async () => {
+    const res = await request(app.getHttpServer()).get('/health/ops').expect(200);
+    const { queue, stores, process: proc } = res.body.data;
+    expect(queue).toEqual({
+      waiting: expect.any(Number),
+      active: expect.any(Number),
+      delayed: expect.any(Number),
+      failed: expect.any(Number),
+      completed: expect.any(Number),
+    });
+    expect(Array.isArray(stores)).toBe(true);
+    for (const store of stores) {
+      expect(store).toEqual({
+        slug: expect.any(String),
+        pricedListings: expect.any(Number),
+        refreshed24h: expect.any(Number),
+        lastSeenAt: store.lastSeenAt === null ? null : expect.any(String),
+        sweeps24h: { completed: expect.any(Number), failed: expect.any(Number) },
+      });
+      expect(store.refreshed24h).toBeLessThanOrEqual(store.pricedListings);
+    }
+    expect(proc).toEqual({ role: 'all', rssMb: expect.any(Number), heapUsedMb: expect.any(Number), uptimeS: expect.any(Number) });
+  });
+
   it('GET /health/ready answers 503 with the failing dependency when one is down', async () => {
     const prismaForCheck = app.get(PrismaService);
     const spy = jest.spyOn(prismaForCheck, '$queryRaw').mockRejectedValueOnce(new Error('connection refused'));

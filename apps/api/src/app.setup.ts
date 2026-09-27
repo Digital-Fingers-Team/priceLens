@@ -87,7 +87,7 @@ export function configureApp(app: NestExpressApplication): void {
   const apiPrefix = process.env.API_PREFIX ?? 'api/v1';
   // Health lives at /health and /health/ready (HealthController) so probes
   // don't depend on the API prefix.
-  app.setGlobalPrefix(apiPrefix, { exclude: ['health', 'health/ready'] });
+  app.setGlobalPrefix(apiPrefix, { exclude: ['health', 'health/ready', 'health/ops'] });
 
   // ─── Validation ──────────────────────────────────────────────────────────
   app.useGlobalPipes(
