@@ -14,6 +14,7 @@ import { INGESTION_QUEUE } from './ingestion.jobs';
 import { IngestionProcessor } from './ingestion.processor';
 import { IngestionScheduler } from './ingestion.scheduler';
 import { ScrapeSlots } from './scrape-slots';
+import { WorkerMemoryGuard } from './worker-memory-guard';
 
 /**
  * Everything that consumes jobs: Bull processors, the schedulers that register
@@ -35,6 +36,7 @@ import { ScrapeSlots } from './scrape-slots';
     IngestionScheduler,
     AffiliateConversionProcessor,
     AffiliateConversionScheduler,
+    WorkerMemoryGuard,
     {
       provide: ScrapeSlots,
       inject: [ConfigService],

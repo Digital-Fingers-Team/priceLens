@@ -80,6 +80,10 @@ services:
     environment:
       PROCESS_ROLE: worker
       RUN_MIGRATIONS_ON_START: "false"
+      # Recycle before the heap limit (~2 GB) and keep one heap snapshot of
+      # the leak for diagnosis: podman cp pricelens-worker:/tmp/heap . (OPS-01)
+      WORKER_MAX_HEAP_MB: "1200"
+      WORKER_HEAP_SNAPSHOT_DIR: /tmp/heap
     depends_on:
       postgres:
         condition: service_healthy
