@@ -5,6 +5,8 @@ allowBuilds:
   "@nestjs/core": true
   "@prisma/client": true
   "@prisma/engines": true
+  # Install-time telemetry of swagger-ui-dist (via @nestjs/swagger 11); not needed.
+  '@scarf/scarf': false
   bcrypt: true
   msgpackr-extract: true
   prisma: true

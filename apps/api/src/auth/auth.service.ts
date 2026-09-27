@@ -5,7 +5,7 @@ import {
   ConflictException,
   Logger,
 } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
+import { JwtService, type JwtSignOptions } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../database/prisma.service';
 import { User, UserRole } from '@prisma/client';
@@ -226,8 +226,8 @@ export class AuthService {
 
     const refreshTtl = this.config.get<string>('auth.jwtRefreshTtl', '7d');
     const refreshToken = this.jwtService.sign(payload, {
-      secret: this.config.get<string>('auth.jwtRefreshSecret'),
-      expiresIn: refreshTtl,
+      secret: this.config.getOrThrow<string>('auth.jwtRefreshSecret'),
+      expiresIn: refreshTtl as JwtSignOptions['expiresIn'],
     });
 
     // The session lives exactly as long as its refresh token (S-16); it used

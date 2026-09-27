@@ -1,6 +1,5 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import type { Cache } from 'cache-manager';
+import { Injectable, Logger } from '@nestjs/common';
+import { RedisCacheService } from '../common/cache/redis-cache.service';
 import { AlertType, PlanTier, SubscriptionStatus } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { FEATURES, FeatureKey, FREE_LIMITS, PlanLimits, isWithinLimit, parsePlanLimits } from './plan-limits';
@@ -57,7 +56,7 @@ export class EntitlementsService {
 
   constructor(
     private readonly prisma: PrismaService,
-    @Inject(CACHE_MANAGER) private readonly cache: Cache,
+    private readonly cache: RedisCacheService,
   ) {}
 
   async getEntitlements(userId: string | null | undefined): Promise<Entitlements> {

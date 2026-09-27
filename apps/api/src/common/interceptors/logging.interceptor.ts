@@ -34,9 +34,13 @@ export class LoggingInterceptor implements NestInterceptor {
       }),
       catchError((err) => {
         const duration = Date.now() - startTime;
-        this.logger.error(
-          `${method} ${url} ERROR ${duration}ms [${requestId}] ${err.message}`,
-        );
+        // A client error (unknown product, bad input, 401/403/429) is the
+        // request's fault and expected; only a 5xx or an unknown error is ours.
+        // With JSON logs (OPS-16) the level is what a log store counts.
+        const status = typeof err?.getStatus === 'function' ? err.getStatus() : 500;
+        const line = `${method} ${url} ${status} ${duration}ms [${requestId}] ${err.message}`;
+        if (status >= 500) this.logger.error(line);
+        else this.logger.warn(line);
         return throwError(() => err);
       }),
     );

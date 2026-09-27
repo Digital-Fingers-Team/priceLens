@@ -1,8 +1,7 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Injectable } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import type { Queue } from 'bull';
-import type { RedisCache } from 'cache-manager-ioredis-yet';
+import { RedisCacheService } from '../common/cache/redis-cache.service';
 import { PrismaService } from '../database/prisma.service';
 import { INGESTION_QUEUE } from '../workers/ingestion.jobs';
 import { withTimeout } from '../common/redis-resilience';
@@ -50,14 +49,14 @@ interface StoreOpsRow {
 export class HealthService {
   constructor(
     private readonly prisma: PrismaService,
-    @Inject(CACHE_MANAGER) private readonly cache: RedisCache,
+    private readonly cache: RedisCacheService,
     @InjectQueue(INGESTION_QUEUE) private readonly queue: Queue,
   ) {}
 
   async check(): Promise<ReadinessReport> {
     const [database, cache, queue] = await Promise.all([
       this.probe('database', () => this.prisma.$queryRaw`SELECT 1`),
-      this.probe('cache', () => this.cache.store.client.ping()),
+      this.probe('cache', () => this.cache.ping()),
       this.probe('queue', () => this.queue.client.ping()),
     ]);
     const checks = { database, cache, queue };

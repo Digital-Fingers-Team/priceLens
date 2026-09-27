@@ -1,7 +1,6 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { Cache } from 'cache-manager';
+import { RedisCacheService } from '../common/cache/redis-cache.service';
 import { Prisma, ProductTier } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { OfferPolicy, liveOfferSql } from '../prices/offer-rules';
@@ -47,7 +46,7 @@ export class SearchService {
     private readonly config: ConfigService,
     private readonly ingestionQueue: IngestionQueue,
     private readonly products: ProductsService,
-    @Inject(CACHE_MANAGER) private readonly cache: Cache,
+    private readonly cache: RedisCacheService,
   ) {
     this.offerMaxAgeDays = this.config.get<number>('pricing.offerMaxAgeDays', 7);
   }

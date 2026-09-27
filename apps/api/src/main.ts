@@ -1,17 +1,25 @@
 // apps/api/src/main.ts
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { Logger } from '@nestjs/common';
+import { ConsoleLogger, Logger } from '@nestjs/common';
 import { SwaggerModule } from '@nestjs/swagger';
 import { AppModule, ENV_FILES } from './app.module';
 import { configureApp } from './app.setup';
 import { createOpenApiDocument } from './openapi';
 import { processRole } from './config/process-role';
+import { mountQueueBoard } from './admin/queue-board';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
-    logger: ['error', 'warn', 'log', 'debug', 'verbose'],
+    // LOG_FORMAT=json writes one JSON object per line (level, context,
+    // message, timestamp, pid) for a log store; production sets it in
+    // docker-compose.server.yml (audit 10 OPS-16). Anything else: Nest's
+    // text format.
+    logger: new ConsoleLogger({
+      json: process.env.LOG_FORMAT === 'json',
+      logLevels: ['error', 'warn', 'log', 'debug', 'verbose'],
+    }),
     // Stripe signs the webhook over the exact request bytes, so the raw body
     // has to survive JSON parsing. Nest keeps it on request.rawBody, which
     // StripeWebhookController reads; every other route is unaffected.
@@ -26,6 +34,11 @@ async function bootstrap() {
   );
 
   configureApp(app);
+
+  // The worker serves only its health check.
+  if (processRole() !== 'worker') {
+    mountQueueBoard(app, `/${process.env.API_PREFIX ?? 'api/v1'}/admin/queues`);
+  }
 
   // ─── Swagger ─────────────────────────────────────────────────────────────
   if (process.env.NODE_ENV !== 'production') {

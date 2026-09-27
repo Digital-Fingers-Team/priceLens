@@ -51,7 +51,7 @@ function hasPath(value: unknown, keys: string[]): boolean {
 }
 
 describe('config keys (B-17)', () => {
-  const namespaces = new Map<string, unknown>(FACTORIES.map((factory) => [factory.KEY.replace(/^CONFIGURATION\(|\)$/g, ''), factory()]));
+  const namespaces = new Map<string, unknown>(FACTORIES.map((factory) => [String(factory.KEY).replace(/^CONFIGURATION\(|\)$/g, ''), factory()]));
 
   const uses = sourceFiles(SRC).flatMap((file) =>
     [...fs.readFileSync(file, 'utf8').matchAll(CONFIG_GET)].map(([, namespace, key]) => ({

@@ -3,7 +3,6 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
-import { CacheModule } from '@nestjs/cache-manager';
 import { BullModule } from '@nestjs/bull';
 
 import { DatabaseModule } from './database/database.module';
@@ -37,9 +36,8 @@ import billingConfig from './config/billing.config';
 import notificationsConfig from './config/notifications.config';
 import { resolveEnvFiles } from './config/env-files';
 import { validateEnv } from './config/env.validation';
-import { RedisCacheLifecycle } from './common/redis-cache-lifecycle';
+import { RedisCacheModule } from './common/cache/redis-cache.module';
 import { WebAwareThrottlerGuard } from './common/guards/web-aware-throttler.guard';
-import { reconnectDelay } from './common/redis-resilience';
 import { processRole, runsWorkers } from './config/process-role';
 
 export const ENV_FILES = resolveEnvFiles();
@@ -82,24 +80,7 @@ export const ENV_FILES = resolveEnvFiles();
     }),
 
     // ─── Cache (Redis) ──────────────────────────────────────────────────────
-    CacheModule.registerAsync({
-      isGlobal: true,
-      inject: [ConfigService],
-      useFactory: async (config: ConfigService) => ({
-        store: (await import('cache-manager-ioredis-yet')).redisStore,
-        host: config.get('redis.host'),
-        port: config.get('redis.port'),
-        password: config.get('redis.password'),
-        db: config.get('redis.db', 0),
-        ttl: 300, // default 5 min cache TTL
-        // The cache is optional: with Redis down, a cache call must fail fast
-        // so callers fall back to Postgres, not wait for a reconnect (B-01).
-        enableOfflineQueue: false,
-        commandTimeout: 1000,
-        maxRetriesPerRequest: 1,
-        retryStrategy: reconnectDelay,
-      }),
-    }),
+    RedisCacheModule,
 
     // ─── BullMQ (Job Queue) ─────────────────────────────────────────────────
     BullModule.forRootAsync({
@@ -151,7 +132,6 @@ export const ENV_FILES = resolveEnvFiles();
     // like login and the scrape-triggering search are unthrottled.
     // The web's own server-side renders are told apart by a shared token.
     { provide: APP_GUARD, useClass: WebAwareThrottlerGuard },
-    RedisCacheLifecycle,
     // FeatureGuard (@RequiresFeature) is registered in AuthModule, directly
     // after JwtAuthGuard -- it needs request.user, so it must not run before
     // authentication has populated it.
