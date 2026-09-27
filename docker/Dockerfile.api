@@ -30,6 +30,9 @@ RUN pnpm config set fetch-timeout 600000 && pnpm config set fetch-retries 5
 RUN pnpm install --frozen-lockfile --filter @pricelens/api...
 
 COPY apps/api apps/api
+# The runtime runs as uid 1000 (OPS-19): whatever mode a file has in the
+# checkout (a 600 file once broke the in-image tests), it must be readable.
+RUN chmod -R a+rX apps/api packages
 
 # apps/api's build script runs:
 # dotenv -e ../../.env -- prisma generate && nest build
