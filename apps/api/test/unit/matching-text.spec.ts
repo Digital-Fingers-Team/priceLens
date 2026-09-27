@@ -51,6 +51,19 @@ describe('matching text', () => {
       // A single capacity on a graphics card is its VRAM, never RAM.
       ['MSI GeForce RTX 5050 Ventus 2X 8GB OC Graphics Card', undefined, '8GB'],
       ['ASUS Dual RTX 5060 Ti 16GB GDDR7 OC Edition', undefined, '16GB'],
+      // Short units ("32G", "1T") and a laptop's GPU memory (audit 07 handoff, the Lenovo in D-12).
+      [
+        'Lenovo LAPTOP LENOVO LEGION 5 15IAX10 Intel Core Ultra 7 255HX RAM (2*16 ) 32G DDR5 5600  1T SSD M2 NVME VGA NVIDIA GeForce RTX 5060 8GB GDDR7 15.6 WQXGA',
+        '32GB',
+        '1TB',
+      ],
+      [
+        'Lenovo LEGION 5 16IAX10 Laptop,Core Ultra 7-255HX Processor/32GB RAM/1TB SSD/Nvidia Geforce RTX 5060 8GB Graphics/Windows 11',
+        '32GB',
+        '1TB',
+      ],
+      ['Gaming Laptop Core i7 16GB RAM RTX 4060 8GB GDDR6', '16GB', undefined],
+      ['Dell G15 Gaming Laptop 16GB DDR5 GeForce RTX 4050 6GB', '16GB', undefined],
       // Nothing to read.
       ['Nokia 105 Feature Phone Dual SIM', undefined, undefined],
       ['Samsung Galaxy A57 5G Awesome Navy', undefined, undefined],
@@ -60,6 +73,11 @@ describe('matching text', () => {
 
     it('does not read a "5G" network label or a model number as a capacity', () => {
       expect(memory('Samsung Galaxy A57 5G')).toEqual({ ram: undefined, storage: undefined });
+    });
+
+    it('does not read a "5G" network label next to a storage word as a capacity', () => {
+      expect(memory('Samsung Galaxy A57 5G Storage 256GB')).toEqual({ ram: undefined, storage: '256GB' });
+      expect(memory('Nokia 4G Memory expandable')).toEqual({ ram: undefined, storage: undefined });
     });
 
     it('does not read two capacities as RAM + storage when the sizes are implausible', () => {

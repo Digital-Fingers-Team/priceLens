@@ -8,6 +8,7 @@
  *   "256GB/8GB", "8GB/256GB", "8/256GB", "8GB - 256GB", "8GB, 256GB"
  *   "8+256", "(8+256)", "8GB+256GB", "8 * 256GB", "12GB 256GB", "256GB ROM", "512GB SSD"
  *   "رام ٨ جيجا", "٢٥٦ جيجابايت" (after toMatchingText)
+ *   "32G DDR5", "1T SSD" (a short unit, but only next to a RAM/storage word)
  * An unlabelled pair is read as RAM + storage only when the smaller number is
  * a plausible RAM size and the larger a plausible storage size, so a GPU's
  * "16GB" or a "Ventus 2X 8GB" is never mistaken for RAM.
@@ -33,7 +34,7 @@ const STORAGE_SIZES = new Set([16, 32, 64, 128, 256, 512, 1000, 2000, 4000]);
 const CAPACITY = /(?<![\w.])(\d+(?:\.\d+)?)\s*(tb|gb)(?![a-z])/gi;
 
 /** "8GB RAM", "8 GB of RAM", "8GB LPDDR5X", "16GB Unified Memory", "8GB DDR4". */
-const RAM_AFTER = /(?<![\w.])(\d{1,3})\s*gb\s*(?:of\s+)?(?:ram|lpddr\d*x?|ddr\d*|unified\s+memory|memory)(?![a-z])/gi;
+const RAM_AFTER = /(?<![\w.])(\d{1,3})\s*gb?\s*(?:of\s+)?(?:ram|lpddr\d*x?|ddr\d*|unified\s+memory|memory)(?![a-z])/gi;
 /**
  * "RAM 8GB", "RAM: 8 GB", "Memory 16GB". No dash: stores separate fields
  * with " - " ("8GB RAM - 128GB"), and the next field is not the RAM.
@@ -41,14 +42,28 @@ const RAM_AFTER = /(?<![\w.])(\d{1,3})\s*gb\s*(?:of\s+)?(?:ram|lpddr\d*x?|ddr\d*
 const RAM_BEFORE = /(?<![a-z])(?:ram|memory)\s*:?\s*(\d{1,3})\s*gb(?![a-z])/gi;
 /** "256GB SSD", "256 GB ROM", "256GB storage", "256GB internal memory". */
 const STORAGE_AFTER =
-  /(?<![\w.])(\d+(?:\.\d+)?)\s*(tb|gb)\s*(?:ssd|hdd|emmc|ufs|rom|nvme|storage|internal(?:\s+(?:storage|memory))?|hard\s+drive)(?![a-z])/gi;
+  /(?<![\w.])(\d+(?:\.\d+)?)\s*(tb?|gb?)\s*(?:ssd|hdd|emmc|ufs|rom|nvme|storage|internal(?:\s+(?:storage|memory))?|hard\s+drive)(?![a-z])/gi;
 /** "Storage 256GB", "ROM: 256 GB", "SSD 512GB". */
 const STORAGE_BEFORE = /(?<![a-z])(?:storage|rom|ssd)\s*:?\s*(\d+(?:\.\d+)?)\s*(tb|gb)(?![a-z])/gi;
 /** Unit-less pairs: "8+256", "(8+256)", "8/256GB", "8GB+256GB", "12+1TB", "8 * 256GB". */
 const PAIR = /(?<![\w.])(\d{1,3})\s*(gb)?\s*([+/*×])\s*(\d{1,4})\s*(gb|tb)?(?![a-z\d])/gi;
 
+/**
+ * A graphics card's memory: "RTX 5060 8GB", "8GB GDDR7", "RX 7600 8GB Graphics".
+ * On a card it is the variant; on a laptop it is neither RAM nor storage.
+ */
+const GPU_MEMORY_AFTER = /^\s*(?:gddr\d*x?|vram|graphics|video\s+memory)(?![a-z])/i;
+const GPU_MEMORY_BEFORE = /(?:rtx|gtx|rx|arc|radeon|geforce|quadro)\s*(?:[a-z]\d{3,4}|\d{3,4})\s*(?:ti|super|xt|xtx)?\s*$/i;
+
+/** "32G", "1T": a unit without the B, accepted only for plausible sizes. */
+const SHORT_UNIT = /\d\s*[gt](?!b)/i;
+
 function toGb(amount: number, unit: string): number {
-  return unit.toLowerCase() === 'tb' ? amount * 1000 : amount;
+  return unit.toLowerCase().startsWith('t') ? amount * 1000 : amount;
+}
+
+function isGpuMemory(text: string, capacity: Capacity): boolean {
+  return GPU_MEMORY_AFTER.test(text.slice(capacity.end)) || GPU_MEMORY_BEFORE.test(text.slice(0, capacity.index));
 }
 
 function formatCapacity(gb: number): string {
@@ -86,6 +101,8 @@ export function extractMemorySpec(matchingText: string): MemorySpec {
       const viaMemoryWord = /memory/.test(match[0]) && !/unified/.test(match[0]);
       if (viaMemoryWord && gb > 64) continue;
       if (gb <= 0 || gb > 128) continue;
+      // "32G DDR5" yes; "5G memory" is a network label.
+      if (SHORT_UNIT.test(match[0]) && (viaMemoryWord || !RAM_SIZES.has(gb))) continue;
       spec.ram ??= gb;
       if (gb === spec.ram) ramPositions.push([match.index!, match.index! + match[0].length]);
     }
@@ -98,7 +115,9 @@ export function extractMemorySpec(matchingText: string): MemorySpec {
     for (const match of text.matchAll(pattern)) {
       const numberIndex = match.index! + match[0].search(/\d/);
       if (insideRam(numberIndex)) continue;
-      spec.storage ??= toGb(parseFloat(match[1]), match[2]);
+      const gb = toGb(parseFloat(match[1]), match[2]);
+      if (SHORT_UNIT.test(match[0]) && !STORAGE_SIZES.has(gb)) continue;
+      spec.storage ??= gb;
       break;
     }
   }
@@ -115,9 +134,12 @@ export function extractMemorySpec(matchingText: string): MemorySpec {
     }
   }
 
-  // 4. Otherwise storage is the largest capacity not already read as RAM.
+  // 4. Otherwise storage is the largest capacity not already read as RAM. A title
+  // that states RAM describes a whole machine, so its GPU memory is not storage.
   if (spec.storage === undefined) {
-    const others = capacities(text).filter((capacity) => !insideRam(capacity.index));
+    const others = capacities(text).filter(
+      (capacity) => !insideRam(capacity.index) && !(spec.ram !== undefined && isGpuMemory(text, capacity)),
+    );
     if (others.length > 0) {
       spec.storage = others.reduce((best, next) => (next.gb > best.gb ? next : best)).gb;
     }
