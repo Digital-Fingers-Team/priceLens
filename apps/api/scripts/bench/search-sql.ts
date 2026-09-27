@@ -56,6 +56,7 @@ async function main() {
     config as unknown as ConfigService,
     {} as IngestionQueue,
     products as unknown as ProductsService,
+    { get: async () => undefined, set: async () => undefined } as never,
   );
 
   const out: string[] = ['\\timing on', 'SET jit = off;'];

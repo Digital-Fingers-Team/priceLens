@@ -1,5 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
+import type { Cache } from 'cache-manager';
 import { Prisma, ProductTier } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { OfferPolicy, liveOfferSql } from '../prices/offer-rules';
@@ -7,6 +9,21 @@ import { IngestionQueue } from '../workers/ingestion-queue.service';
 import { ProductsService } from '../products/products.service';
 import { escapeLike, searchPhrase, searchTermGroups } from './search-text';
 import { SearchQueryDto, SearchSortBy, SearchSortDir, SuggestQueryDto } from './dto/search.dto';
+
+/**
+ * Browse pages (no query text) are the same for every visitor and the most
+ * expensive search: every product with a live offer is grouped and ranked.
+ * They are cached briefly (audit 08, P-08). Searches with text are not: they
+ * queue a live scrape, and the page refetches to show what it found.
+ */
+const BROWSE_CACHE_PREFIX = 'search:browse:v1:';
+const BROWSE_CACHE_TTL_MS = 60_000;
+
+type SearchPage = {
+  hits: Awaited<ReturnType<ProductsService['searchHits']>>;
+  total: number;
+  page: number;
+};
 
 export interface SuggestionItem {
   id: string;
@@ -21,6 +38,7 @@ export interface SuggestionItem {
  */
 @Injectable()
 export class SearchService {
+  private readonly logger = new Logger(SearchService.name);
   /** How old an offer may be and still count as a current price (D-13). */
   private readonly offerMaxAgeDays: number;
 
@@ -29,6 +47,7 @@ export class SearchService {
     private readonly config: ConfigService,
     private readonly ingestionQueue: IngestionQueue,
     private readonly products: ProductsService,
+    @Inject(CACHE_MANAGER) private readonly cache: Cache,
   ) {
     this.offerMaxAgeDays = this.config.get<number>('pricing.offerMaxAgeDays', 7);
   }
@@ -60,6 +79,14 @@ export class SearchService {
 
     const normalizedQuery = q.trim().toLowerCase();
     const offset = (page - 1) * limit;
+
+    const browseKey = normalizedQuery
+      ? null
+      : BROWSE_CACHE_PREFIX + JSON.stringify([brand ?? null, categoryId ?? null, minPrice ?? null, maxPrice ?? null, tier ?? null, page, limit, sortBy, sortDir]);
+    const cached = browseKey ? await this.cacheGet(browseKey) : null;
+    if (cached) {
+      return { ...cached, query: q.trim(), processingTimeMs: Date.now() - started, limit, liveFetchTriggered: false };
+    }
 
     const termGroups = searchTermGroups(normalizedQuery);
     const whereClause = this.buildSearchWhereSql(termGroups, brand, categoryId, tier);
@@ -104,17 +131,35 @@ export class SearchService {
     }
 
     const hits = await this.products.searchHits(pageRows.map((row) => row.id));
+    const result: SearchPage = { hits, total, page: Math.min(page, totalPages) };
+    if (browseKey) await this.cacheSet(browseKey, result);
 
     return {
-      hits,
-      total,
+      ...result,
       query: q.trim(),
-      // Measured, not a placeholder: database time for this page (B-13).
+      // Measured, not a placeholder: time to build this page (B-13).
       processingTimeMs: Date.now() - started,
-      page: Math.min(page, totalPages),
       limit,
       liveFetchTriggered,
     };
+  }
+
+  // The cache is optional: any Redis failure falls through to Postgres.
+  private async cacheGet(key: string): Promise<SearchPage | null> {
+    try {
+      return (await this.cache.get<SearchPage>(key)) ?? null;
+    } catch (error) {
+      this.logger.warn(`Search cache read failed: ${(error as Error).message}`);
+      return null;
+    }
+  }
+
+  private async cacheSet(key: string, value: SearchPage): Promise<void> {
+    try {
+      await this.cache.set(key, value, BROWSE_CACHE_TTL_MS);
+    } catch (error) {
+      this.logger.warn(`Search cache write failed: ${(error as Error).message}`);
+    }
   }
 
   /**
