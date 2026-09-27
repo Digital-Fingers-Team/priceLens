@@ -35,6 +35,7 @@ API="pricelens-api"
 WORKER="pricelens-worker"
 IMAGE="localhost/pricelens_api:latest"
 ROLLBACK="localhost/pricelens_api:rollback"
+PROFILES_VOLUME="pricelens_browser_profiles"
 HEALTH_TIMEOUT=180
 
 log()  { printf '\033[32m==>\033[0m %s\n' "$*"; }
@@ -126,6 +127,18 @@ log "live ($(( $(date +%s) - started ))s of API downtime)"
 # traffic goes to it, so this costs no downtime; unfinished jobs resume.
 log "replacing $WORKER"
 podman rm -f "$WORKER" >/dev/null 2>&1 || true
+
+# The image runs as uid 1000 (OPS-19). Profiles written by an older, root
+# image would be unreadable to it and every browser store would fail, so hand
+# them over once -- after the old worker is gone, so nothing writes as root
+# meanwhile. A no-op once everything is uid 1000.
+if podman volume exists "$PROFILES_VOLUME" \
+   && [[ -n "$(podman run --rm -u 0 --entrypoint find -v "$PROFILES_VOLUME:/p" "$IMAGE" /p ! -uid 1000 -print -quit)" ]]; then
+  log "handing $PROFILES_VOLUME to uid 1000"
+  podman run --rm -u 0 --entrypoint chown -v "$PROFILES_VOLUME:/p" "$IMAGE" -R 1000:1000 /p \
+    || die "could not re-own $PROFILES_VOLUME -- the worker is NOT running. Fix, then: docker compose -f $COMPOSE up -d --no-deps worker"
+fi
+
 docker compose -f "$COMPOSE" up -d --no-deps worker >/dev/null 2>&1 \
   || die "the API is live but the worker did not start -- jobs are not running. Check 'podman ps -a'"
 

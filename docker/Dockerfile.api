@@ -102,6 +102,16 @@ COPY docker/entrypoint.api.sh /usr/local/bin/entrypoint.api.sh
 
 RUN chmod +x /usr/local/bin/entrypoint.api.sh
 
+# Run as the image's unprivileged "node" user (uid 1000), not root (audit 10
+# OPS-19). What it writes: /tmp (Xvfb, heap snapshots) and the browser
+# profiles, a volume mounted over this directory; deploy-api.sh hands an
+# existing volume to uid 1000 once. The X socket directory is made here so
+# Xvfb does not need root to create it.
+RUN mkdir -p /repo/apps/api/.browser-profiles /tmp/.X11-unix \
+    && chown node:node /repo/apps/api/.browser-profiles \
+    && chmod 1777 /tmp/.X11-unix
+USER node
+
 ENV NODE_ENV=production
 
 EXPOSE 3001 6080

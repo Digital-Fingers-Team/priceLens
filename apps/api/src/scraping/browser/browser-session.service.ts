@@ -175,9 +175,13 @@ export class BrowserSessionService implements OnModuleDestroy {
     const profileDir = path.join(profileRoot, storeSlug);
     const target = this.resolveBrowserLaunchTarget();
 
-    // Chrome's sandbox cannot be used as uid 0, which is how the API container runs.
-    const needsNoSandbox = typeof process.getuid === 'function' && process.getuid() === 0;
-    const args = needsNoSandbox ? ['--no-sandbox', '--disable-dev-shm-usage'] : [];
+    // A container's /dev/shm is 64 MB, too small for Chrome's shared memory
+    // on a heavy store page; this moves it to /tmp. Harmless elsewhere.
+    const args = ['--disable-dev-shm-usage'];
+    // Chrome's sandbox cannot be used as uid 0. The image runs as uid 1000
+    // since audit 11 (OPS-19), where the sandbox works (tested under this
+    // host's rootless podman), so --no-sandbox is only for a root process.
+    if (typeof process.getuid === 'function' && process.getuid() === 0) args.push('--no-sandbox');
 
     // Profiles live on a volume that outlives the container, and Chromium's
     // singleton lock names the hostname that held it. Every deploy brings a
