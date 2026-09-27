@@ -52,6 +52,8 @@ services:
     environment:
       # HTTP only: jobs are enqueued here and run in the worker (ADR 0004, D-9).
       PROCESS_ROLE: api
+      # One JSON object per log line (OPS-16).
+      LOG_FORMAT: json
     ports:
       - "127.0.0.1:3002:3001"
     depends_on:
@@ -79,6 +81,7 @@ services:
     env_file: .env
     environment:
       PROCESS_ROLE: worker
+      LOG_FORMAT: json
       RUN_MIGRATIONS_ON_START: "false"
       # Recycle before the heap limit (~2 GB) and keep one heap snapshot of
       # the leak for diagnosis: podman cp pricelens-worker:/tmp/heap . (OPS-01)
@@ -121,7 +124,11 @@ services:
       - api
 
   proxy:
-    image: docker.io/library/nginx:1.27-alpine
+    # nginx 1.27.5 plus the Brotli modules (docker/Dockerfile.proxy).
+    image: localhost/pricelens_proxy:latest
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.proxy
     container_name: pricelens-proxy
     restart: always
     # The host's network namespace (D-31): rootless port forwarding into a

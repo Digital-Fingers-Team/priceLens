@@ -1,0 +1,41 @@
+# syntax=docker/dockerfile:1
+#
+# The public proxy: the official nginx image plus the Brotli modules
+# (audit 08 P-15, audit 10 OPS-20). nginx.org does not ship Brotli, and a
+# module must be built against the exact nginx it loads into, so it is
+# compiled here from the same release (--with-compat) and copied into the
+# unmodified official image.
+#
+# ngx_brotli is pinned to a commit and built with its bundled brotli library
+# (the submodule), so a rebuild produces the same module.
+
+ARG NGINX_VERSION=1.27.5
+ARG NGX_BROTLI_COMMIT=a71f9312c2deb28875acc7bacfdd5695a111aa53
+
+FROM docker.io/library/nginx:${NGINX_VERSION}-alpine AS build
+ARG NGINX_VERSION
+ARG NGX_BROTLI_COMMIT
+RUN apk add --no-cache build-base git cmake pcre2-dev zlib-dev openssl-dev linux-headers
+WORKDIR /src
+RUN wget -q "https://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz" \
+    && tar -xzf "nginx-${NGINX_VERSION}.tar.gz"
+RUN git clone https://github.com/google/ngx_brotli.git \
+    && cd ngx_brotli \
+    && git checkout "${NGX_BROTLI_COMMIT}" \
+    && git submodule update --init --depth 1
+# The module links the bundled brotli statically; build it first (ngx_brotli
+# README). -fPIC because it ends up inside a shared module.
+RUN cd ngx_brotli/deps/brotli && mkdir out && cd out \
+    && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_C_FLAGS="-O2 -fPIC" .. \
+    && cmake --build . --config Release --target brotlienc
+RUN cd "nginx-${NGINX_VERSION}" \
+    && ./configure --with-compat --add-dynamic-module=../ngx_brotli \
+    && make modules \
+    && cp objs/ngx_http_brotli_filter_module.so objs/ngx_http_brotli_static_module.so /src/
+
+FROM docker.io/library/nginx:${NGINX_VERSION}-alpine
+COPY --from=build /src/ngx_http_brotli_filter_module.so /src/ngx_http_brotli_static_module.so /usr/lib/nginx/modules/
+# load_module is only valid at the top of nginx.conf, before the http block
+# that includes conf.d/*.conf.
+RUN sed -i '1i load_module modules/ngx_http_brotli_filter_module.so;\nload_module modules/ngx_http_brotli_static_module.so;' /etc/nginx/nginx.conf \
+    && nginx -t
