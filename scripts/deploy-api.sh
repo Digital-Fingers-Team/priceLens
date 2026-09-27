@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy the API.
+# Deploy the API and the worker (the same image in two roles, ADR 0004).
 #
 # Two things about this stack have each caused an outage and are why this
 # script exists rather than a bare compose command:
@@ -32,6 +32,7 @@ cd "$ROOT"
 COMPOSE="docker-compose.server.yml"
 PROXY="pricelens-proxy"
 API="pricelens-api"
+WORKER="pricelens-worker"
 IMAGE="localhost/pricelens_api:latest"
 ROLLBACK="localhost/pricelens_api:rollback"
 HEALTH_TIMEOUT=180
@@ -117,3 +118,23 @@ done
      Roll back with: podman tag $ROLLBACK $IMAGE && ./scripts/deploy-api.sh --no-build"
 
 log "live ($(( $(date +%s) - started ))s of API downtime)"
+
+# The worker (Bull jobs, schedulers, browsers) runs the same image in its own
+# container (ADR 0004). It is replaced after the API is live: until then the
+# old container was still running the jobs itself, and two processes must not
+# consume the queue at once (matching's per-family lock is in-process). No
+# traffic goes to it, so this costs no downtime; unfinished jobs resume.
+log "replacing $WORKER"
+podman rm -f "$WORKER" >/dev/null 2>&1 || true
+docker compose -f "$COMPOSE" up -d --no-deps worker >/dev/null 2>&1 \
+  || die "the API is live but the worker did not start -- jobs are not running. Check 'podman ps -a'"
+
+for _ in $(seq 1 $((HEALTH_TIMEOUT / 3))); do
+  if podman ps --filter "name=$WORKER" --format '{{.Status}}' | grep -q healthy; then
+    log "worker healthy"
+    exit 0
+  fi
+  sleep 3
+done
+podman logs --tail 40 "$WORKER" 2>&1 | sed 's/^/    /' || true
+die "the API is live but the worker never became healthy -- jobs are not running"

@@ -49,8 +49,37 @@ services:
     container_name: pricelens-api
     restart: always
     env_file: .env
+    environment:
+      # HTTP only: jobs are enqueued here and run in the worker (ADR 0004, D-9).
+      PROCESS_ROLE: api
     ports:
       - "127.0.0.1:3002:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+      - external
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # The same image in the worker role: Bull processors, schedulers and the
+  # scraping browsers (ADR 0004, D-9). An out-of-memory crash here no longer
+  # takes the API down with it. It listens on 3001 only for its health check;
+  # nothing routes to it. deploy-api.sh applies migrations, not this container.
+  worker:
+    image: localhost/pricelens_api:latest
+    container_name: pricelens-worker
+    restart: always
+    env_file: .env
+    environment:
+      PROCESS_ROLE: worker
+      RUN_MIGRATIONS_ON_START: "false"
     depends_on:
       postgres:
         condition: service_healthy
@@ -64,6 +93,9 @@ services:
     networks:
       - internal
       - external
+    # Give the current store call a moment to end; an unfinished Bull job is
+    # picked up again once its lock expires.
+    stop_grace_period: 30s
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3001/health"]
       interval: 15s

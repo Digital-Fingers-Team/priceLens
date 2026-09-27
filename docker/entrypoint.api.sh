@@ -3,34 +3,38 @@ set -e
 
 export DISPLAY=:99
 
-# A container restarted in place (restart=always after a crash) keeps its /tmp,
-# and Xvfb refuses to start while the previous run's lock is there ("Server is
-# already active for display 99"). Every browser launch then fails with
-# "Missing X server" until the container is recreated (2026-09-27 outage).
-# Nothing else in this container owns display 99, so the lock is always stale.
-rm -f /tmp/.X99-lock /tmp/.X11-unix/X99
+# The api role runs no browsers (ADR 0004), so it needs no X server.
+if [ "${PROCESS_ROLE:-all}" != "api" ]; then
 
-Xvfb :99 -screen 0 1366x850x24 -nolisten tcp &
-XVFB_PID=$!
+  # A container restarted in place (restart=always after a crash) keeps its /tmp,
+  # and Xvfb refuses to start while the previous run's lock is there ("Server is
+  # already active for display 99"). Every browser launch then fails with
+  # "Missing X server" until the container is recreated (2026-09-27 outage).
+  # Nothing else in this container owns display 99, so the lock is always stale.
+  rm -f /tmp/.X99-lock /tmp/.X11-unix/X99
 
-fluxbox >/tmp/fluxbox.log 2>&1 &
+  Xvfb :99 -screen 0 1366x850x24 -nolisten tcp &
+  XVFB_PID=$!
 
-# noVNC is OFF by default. Only turn it on (ENABLE_NOVNC=true) temporarily when
-# you need to do a one-time interactive login/CAPTCHA-solve for a connector's
-# profile (see apps/api/scripts/ops/login-store.ts), then turn it back off — it's
-# a remote-control window into this container's browser session, which is why
-# it refuses to start without a real VNC_PASSWORD rather than defaulting open.
-if [ "${ENABLE_NOVNC:-false}" = "true" ]; then
-  if [ -z "$VNC_PASSWORD" ]; then
-    echo "ENABLE_NOVNC=true but VNC_PASSWORD is not set — refusing to start an unauthenticated remote desktop. Set VNC_PASSWORD and restart." >&2
-    exit 1
+  fluxbox >/tmp/fluxbox.log 2>&1 &
+
+  # noVNC is OFF by default. Only turn it on (ENABLE_NOVNC=true) temporarily when
+  # you need to do a one-time interactive login/CAPTCHA-solve for a connector's
+  # profile (see apps/api/scripts/ops/login-store.ts), then turn it back off — it's
+  # a remote-control window into this container's browser session, which is why
+  # it refuses to start without a real VNC_PASSWORD rather than defaulting open.
+  if [ "${ENABLE_NOVNC:-false}" = "true" ]; then
+    if [ -z "$VNC_PASSWORD" ]; then
+      echo "ENABLE_NOVNC=true but VNC_PASSWORD is not set — refusing to start an unauthenticated remote desktop. Set VNC_PASSWORD and restart." >&2
+      exit 1
+    fi
+    x11vnc -display :99 -forever -shared -rfbport 5900 -passwd "$VNC_PASSWORD" -quiet >/tmp/x11vnc.log 2>&1 &
+    websockify --web=/usr/share/novnc/ "${NOVNC_PORT:-6080}" localhost:5900 >/tmp/novnc.log 2>&1 &
   fi
-  x11vnc -display :99 -forever -shared -rfbport 5900 -passwd "$VNC_PASSWORD" -quiet >/tmp/x11vnc.log 2>&1 &
-  websockify --web=/usr/share/novnc/ "${NOVNC_PORT:-6080}" localhost:5900 >/tmp/novnc.log 2>&1 &
-fi
 
-# Give Xvfb a moment before Chrome ever tries to attach to it.
-sleep 1
+  # Give Xvfb a moment before Chrome ever tries to attach to it.
+  sleep 1
+fi
 
 # ─── Database migrations ─────────────────────────────────────────────────────
 # Nothing in the deploy path ran migrations before this, so every schema change
@@ -53,7 +57,7 @@ if [ "${RUN_MIGRATIONS_ON_START:-true}" = "true" ]; then
 fi
 
 cleanup() {
-  kill "$XVFB_PID" 2>/dev/null || true
+  [ -z "${XVFB_PID:-}" ] || kill "$XVFB_PID" 2>/dev/null || true
 }
 trap cleanup TERM INT
 
