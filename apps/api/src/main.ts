@@ -6,6 +6,7 @@ import { SwaggerModule } from '@nestjs/swagger';
 import { AppModule, ENV_FILES } from './app.module';
 import { configureApp } from './app.setup';
 import { createOpenApiDocument } from './openapi';
+import { processRole } from './config/process-role';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -44,7 +45,7 @@ async function bootstrap() {
 
   const port = Number(process.env.PORT ?? 3001);
   await app.listen(port);
-  logger.log(`PriceLens API running on port ${port} in ${process.env.NODE_ENV} mode`);
+  logger.log(`PriceLens API running on port ${port} in ${process.env.NODE_ENV} mode (role: ${processRole()})`);
 }
 
 bootstrap().catch((err) => {

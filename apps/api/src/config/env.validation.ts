@@ -32,6 +32,7 @@ const NUMERIC = [
   'CONNECTOR_FAILURE_THRESHOLD',
   'STORE_MIN_REQUEST_INTERVAL_MS',
   'STORE_RETRY_DELAY_MS',
+  'SCRAPE_CONCURRENCY',
   'CROSS_STORE_BACKFILL_LIMIT_PER_QUERY',
   'CROSS_STORE_BACKFILL_MAX_PRODUCTS',
   'STORE_COVERAGE_SWEEP_BATCH_SIZE',
@@ -82,6 +83,9 @@ const schema = z
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message });
 
     if (!vars.DATABASE_URL) issue('DATABASE_URL', 'is required');
+    if (vars.PROCESS_ROLE && !['all', 'api', 'worker'].includes(vars.PROCESS_ROLE.trim().toLowerCase())) {
+      issue('PROCESS_ROLE', 'must be all, api or worker');
+    }
     if (vars.NODE_ENV && !['development', 'test', 'production'].includes(vars.NODE_ENV)) {
       issue('NODE_ENV', 'must be development, test or production');
     }

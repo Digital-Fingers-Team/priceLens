@@ -24,6 +24,8 @@ export default registerAs('retailers', () => ({
   // unsatisfiable, so every product stayed permanently "under-covered" and the
   // sweep re-scraped the whole catalog on every run, forever.
   minStoresPerProduct: parseInt(process.env.MIN_STORES_PER_PRODUCT ?? '4', 10),
+  // Scrape jobs running at once in the worker (workers/scrape-slots.ts, D-9).
+  scrapeConcurrency: Math.max(1, parseInt(process.env.SCRAPE_CONCURRENCY ?? '2', 10) || 2),
   // Reactive expansion (above) only fires for products someone actually browses
   // to (product detail page, or now a search hit). This periodic sweep catches
   // the rest of the catalog -- products under minStoresPerProduct that nobody

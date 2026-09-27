@@ -32,6 +32,8 @@ import {
   StoreCoverageSweepJobData,
   StoreExpansionJobData,
 } from './ingestion.jobs';
+import { JOB_PRIORITY } from './ingestion-queue.service';
+import { ScrapeSlots } from './scrape-slots';
 
 @Processor(INGESTION_QUEUE)
 export class IngestionProcessor {
@@ -48,7 +50,13 @@ export class IngestionProcessor {
     private readonly mapMonitoringService: MapMonitoringService,
     private readonly launchDetectionService: LaunchDetectionService,
     private readonly marketReportsService: MarketReportsService,
+    private readonly scrapeSlots: ScrapeSlots,
   ) {}
+
+  /** Runs a scrape job once one of the scrape slots is free (scrape-slots.ts). */
+  private scrape<T>(job: Job, work: () => Promise<T>): Promise<T> {
+    return this.scrapeSlots.run(job.opts?.priority ?? JOB_PRIORITY.storeExpansion, work);
+  }
 
   /** MAP violations. Idempotent: one violation per product/retailer/day. */
   @Process(RUN_MAP_SWEEP_JOB)
@@ -145,7 +153,7 @@ export class IngestionProcessor {
   @Process(RUN_LIVE_INGESTION_JOB)
   async handleRunLiveIngestion(job: Job<LiveIngestionJobData>) {
     this.logger.log(`Starting live ingestion (job ${job.id})`);
-    const report = await this.liveIngestionService.runLiveIngestion(job.data ?? {});
+    const report = await this.scrape(job, () => this.liveIngestionService.runLiveIngestion(job.data ?? {}));
     this.logger.log(
       `Finished live ingestion (job ${job.id}): ` +
         `${report.platforms.length} platform(s) ingested, ${report.skippedPlatforms.length} skipped`,
@@ -157,15 +165,15 @@ export class IngestionProcessor {
   async handleRunStoreExpansion(job: Job<StoreExpansionJobData>) {
     const { productId, targetStores } = job.data;
     this.logger.log(`Starting store expansion for product ${productId} (job ${job.id})`);
-    await this.storeCoverageService.expandProductStores(productId, targetStores);
+    await this.scrape(job, () => this.storeCoverageService.expandProductStores(productId, targetStores));
     this.logger.log(`Finished store expansion for product ${productId} (job ${job.id})`);
   }
 
   @Process(RUN_STORE_COVERAGE_SWEEP_JOB)
   async handleRunStoreCoverageSweep(job: Job<StoreCoverageSweepJobData>) {
     this.logger.log(`Starting store coverage sweep (job ${job.id})`);
-    const { scanned, expanded } = await this.storeCoverageService.runStoreCoverageSweep(
-      job.data?.maxProducts,
+    const { scanned, expanded } = await this.scrape(job, () =>
+      this.storeCoverageService.runStoreCoverageSweep(job.data?.maxProducts),
     );
     this.logger.log(
       `Finished store coverage sweep (job ${job.id}): ${expanded}/${scanned} product(s) processed`,
@@ -176,7 +184,7 @@ export class IngestionProcessor {
   async handleRunQueryIngestion(job: Job<QueryIngestionJobData>) {
     const { query, ...options } = job.data;
     this.logger.log(`Starting query-triggered ingestion for "${query}" (job ${job.id})`);
-    const report = await this.liveIngestionService.runQueryIngestion(query, options);
+    const report = await this.scrape(job, () => this.liveIngestionService.runQueryIngestion(query, options));
     this.logger.log(
       `Finished query-triggered ingestion for "${query}" (job ${job.id}): ` +
         `${report.platforms.length} platform(s) ingested, ${report.skippedPlatforms.length} skipped`,

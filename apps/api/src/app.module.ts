@@ -12,7 +12,6 @@ import { ProductsModule } from './products/products.module';
 import { CategoriesModule } from './categories/categories.module';
 import { SearchModule } from './search/search.module';
 import { MatchingModule } from './matching/matching.module';
-import { ScrapingModule } from './scraping/scraping.module';
 import { AdminModule } from './admin/admin.module';
 import { WatchlistModule } from './watchlist/watchlist.module';
 import { PricesModule } from './prices/prices.module';
@@ -40,6 +39,7 @@ import { resolveEnvFiles } from './config/env-files';
 import { validateEnv } from './config/env.validation';
 import { RedisCacheLifecycle } from './common/redis-cache-lifecycle';
 import { reconnectDelay } from './common/redis-resilience';
+import { processRole, runsWorkers } from './config/process-role';
 
 export const ENV_FILES = resolveEnvFiles();
 
@@ -126,11 +126,12 @@ export const ENV_FILES = resolveEnvFiles();
     CategoriesModule,
     SearchModule,
     MatchingModule,
-    ScrapingModule,
     AdminModule,
     WatchlistModule,
     PricesModule,
-    WorkersModule,
+    // Processors, schedulers and browsers only where jobs run (ADR 0004).
+    // Evaluated after ConfigModule.forRoot above has loaded the env files.
+    ...(runsWorkers(processRole()) ? [WorkersModule] : []),
     AffiliateModule,
     // Billing and Notifications are @Global and are imported before the
     // feature modules that depend on them.

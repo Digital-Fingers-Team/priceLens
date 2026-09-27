@@ -12,8 +12,6 @@ import { ConversionProviderRegistry } from './providers/conversion-provider.regi
 import { AffiliateConfigService } from './affiliate-config.service';
 import { AffiliateService } from './affiliate.service';
 import { ConversionReconciliationService } from './conversion-reconciliation.service';
-import { AffiliateConversionProcessor } from './affiliate-conversion.processor';
-import { AffiliateConversionScheduler } from './affiliate-conversion.scheduler';
 import { AffiliateController } from './affiliate.controller';
 import { AffiliateConversionsController } from './affiliate-conversions.controller';
 
@@ -57,8 +55,9 @@ import { AffiliateConversionsController } from './affiliate-conversions.controll
     },
     ConversionProviderRegistry,
     ConversionReconciliationService,
-    AffiliateConversionProcessor,
-    AffiliateConversionScheduler,
   ],
+  // The conversion poll's processor and scheduler live in WorkersModule, so
+  // they run only where jobs run (PROCESS_ROLE, ADR 0004).
+  exports: [ConversionReconciliationService],
 })
 export class AffiliateModule {}
