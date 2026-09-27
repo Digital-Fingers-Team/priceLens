@@ -27,7 +27,7 @@ export function IntelligencePanel({ productId }: { productId: string }) {
   const pathname = usePathname();
   const isAuthenticated = useAuthStore((s) => Boolean(s.user));
   const { hasFeature, isLoading: entitlementsLoading } = useEntitlements();
-  const { data, isLoading, isError } = useProductIntelligence(isAuthenticated ? productId : undefined);
+  const { data, isLoading } = useProductIntelligence(isAuthenticated ? productId : undefined);
 
   const heading = (
     <h2 id="intel-heading" className="text-lg font-semibold text-fg">
@@ -51,7 +51,8 @@ export function IntelligencePanel({ productId }: { productId: string }) {
         <Skeleton className="h-64 w-full" />
       </>
     );
-  } else if (isError || !data) {
+  } else if (!data) {
+    // Only without data: a failed background refresh keeps the advice on screen.
     body = <ErrorState title={t.intel.loadFailed} description={t.intel.loadFailedBody} className="rounded border border-border" />;
   } else {
     const canSeeDiscountCheck = hasFeature(FEATURES.FAKE_SALE_DETECTION);

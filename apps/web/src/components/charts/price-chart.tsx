@@ -45,12 +45,13 @@ function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: 
 export function PriceChart({ productId }: { productId: string }) {
   const { t, tf, tp, fmt, locale } = useI18n();
   const [days, setDays] = useState<number>(90);
-  const { data, isLoading, isError } = usePriceHistory(productId, { days });
+  const { data, isLoading } = usePriceHistory(productId, { days });
   const colors = useThemeColors(TOKENS);
 
   if (isLoading || !colors) return <PriceChartSkeleton />;
 
-  if (isError || !data) {
+  // Only without data: a failed background refresh keeps the chart it has.
+  if (!data) {
     return <ErrorState title={t.chart.unavailable} className="rounded border border-border bg-surface" />;
   }
 

@@ -38,7 +38,7 @@ const PriceChart = dynamic(() => import('@/components/charts/price-chart').then(
 
 export function ProductDetailClient({ slug, initialProduct, fetchedAt }: ProductDetailClientProps) {
   const { t, tf, tp, fmt } = useI18n();
-  const { data: product, isLoading, isError, refetch } = useProduct(slug, initialProduct, fetchedAt);
+  const { data: product, isLoading, refetch } = useProduct(slug, initialProduct, fetchedAt);
   const { data: stats } = usePriceStats(product?.id ?? '');
 
   if (isLoading) {
@@ -51,7 +51,10 @@ export function ProductDetailClient({ slug, initialProduct, fetchedAt }: Product
     );
   }
 
-  if (isError || !product) {
+  // Only when there is nothing to show. A failed background refresh (isError
+  // with data, e.g. a 429 or a deploy's API restart) keeps the product on
+  // screen; it used to replace the whole page with this error (audit 11).
+  if (!product) {
     return (
       <div className={PAGE}>
         <ErrorState

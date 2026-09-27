@@ -28,7 +28,12 @@ export function SearchPageClient({ initial }: { initial: InitialSearch | null })
   // The URL is the state (FE-03): no copy in a store to drift from it.
   const filters = parseSearchParams(searchParams);
 
-  const { data, isLoading, isFetching, isError, refetch } = useSearch(filters, initial);
+  const { data, isLoading, isFetching, isError, isPlaceholderData, refetch } = useSearch(filters, initial);
+  // The error replaces the results only when there are none for this search:
+  // a failed refresh of the same search (focus, live-fetch polling, a
+  // resubmit) keeps what is on screen. Placeholder data belongs to the
+  // previous search, so a failed new search still says so.
+  const failed = isError && (!data || isPlaceholderData);
 
   function navigate(changes: Partial<SearchFiltersType>) {
     router.push(searchHref(withChanges(filters, changes)), { scroll: false });
@@ -79,7 +84,7 @@ export function SearchPageClient({ initial }: { initial: InitialSearch | null })
         <SearchFilters applied={filters} onApply={navigate} />
 
         <div className="flex min-w-0 flex-1 flex-col gap-8">
-          {isError ? (
+          {failed ? (
             <ErrorState
               title={t.search.loadFailed}
               action={

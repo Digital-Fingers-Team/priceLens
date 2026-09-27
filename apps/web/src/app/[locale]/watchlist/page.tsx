@@ -42,7 +42,8 @@ function WatchlistContent() {
   const { mutate: toggleWatchlist } = useToggleWatchlist();
   const openAlertModal = useUiStore((s) => s.openAlertModal);
 
-  if (isError) {
+  // A failed refresh keeps the list it already has on screen.
+  if (isError && !items) {
     return <ErrorState title={t.watchlist.unavailable} description={t.watchlist.unavailableBody} />;
   }
 
