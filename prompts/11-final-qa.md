@@ -19,3 +19,11 @@ Act as a skeptical QA lead who didn't write any of this. Trust nothing marked "F
 ## Carried over (recorded 2026-09-26)
 - **D-14 (left as is):** per-color GTINs keep some colors as separate products. Revisit with data now that the color filter exists (phase 06).
 - Re-check every "Decisions for Baraa" item in audit/00–10 and list anything still open for the owner.
+
+## Carried over (recorded 2026-09-27, end of phase 09)
+- Lenovo parser bug (skipped in the D-12 repair, audit 07 handoff).
+- 9,126 of 16,480 products have no accepted listing at all (audit 07): should they be listed or searchable?
+- High Total Blocking Time on every page (audit 08 P-13): the search page is one big client component; move what can be server components. Budget for home JS is met (158 kB).
+- Server-generated English text in the Arabic UI (intelligence reasons, plan names, some API errors): message codes instead (audit 07).
+- Google Search Console (owner, audit 09 SEO-16): soft-404 cleanup; submit the new sitemap (categories + hreflang).
+- Open decisions to re-check at the end: D-31 (proxy source IPs, if not done in phase 10), D-14, and the FYIs in audit/07-09.
