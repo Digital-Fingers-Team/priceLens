@@ -1,0 +1,6 @@
+[Unit]
+Description=Reload pricelens-proxy when the API container's IP changes
+
+[Service]
+Type=oneshot
+ExecStart=%h/pricelens/scripts/sync-api-upstream.sh

@@ -1,0 +1,6 @@
+[Unit]
+Description=Re-point pricelens-proxy at the web container's current IP
+
+[Service]
+Type=oneshot
+ExecStart=%h/pricelens/scripts/sync-web-upstream.sh
