@@ -24,6 +24,11 @@ export interface CategoryDefinition {
   parentSlug?: string;
   level: number;
   searchTerms: string[];
+  nameAr?: string;
+  /** 0 = always swept (the original categories); higher waves per CATEGORY_SWEEP_MAX_WAVE. */
+  rolloutWave?: number;
+  /** Price floor override in EGP; 0 = none, undefined = MIN_LISTING_PRICE_EGP. */
+  minPriceEgp?: number;
 }
 
 export interface StoreDefinition {
