@@ -200,3 +200,9 @@ test('a failed background price refresh keeps the product on screen', async ({ p
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   await expect(page.getByRole('main').getByRole('alert')).toHaveCount(0);
 });
+
+test('the Arabic pricing page names the plans in Arabic', async ({ page }) => {
+  await openHydrated(page, '/ar/pricing');
+  await expect(page.getByRole('heading', { level: 2, name: 'مجاني' })).toBeVisible();
+  await expect(page.getByRole('main')).not.toContainText('Compare prices, track a handful of products');
+});

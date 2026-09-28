@@ -57,7 +57,7 @@ function BillingContent() {
       <Card>
         <CardHeader className="flex-wrap">
           <div className="flex flex-col gap-1">
-            <h2 className="text-base font-semibold text-fg">{data.planName}</h2>
+            <h2 className="text-base font-semibold text-fg">{t.pricing.plans[data.tier]?.name ?? data.planName}</h2>
             {data.currentPeriodEnd && (
               <p className="text-xs text-muted">
                 {tf(data.cancelAtPeriodEnd ? t.account.accessEnds : t.account.renews, { date: fmt.date(data.currentPeriodEnd) })}

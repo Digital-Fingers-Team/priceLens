@@ -76,6 +76,8 @@ export default function PricingPage() {
             {data.plans.map((plan) => {
               const isCurrent = billing?.planKey === plan.key;
               const featured = plan.tier === 'PLUS';
+              // Worded by the dictionary per tier; the API's English for anything else.
+              const words = t.pricing.plans[plan.tier] ?? { name: plan.name, description: plan.description };
               return (
                 <div
                   key={plan.id}
@@ -85,7 +87,7 @@ export default function PricingPage() {
                   )}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <h2 className="text-lg font-semibold text-fg">{plan.name}</h2>
+                    <h2 className="text-lg font-semibold text-fg">{words.name}</h2>
                     {isCurrent ? (
                       <Badge variant="success">{t.pricing.current}</Badge>
                     ) : featured ? (
@@ -93,7 +95,7 @@ export default function PricingPage() {
                     ) : null}
                   </div>
                   <p className="min-h-10 text-sm text-muted" dir="auto">
-                    {plan.description}
+                    {words.description}
                   </p>
                   <p className="flex flex-wrap items-baseline gap-2">
                     <span className="text-2xl font-semibold tabular-nums text-fg">
@@ -146,7 +148,7 @@ export default function PricingPage() {
                           checkout(plan.key);
                         }}
                       >
-                        {isAuthenticated ? tf(t.pricing.choose, { plan: plan.name }) : t.pricing.signInToSubscribe}
+                        {isAuthenticated ? tf(t.pricing.choose, { plan: words.name }) : t.pricing.signInToSubscribe}
                       </Button>
                     )}
                   </div>

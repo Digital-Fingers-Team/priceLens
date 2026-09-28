@@ -491,6 +491,22 @@ export const en = {
     failures: p({ one: '{count} recent delivery failure here.', other: '{count} recent delivery failures here.' }),
   },
   pricing: {
+    // Plan names and blurbs by tier (the API sends English; audit 11).
+    plans: {
+      FREE: { name: 'Free', description: 'Compare prices, track a handful of products, and get basic alerts.' },
+      PLUS: {
+        name: 'PriceLens Plus',
+        description: 'Know when to buy. Unlimited tracking, every alert type, and full buying intelligence.',
+      },
+      SELLER: {
+        name: 'Seller',
+        description: 'Watch your competitors, hold your price position, and price with your margin in view.',
+      },
+      ENTERPRISE: {
+        name: 'Enterprise',
+        description: 'Market-wide intelligence: MAP enforcement, distribution coverage, reports and API access.',
+      },
+    },
     title: 'Pricelens watches the market for you',
     lede: 'Every plan is built on the same thing: prices we record ourselves, every day, across every store we track. Nothing here is estimated.',
     unavailable: 'Plans are not available right now. Please try again shortly.',
