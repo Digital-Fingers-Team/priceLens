@@ -101,14 +101,16 @@ describe('StoreCallGuard (B-07)', () => {
 describe('LiveIngestionService sweep with a failing query (B-07)', () => {
   const platform = { id: 'p-noon', slug: 'noon', name: 'Noon' } as Platform;
   const categories = [
-    { id: 'c1', slug: 'smartphones', name: 'Smartphones', searchTerms: ['phone'] },
-    { id: 'c2', slug: 'laptops', name: 'Laptops', searchTerms: ['laptop'] },
+    { id: 'c1', slug: 'smartphones', name: 'Smartphones', searchTerms: ['phone'], rolloutWave: 0, lastSweptAt: null },
+    { id: 'c2', slug: 'laptops', name: 'Laptops', searchTerms: ['laptop'], rolloutWave: 0, lastSweptAt: null },
+    { id: 'c3', slug: 'refrigerators', name: 'Refrigerators', searchTerms: ['fridge'], rolloutWave: 1, lastSweptAt: null },
   ] as unknown as Category[];
 
-  function setup(search: RetailerConnector['searchListings'], process?: jest.Mock) {
+  function setup(search: RetailerConnector['searchListings'], process?: jest.Mock, settings: Record<string, unknown> = {}) {
     const repository = {
       findActivePlatforms: jest.fn(async () => [platform]),
-      findSweepCategories: jest.fn(async () => categories),
+      findLeafCategories: jest.fn(async () => categories),
+      markCategoriesSwept: jest.fn(async () => undefined),
       startJob: jest.fn(async () => 'job-1'),
       completeJob: jest.fn(async () => undefined),
       failJob: jest.fn(async () => undefined),
@@ -123,6 +125,7 @@ describe('LiveIngestionService sweep with a failing query (B-07)', () => {
           matchedExistingCanonicalProduct: true,
         })),
       recordUnpriced: jest.fn(async () => undefined),
+      takeBelowFloorCount: jest.fn(() => 0),
     } as unknown as ListingProcessor;
     const store = connector('noon', search);
     const service = new LiveIngestionService(
@@ -130,7 +133,7 @@ describe('LiveIngestionService sweep with a failing query (B-07)', () => {
       processor,
       new ConnectorRegistry([store]),
       {} as NormalizerService,
-      config(),
+      config(settings),
       new StoreCallGuard(config({ 'retailers.connectorFailureThreshold': 100 })),
     );
     return { service, repository, store };
@@ -167,6 +170,36 @@ describe('LiveIngestionService sweep with a failing query (B-07)', () => {
 
     expect(report.platforms[0].listingsFailed).toBe(1);
     expect(report.platforms[0].listingsUpserted).toBe(report.platforms[0].listingsDiscovered - 1);
+  });
+
+  it('sweeps only wave 0 while no wave is enabled, and marks nothing swept', async () => {
+    const queries: string[] = [];
+    const { service, repository } = setup(async (query) => {
+      queries.push(query);
+      return [];
+    });
+
+    await service.runLiveIngestion({ platformSlugs: ['noon'] });
+
+    expect(queries.some((query) => /fridge|refrigerator/i.test(query))).toBe(false);
+    expect(repository.markCategoriesSwept).toHaveBeenCalledWith([], expect.any(Date));
+  });
+
+  it('adds an enabled wave to the sweep and marks it swept, even when stores return nothing', async () => {
+    const queries: string[] = [];
+    const { service, repository } = setup(
+      async (query) => {
+        queries.push(query);
+        return [];
+      },
+      undefined,
+      { 'retailers.categorySweepMaxWave': 1 },
+    );
+
+    await service.runLiveIngestion({ platformSlugs: ['noon'] });
+
+    expect(queries).toContain('Refrigerators');
+    expect(repository.markCategoriesSwept).toHaveBeenCalledWith(['c3'], expect.any(Date));
   });
 });
 

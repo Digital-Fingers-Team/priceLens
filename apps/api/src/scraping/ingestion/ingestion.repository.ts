@@ -47,17 +47,15 @@ export class IngestionRepository {
     return this.prisma.platform.findMany({ where: { isActive: true }, select: { slug: true } });
   }
 
-  /** Leaf categories, in sweep order. */
-  findSweepCategories(): Promise<Category[]> {
-    return this.prisma.category.findMany({
-      where: { level: { gt: 0 } },
-      orderBy: [{ level: 'asc' }, { name: 'asc' }],
-    });
+  /** Leaf categories, by name (the sweep's order for wave 0). */
+  findLeafCategories(): Promise<Category[]> {
+    return this.prisma.category.findMany({ where: { level: { gt: 0 } }, orderBy: { name: 'asc' } });
   }
 
-  /** Leaf categories in database order (the query resolver's fallback is the first). */
-  findLeafCategories(): Promise<Category[]> {
-    return this.prisma.category.findMany({ where: { level: { gt: 0 } } });
+  /** Moves these categories to the back of the sweep rotation. */
+  async markCategoriesSwept(categoryIds: string[], at: Date): Promise<void> {
+    if (categoryIds.length === 0) return;
+    await this.prisma.category.updateMany({ where: { id: { in: categoryIds } }, data: { lastSweptAt: at } });
   }
 
   /**

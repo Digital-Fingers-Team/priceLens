@@ -7,6 +7,11 @@ export default registerAs('retailers', () => ({
   // before matching. A category's own min_price_egp overrides it; the original
   // electronics categories are seeded with 0 (no floor).
   minListingPriceEgp: parseInt(process.env.MIN_LISTING_PRICE_EGP ?? '5000', 10),
+  // The scheduled sweep covers wave 0 (the original categories) plus waves
+  // 1..categorySweepMaxWave, at most maxCategorySweepsPerRun of those per run,
+  // least recently swept first. 0 turns the new categories' sweep off.
+  categorySweepMaxWave: parseInt(process.env.CATEGORY_SWEEP_MAX_WAVE ?? '0', 10),
+  maxCategorySweepsPerRun: parseInt(process.env.MAX_CATEGORY_SWEEPS_PER_RUN ?? '15', 10),
   liveIngestionScheduleEnabled: process.env.LIVE_INGESTION_SCHEDULE_ENABLED !== 'false',
   liveIngestionCron: process.env.LIVE_INGESTION_CRON ?? '0 */6 * * *',
   // After the generic category sweep discovers a product on one store, re-query

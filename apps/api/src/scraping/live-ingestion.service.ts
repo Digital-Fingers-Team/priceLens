@@ -9,6 +9,7 @@ import { IngestionRepository } from './ingestion/ingestion.repository';
 import { ListingProcessor } from './ingestion/listing-processor.service';
 import { StoreCallGuard, StoreUnavailableError } from './ingestion/store-call-guard';
 import { buildProductQuery, buildQueriesForCategory, pickCategoryForQuery } from './ingestion/search-queries';
+import { selectSweepCategories } from './ingestion/sweep-selection';
 
 export interface LiveIngestionOptions {
   platformSlugs?: string[];
@@ -75,6 +76,14 @@ export class LiveIngestionService {
     // re-queries the other stores for exactly these.
     const touchedProductIds = new Set<string>();
 
+    // Chosen once per run, so every store sweeps the same categories and the
+    // rotation advances once.
+    const categories = await this.sweepCategories();
+    const categoryQueries = categories.map((category) => ({
+      category,
+      queries: buildQueriesForCategory(category),
+    }));
+
     for (const platform of platforms) {
       const connector = this.usableConnector(platform, skippedPlatforms);
       if (!connector) {
@@ -82,11 +91,6 @@ export class LiveIngestionService {
       }
 
       try {
-        const categories = await this.repository.findSweepCategories();
-        const categoryQueries = categories.map((category) => ({
-          category,
-          queries: buildQueriesForCategory(category),
-        }));
         summaries.push(
           await this.runIngestionJob(
             platform,
@@ -104,6 +108,13 @@ export class LiveIngestionService {
       }
     }
 
+    // Marked even when stores returned nothing, so an empty category moves to
+    // the back of the rotation instead of being retried every run.
+    await this.repository.markCategoriesSwept(
+      categories.filter((category) => category.rolloutWave > 0).map((category) => category.id),
+      new Date(),
+    );
+
     await this.backfillCrossStore(platforms, touchedProductIds, summaries);
 
     return {
@@ -112,6 +123,17 @@ export class LiveIngestionService {
       platforms: summaries,
       skippedPlatforms,
     };
+  }
+
+  /**
+   * The leaves this scheduled sweep covers: wave 0 always, plus the least
+   * recently swept of the enabled waves (see selectSweepCategories).
+   */
+  async sweepCategories(): Promise<Category[]> {
+    return selectSweepCategories(await this.repository.findLeafCategories(), {
+      maxWave: this.configService.get<number>('retailers.categorySweepMaxWave', 0),
+      maxNewPerRun: this.configService.get<number>('retailers.maxCategorySweepsPerRun', 15),
+    });
   }
 
   /**
