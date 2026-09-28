@@ -1,6 +1,7 @@
 import type { Queue } from 'bull';
 import type { ConfigService } from '@nestjs/config';
 import { IngestionScheduler } from '../../src/workers/ingestion.scheduler';
+import { JOB_PRIORITY } from '../../src/workers/ingestion-queue.service';
 import {
   RUN_COMPETITOR_DETECTION_JOB,
   RUN_LAUNCH_DETECTION_JOB,
@@ -57,5 +58,22 @@ describe('IngestionScheduler switches (B-08)', () => {
       'retailers.storeCoverageSweepEnabled': false,
     });
     expect(jobs).toEqual([...ALWAYS_ON].sort());
+  });
+
+  it('runs every scheduled job ahead of the store-expansion backlog (audit 11)', async () => {
+    const add = jest.fn(async () => ({}));
+    const queue = {
+      getRepeatableJobs: jest.fn(async () => []),
+      removeRepeatableByKey: jest.fn(async () => undefined),
+      add,
+    } as unknown as Queue;
+    const config = { get: (_key: string, fallback: unknown) => fallback } as ConfigService;
+    await new IngestionScheduler(queue, config).registerJobs();
+
+    expect(add.mock.calls.length).toBeGreaterThan(0);
+    for (const call of add.mock.calls as unknown as Array<[string, unknown, { priority?: number }]>) {
+      expect(call[2].priority).toBe(JOB_PRIORITY.scheduled);
+      expect(call[2].priority).toBeLessThan(JOB_PRIORITY.storeExpansion);
+    }
   });
 });

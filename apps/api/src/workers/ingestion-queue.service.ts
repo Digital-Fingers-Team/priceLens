@@ -26,7 +26,13 @@ export const ENQUEUE_TIMEOUT_MS = 1_000;
  * behind hundreds of background store expansions: it did, for 45 minutes.
  * Bull inserts a prioritised job ahead of every unprioritised one.
  */
-export const JOB_PRIORITY = { userSearch: 1, admin: 2, storeExpansion: 10 } as const;
+/**
+ * Bull priority: lower runs first. A job with no priority goes behind every
+ * prioritized one, so scheduled jobs (price alerts, notification retries,
+ * billing maintenance) once waited ~8 h behind 9,900 store expansions
+ * (audit 11). They are scheduled at `scheduled`, ahead of expansions.
+ */
+export const JOB_PRIORITY = { userSearch: 1, admin: 2, scheduled: 3, storeExpansion: 10 } as const;
 
 /**
  * The one place on-demand ingestion jobs are enqueued. Each method fixes the

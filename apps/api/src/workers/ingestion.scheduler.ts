@@ -16,6 +16,7 @@ import {
   RUN_WEEKLY_REPORTS_JOB,
 } from './ingestion.jobs';
 import { retryUntilDone } from '../common/redis-resilience';
+import { JOB_PRIORITY } from './ingestion-queue.service';
 
 const REPEATABLE_JOB_ID = 'scheduled-live-ingestion';
 const RECONCILIATION_JOB_ID = 'scheduled-reconciliation';
@@ -86,7 +87,7 @@ export class IngestionScheduler implements OnApplicationBootstrap, OnApplication
       {},
       {
         jobId: REPEATABLE_JOB_ID,
-        repeat: { cron },
+        priority: JOB_PRIORITY.scheduled, repeat: { cron },
       },
     );
 
@@ -105,14 +106,14 @@ export class IngestionScheduler implements OnApplicationBootstrap, OnApplication
     await this.queue.add(
       RUN_NOTIFICATION_RETRY_JOB,
       {},
-      { jobId: NOTIFICATION_RETRY_JOB_ID, repeat: { cron: retryCron } },
+      { jobId: NOTIFICATION_RETRY_JOB_ID, priority: JOB_PRIORITY.scheduled, repeat: { cron: retryCron } },
     );
 
     const maintenanceCron = this.configService.get<string>('retailers.subscriptionMaintenanceCron', '17 * * * *');
     await this.queue.add(
       RUN_SUBSCRIPTION_MAINTENANCE_JOB,
       {},
-      { jobId: SUBSCRIPTION_MAINTENANCE_JOB_ID, repeat: { cron: maintenanceCron } },
+      { jobId: SUBSCRIPTION_MAINTENANCE_JOB_ID, priority: JOB_PRIORITY.scheduled, repeat: { cron: maintenanceCron } },
     );
 
     // Runs on the half hour, between ingestion runs, so it reads prices that
@@ -121,19 +122,19 @@ export class IngestionScheduler implements OnApplicationBootstrap, OnApplication
     await this.queue.add(
       RUN_COMPETITOR_DETECTION_JOB,
       {},
-      { jobId: COMPETITOR_DETECTION_JOB_ID, repeat: { cron: detectionCron } },
+      { jobId: COMPETITOR_DETECTION_JOB_ID, priority: JOB_PRIORITY.scheduled, repeat: { cron: detectionCron } },
     );
 
     // Brand-side sweeps. All three are idempotent and cheap when no brand
     // workspace exists, so they are not behind a feature flag.
     const mapCron = this.configService.get<string>('retailers.mapSweepCron', '50 */3 * * *');
-    await this.queue.add(RUN_MAP_SWEEP_JOB, {}, { jobId: MAP_SWEEP_JOB_ID, repeat: { cron: mapCron } });
+    await this.queue.add(RUN_MAP_SWEEP_JOB, {}, { jobId: MAP_SWEEP_JOB_ID, priority: JOB_PRIORITY.scheduled, repeat: { cron: mapCron } });
 
     const launchCron = this.configService.get<string>('retailers.launchDetectionCron', '20 */6 * * *');
     await this.queue.add(
       RUN_LAUNCH_DETECTION_JOB,
       {},
-      { jobId: LAUNCH_DETECTION_JOB_ID, repeat: { cron: launchCron } },
+      { jobId: LAUNCH_DETECTION_JOB_ID, priority: JOB_PRIORITY.scheduled, repeat: { cron: launchCron } },
     );
 
     // Monday morning, covering the week that just ended.
@@ -141,7 +142,7 @@ export class IngestionScheduler implements OnApplicationBootstrap, OnApplication
     await this.queue.add(
       RUN_WEEKLY_REPORTS_JOB,
       {},
-      { jobId: WEEKLY_REPORTS_JOB_ID, repeat: { cron: reportsCron } },
+      { jobId: WEEKLY_REPORTS_JOB_ID, priority: JOB_PRIORITY.scheduled, repeat: { cron: reportsCron } },
     );
 
     this.logger.log(
@@ -168,7 +169,7 @@ export class IngestionScheduler implements OnApplicationBootstrap, OnApplication
       {},
       {
         jobId: RECONCILIATION_JOB_ID,
-        repeat: { cron },
+        priority: JOB_PRIORITY.scheduled, repeat: { cron },
       },
     );
     this.logger.log(`Scheduled reconciliation to run on cron "${cron}"`);
@@ -191,7 +192,7 @@ export class IngestionScheduler implements OnApplicationBootstrap, OnApplication
       {},
       {
         jobId: STORE_COVERAGE_SWEEP_JOB_ID,
-        repeat: { cron },
+        priority: JOB_PRIORITY.scheduled, repeat: { cron },
       },
     );
 
@@ -211,7 +212,7 @@ export class IngestionScheduler implements OnApplicationBootstrap, OnApplication
       {},
       {
         jobId: PRICE_ALERTS_JOB_ID,
-        repeat: { cron: priceAlertCron },
+        priority: JOB_PRIORITY.scheduled, repeat: { cron: priceAlertCron },
       },
     );
 
