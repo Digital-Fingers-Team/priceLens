@@ -6,7 +6,7 @@ import { Link } from '@/lib/i18n/navigation';
 import { getI18n, resolveLocale } from '@/lib/i18n/server';
 import { CategoryLinks } from '@/components/seo/category-links';
 import { categoriesApi } from '@/lib/api/categories.api';
-import { localizedCategories } from '@/lib/categories';
+import { groupCategories } from '@/lib/categories';
 import type { Locale } from '@/lib/i18n/config';
 import { absoluteUrl, localizedAlternates } from '@/lib/seo';
 import { organizationJsonLd, websiteJsonLd } from '@/lib/structured-data';
@@ -37,15 +37,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
  */
 async function HomeCategories({ locale }: { locale: Locale }) {
   const { t } = getI18n(locale);
-  let categories: Array<{ slug: string; name: string }>;
   try {
-    categories = localizedCategories(t, await categoriesApi.list());
+    return <CategoryLinks groups={groupCategories(t, await categoriesApi.list(), locale)} title={t.seo.categoriesTitle} />;
   } catch {
-    categories = Object.entries(t.categories as Record<string, string>)
+    const categories = Object.entries(t.categories as Record<string, string>)
       .filter(([slug]) => slug !== 'electronics')
       .map(([slug, name]) => ({ slug, name }));
+    return <CategoryLinks categories={categories} title={t.seo.categoriesTitle} />;
   }
-  return <CategoryLinks categories={categories} title={t.seo.categoriesTitle} />;
 }
 
 export default async function HomePage({ params }: Props) {

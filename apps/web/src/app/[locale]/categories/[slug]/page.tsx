@@ -9,7 +9,7 @@ import { buttonClassName } from '@/components/ui/button-styles';
 import { EmptyState } from '@/components/ui/state';
 import { categoriesApi } from '@/lib/api/categories.api';
 import { searchApi } from '@/lib/api/search.api';
-import { localizedCategories } from '@/lib/categories';
+import { categoryName, groupCategories } from '@/lib/categories';
 import { Link } from '@/lib/i18n/navigation';
 import { getI18n, resolveLocale } from '@/lib/i18n/server';
 import { localizedAlternates, NOINDEX } from '@/lib/seo';
@@ -51,7 +51,7 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
   const data = await loadCategoryPage(slug, page);
   if (!data) return { title: t.errors.notFoundTitle, robots: { index: false, follow: false } };
 
-  const name = (t.categories as Record<string, string>)[slug] ?? data.category.name;
+  const name = categoryName(t, data.category, locale);
   // Each page of a paginated list is its own canonical (not page 1).
   const path = page > 1 ? `/categories/${slug}?page=${page}` : `/categories/${slug}`;
   return {
@@ -79,7 +79,7 @@ export default async function CategoryPage({ params, searchParams }: PageProps) 
   const totalPages = Math.max(1, Math.ceil(results.total / PAGE_SIZE));
   if (page > totalPages) notFound();
 
-  const name = (t.categories as Record<string, string>)[slug] ?? category.name;
+  const name = categoryName(t, category, locale);
   const trail = [
     { name: t.seo.home, path: href('/') },
     { name, path: href(`/categories/${slug}`) },
@@ -110,7 +110,7 @@ export default async function CategoryPage({ params, searchParams }: PageProps) 
 
       <CategoryPagination slug={slug} page={page} totalPages={totalPages} />
 
-      <CategoryLinks categories={localizedCategories(t, categories)} title={t.seo.categoriesTitle} current={slug} />
+      <CategoryLinks groups={groupCategories(t, categories, locale)} title={t.seo.categoriesTitle} current={slug} />
     </div>
   );
 }

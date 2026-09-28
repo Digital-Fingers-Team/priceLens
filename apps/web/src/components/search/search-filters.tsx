@@ -70,7 +70,7 @@ export function SearchFilters({ applied, onApply }: SearchFiltersProps) {
   const categoryOptions = useMemo(
     () =>
       (categories ?? [])
-        .map((category) => ({ value: category.id, label: categoryLabel(t, category) }))
+        .map((category) => ({ value: category.id, label: categoryLabel(t, category, locale) }))
         .sort((a, b) => a.label.localeCompare(b.label, locale)),
     [categories, t, locale],
   );

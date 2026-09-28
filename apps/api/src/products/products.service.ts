@@ -13,6 +13,7 @@ interface ProductWithRelations extends CanonicalProduct {
     id: string;
     slug: string;
     name: string;
+    nameAr: string | null;
     parentId: string | null;
     level: number;
     searchTerms: string[];
@@ -359,6 +360,7 @@ export class ProductsService {
         id: product.category.id,
         slug: product.category.slug,
         name: product.category.name,
+        nameAr: product.category.nameAr,
         parentId: product.category.parentId,
         level: product.category.level,
       },

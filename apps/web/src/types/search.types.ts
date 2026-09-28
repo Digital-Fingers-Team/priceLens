@@ -41,7 +41,13 @@ export interface CategoryOption {
   id: string;
   slug: string;
   name: string;
+  /** Arabic name, when the category tree has one. */
+  nameAr: string | null;
   parentId: string | null;
   level: number;
   productCount: number;
+  /** The department (level-0 group) the category belongs to. */
+  groupSlug: string | null;
+  groupName: string | null;
+  groupNameAr: string | null;
 }

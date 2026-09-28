@@ -35,6 +35,7 @@ export const ar: Dictionary = {
     relatedTitle: 'المزيد من {name}',
     refine: 'تصفية وترتيب',
     categoriesTitle: 'تصفح حسب الفئة',
+    otherCategories: 'أخرى',
     ogStores: {
       zero: 'لا متاجر بعد',
       one: 'في متجر واحد',

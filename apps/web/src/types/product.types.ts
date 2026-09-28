@@ -12,6 +12,8 @@ export interface Category {
   id: string;
   slug: string;
   name: string;
+  /** Arabic name, when the category tree has one. */
+  nameAr?: string | null;
   parentId: string | null;
   level: number;
 }

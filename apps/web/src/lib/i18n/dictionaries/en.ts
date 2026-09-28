@@ -31,6 +31,7 @@ export const en = {
     relatedTitle: 'More in {name}',
     refine: 'Filter and sort',
     categoriesTitle: 'Browse by category',
+    otherCategories: 'Other',
     ogStores: p({ one: 'Compared across {count} store', other: 'Compared across {count} stores' }),
     ogFrom: 'From',
   },
