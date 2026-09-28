@@ -22,7 +22,7 @@ read-only production data checks; security re-checks; the grep sweep.
 | QA-03 | `search-bar.tsx` | The box copied the URL's query whenever a search landed, so an earlier search landing late overwrote the next one being typed: three quick searches ended on the second. | Playwright, mobile: final URL `q=xiaomi` instead of `q=galaxy a57`. | P1 | **Fixed** 969b825: follows the URL only while the user has not typed since (back/forward still follow). Vitest ×2, Playwright. |
 | QA-04 | `search/page.tsx` | Client navigations were meant to skip the server fetch by reading the `rsc` header; Next 15.5 does not pass it to `headers()`, so it never fired, and a filter/sort/new search showed the old results unmarked until the server answered. | Trace: no browser `/api/v1/search` call after a client search; the dev API logged a server-side search for an `RSC: 1` request. | P2 | **Fixed** 969b825, then e63b6e7: dead check removed; current results dimmed + `aria-busy` until the URL changes (a plain flag; the first version used a React transition, suspected wrongly in QA-18). Behaviour otherwise unchanged (the server always fetched). |
 | QA-05 | variant parser | GPU memory read as storage on machines that state RAM ("RTX 5060 8GB GDDR7", "RTX 3050 6GB", "12GB NVIDIA GeForce RTX 3060"); "32G"/"1T" not read; "16GB SSD512GB" read as 16GB storage. | Audit 07 handoff (Lenovo in D-12); read-only production query: 6 products with 2+ storage values, 1 with 2 RAM values among accepted listings. | P1 | **Fixed** a887b43, 574933d (tests from the real titles). Stored attributes are from the old parser: see D-37. |
-| QA-06 | Arabic UI | The buy/wait reasons were the API's English sentences in the Arabic page. | Audit 07 handoff. | P2 | **Fixed** 64a4626: `reasonCodes` from the API, worded by the dictionaries (Arabic plurals, localized % and prices); English sentences kept for API clients. Plan names and a few API error texts remain English (below). |
+| QA-06 | Arabic UI | The buy/wait reasons were the API's English sentences in the Arabic page. | Audit 07 handoff. | P2 | **Fixed** 64a4626: `reasonCodes` from the API, worded by the dictionaries (Arabic plurals, localized % and prices); English sentences kept for API clients. Plan names and descriptions: a8eccbb (dictionary per tier; Playwright checks /ar/pricing at 3 widths). A few API error texts remain English. |
 | QA-07 | proxy (D-31) | Every visitor was 10.89.1.7 to nginx and the API: one rate-limit bucket for the whole site. | audit 09/10. | P0 | **Fixed and live** 3f23578 (20:54 UTC): proxy in the host network, fixed loopback upstreams. A request from outside (a phone, 196.154.13.91) is logged with its own address. |
 | QA-08 | web → API (OPS-14) | The web's server renders shared one bucket and went out through the public URL. | audit 08 P-19. | P1 | **Fixed and live** a0ef2d9 + fc2b1e1 (20:58): SSR calls the API directly; `WEB_INTERNAL_TOKEN`-signed renders are limited per forwarded visitor (search) or not per address (cached pages). Unit tests ×6. |
 | QA-09 | API logging | Expected 4xx (unknown product, bad input) logged at `error` level. | Nest 11 boot check with JSON logs. | P2 | **Fixed** 16e3cd0: 4xx → warn, 5xx → error. |
@@ -72,7 +72,7 @@ Live production (read-only), after the 20:16/20:30/20:54 deploys:
 
 ## Summary
 
-- Production now runs the whole overhaul: API/worker 6e9b928 (Nest 11, non-root with Chrome's sandbox, JSON logs, queue dashboard), web e63b6e7 (blue, 127.0.0.1:3010; redeployed 2026-09-28 00:31:23 UTC with the QA-18 mitigation), proxy on the host network with Brotli; backups and the upstream watchdog run on timers.
+- Production now runs the whole overhaul: API/worker 6e9b928 (Nest 11, non-root with Chrome's sandbox, JSON logs, queue dashboard), web a8eccbb (green, 127.0.0.1:3011; last redeployed 2026-09-28 01:11:28 UTC), proxy on the host network with Brotli; backups and the upstream watchdog run on timers.
 - D-31 is done: the site sees real visitor addresses, and the web's own renders are rate-limited per visitor (OPS-14).
 - QA found and fixed four user-facing bugs: product pages turning into an error after a failed background refresh (QA-01), lost typed searches (QA-03), missing busy state on search navigation (QA-04), and English advice text in the Arabic UI (QA-06); plus parser misreads seen in production data (QA-05, QA-15).
 - Everything earlier phases marked Fixed that can be checked from outside was re-verified live (list above).
@@ -81,7 +81,7 @@ Live production (read-only), after the 20:16/20:30/20:54 deploys:
 ## Remaining items
 
 - OPS-01 / D-33: analyse `/tmp/heap/worker-*.heapsnapshot` from the worker's first recycle (expected ~03:00-05:00 UTC 2026-09-28; the sampler log is `/tmp/worker-rss.log`).
-- QA-11 category pages per request; QA-16 CPU-model guard; plan names and some API error texts still English in the Arabic UI (API sends English names; the dictionary covers the error codes the forms use).
+- QA-11 category pages per request; QA-16 CPU-model guard; QA-18 aborted sort navigation on phones; some API error texts still English in the Arabic UI (the dictionary covers the error codes the forms use).
 - Deal Hunter reasons are English only (its parser understands English only; audit 07).
 - Dates: remove prod volume `pricelens_meili_data` on/after 2026-10-03; recheck unused indexes on/after 2026-10-04.
 

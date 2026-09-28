@@ -28,13 +28,13 @@ None open. The P0/P1 items found in phase 11 are fixed and deployed:
 | QA-07 P0 (D-31) | every visitor had the same address; one rate-limit bucket | 3f23578 (proxy in the host network) |
 | QA-08 P1 (OPS-14) | the web's renders shared one bucket | a0ef2d9 |
 
-## What is live (baseline 2026-09-28 00:45 UTC)
+## What is live (baseline 2026-09-28 01:12 UTC)
 
 | Container | Version | Started |
 |---|---|---|
 | pricelens-api (`PROCESS_ROLE=api`, uid 1000) | 6e9b928 | 23:00:31 |
 | pricelens-worker (`PROCESS_ROLE=worker`, uid 1000, Chrome sandboxed) | 6e9b928 | 23:00:54 |
-| pricelens-web-blue (127.0.0.1:3010) | e63b6e7 | 09-28 00:31:23 |
+| pricelens-web-green (127.0.0.1:3011) | a8eccbb | 09-28 01:11:28 |
 | pricelens-proxy (host network, nginx 1.27.5 + Brotli) | e0fb3cc image | 22:28:47 |
 | pricelens-postgres / pricelens-redis | unchanged | 09-27 04:34 / 09-25 |
 
@@ -109,7 +109,7 @@ D-35 (on-box), D-31. See `~/pricelens-work/morning-list.md` and the audits.
 - Matching has no CPU-model guard (QA-16).
 - Category pages render per request (QA-11, 200-360 ms TTFB).
 - On phones a sort change occasionally does nothing (an aborted navigation inside Next, pre-existing, QA-18); trying again works.
-- Plan names, some API error texts and Deal Hunter explanations are English in the Arabic UI.
+- Some API error texts and Deal Hunter explanations are English in the Arabic UI (plan names and buying advice are translated).
 - 18% of scrape jobs fail fast at five stores (bot walls); Alibaba needs a manual CAPTCHA re-solve now and then (`npm run login:alibaba`, RUNBOOK).
 - Store product images are hot-linked from the stores' CDNs and occasionally fail to load.
 - Dates: remove the old Meilisearch volume on/after 2026-10-03; recheck unused indexes on/after 2026-10-04.
