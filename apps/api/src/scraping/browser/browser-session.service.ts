@@ -21,10 +21,33 @@ export class BrowserSessionService implements OnModuleDestroy {
   /** When each store's last browser launch failed; cleared by a successful launch. */
   private readonly launchFailedAt = new Map<string, number>();
   static readonly LAUNCH_RETRY_MS = 60_000;
+  /**
+   * Pages a store's browser serves before it is closed and relaunched (at a
+   * moment none of its pages is open). The driver keeps child sessions of
+   * closed pages (frames, workers) attached to the browser connection, and
+   * each pins its page with every network request the page made: ~57,000
+   * requests and ~1 GB after 3.7 h (heap snapshot, audit 11 OPS-01). Closing
+   * the browser drops the connection and all of it. The profile (cookies,
+   * CAPTCHA solves) is on disk and survives.
+   */
+  static readonly MAX_PAGES_PER_BROWSER = 40;
+  /** Per store: pages handed out by this browser, and how many are still open. */
+  private readonly usage = new Map<string, { served: number; open: number; context: Promise<BrowserContext> }>();
+  /** Per store: getPage() calls still opening a page (they must not lose their browser). */
+  private readonly opening = new Map<string, number>();
 
   constructor(private readonly configService: ConfigService) {}
 
   async getPage(storeSlug: string): Promise<Page> {
+    this.opening.set(storeSlug, (this.opening.get(storeSlug) ?? 0) + 1);
+    try {
+      return await this.openPage(storeSlug);
+    } finally {
+      this.opening.set(storeSlug, (this.opening.get(storeSlug) ?? 1) - 1);
+    }
+  }
+
+  private async openPage(storeSlug: string): Promise<Page> {
     let page: Page;
     try {
       page = await (await this.getContext(storeSlug)).newPage();
@@ -42,7 +65,31 @@ export class BrowserSessionService implements OnModuleDestroy {
     // started with are disposed of. See launchContext for why this cannot
     // happen at launch time.
     await this.closeStrayPages(storeSlug);
+    this.track(storeSlug, page);
     return page;
+  }
+
+  /** Counts the page; recycles the browser once it has served enough and is idle. */
+  private track(storeSlug: string, page: Page): void {
+    const context = this.contexts.get(storeSlug);
+    if (!context) return;
+    let usage = this.usage.get(storeSlug);
+    if (!usage || usage.context !== context) {
+      usage = { served: 0, open: 0, context };
+      this.usage.set(storeSlug, usage);
+    }
+    const counted = usage;
+    counted.served += 1;
+    counted.open += 1;
+    page.once('close', () => {
+      counted.open -= 1;
+      if (counted.open > 0 || counted.served < BrowserSessionService.MAX_PAGES_PER_BROWSER) return;
+      if ((this.opening.get(storeSlug) ?? 0) > 0) return; // the next close will recycle
+      if (this.contexts.get(storeSlug) !== counted.context) return;
+      this.logger.log(`Recycling the "${storeSlug}" browser after ${counted.served} pages (driver memory, OPS-01).`);
+      this.usage.delete(storeSlug);
+      void this.closeStore(storeSlug);
+    });
   }
 
   /**
@@ -124,6 +171,7 @@ export class BrowserSessionService implements OnModuleDestroy {
     if (only && this.contexts.get(storeSlug) !== only) return;
     this.contexts.delete(storeSlug);
     this.pendingStrayPages.delete(storeSlug);
+    this.usage.delete(storeSlug);
   }
 
   /**
