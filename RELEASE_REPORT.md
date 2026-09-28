@@ -45,9 +45,9 @@ Timers: web upstream (existing), API upstream watchdog (D-32), nightly backups
 
 **Tests** (release tree): API unit 576, integration 54, e2e 83 (incl. the
 matching characterization, 5 snapshots unchanged); web vitest 81; Playwright
-54 tests at 375 / 768 / 1440 px, both languages, light and dark: 51 passed,
-1 skipped (theme toggle on phones, by design), 2 load-related timeouts that
-pass on rerun (9/9 and 2/2). CI on GitHub runs the same gates plus gitleaks
+54 tests at 375 / 768 / 1440 px, both languages, light and dark: 53 passed,
+1 skipped (theme toggle on phones, by design); one pre-existing intermittent
+failure on phones (QA-18) is retried once in CI. CI on GitHub runs the same gates plus gitleaks
 and `pnpm audit`.
 
 **Matching precision** (production, read-only, accepted listings): products
@@ -108,6 +108,7 @@ D-35 (on-box), D-31. See `~/pricelens-work/morning-list.md` and the audits.
 - Worker heap growth (OPS-01): analyse the first recycle's heap snapshot.
 - Matching has no CPU-model guard (QA-16).
 - Category pages render per request (QA-11, 200-360 ms TTFB).
+- On phones a sort change occasionally does nothing (an aborted navigation inside Next, pre-existing, QA-18); trying again works.
 - Plan names, some API error texts and Deal Hunter explanations are English in the Arabic UI.
 - 18% of scrape jobs fail fast at five stores (bot walls); Alibaba needs a manual CAPTCHA re-solve now and then (`npm run login:alibaba`, RUNBOOK).
 - Store product images are hot-linked from the stores' CDNs and occasionally fail to load.
