@@ -119,6 +119,19 @@ describe('ingestion concurrency (integration)', () => {
     expect(await prisma.sourceListing.count({ where: { externalId: `${run}-xyz` } })).toBe(0);
   });
 
+  describe('dominantLeafCategoryForQuery (free-text fallback)', () => {
+    it('returns the leaf most existing products matching every word belong to', async () => {
+      // Products titled "Zentrofon Z900 ..." were created in this category above.
+      const found = await repository.dominantLeafCategoryForQuery('zentrofon z900');
+      expect(found?.id).toBe(category.id);
+    });
+
+    it('returns null when no product matches every word, and ignores LIKE wildcards', async () => {
+      expect(await repository.dominantLeafCategoryForQuery(`zentrofon nosuchword${run}`)).toBeNull();
+      expect(await repository.dominantLeafCategoryForQuery('%')).toBeNull();
+    });
+  });
+
   describe('price floor (step 4b)', () => {
     it('drops a listing under the EGP floor without writing a row, and counts it per store', async () => {
       processor.takeBelowFloorCount(platforms[0].slug);

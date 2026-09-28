@@ -50,16 +50,18 @@ const original = (slug: string, name: string, nameAr: string, searchTerms: strin
 export const categoryTree: CategoryDefinition[] = [
   // ─── Electronics (the original catalogue) ─────────────────────────────
   group('electronics', 'Electronics', 'إلكترونيات', ['electronics', 'tech', 'gadgets']),
-  original('smartphones', 'Smartphones', 'هواتف ذكية', ['phone', 'smartphone', 'mobile', 'cell phone', '5g phone', 'موبايل']),
-  original('laptops', 'Laptops', 'لابتوب', ['laptop', 'notebook', 'ultrabook', 'chromebook', 'لاب توب']),
-  original('graphics-cards', 'Graphics Cards', 'كروت شاشة', ['gpu', 'graphics card', 'video card', 'gfx card', 'كارت شاشة']),
-  original('processors', 'CPUs', 'معالجات', ['cpu', 'processor', 'desktop processor', 'معالج']),
+  // After the original terms: model-family words, so searches like
+  // "iphone 16" or "rtx 4070" still resolve now that terms match whole words.
+  original('smartphones', 'Smartphones', 'هواتف ذكية', ['phone', 'smartphone', 'mobile', 'cell phone', '5g phone', 'iphone', 'galaxy', 'redmi', 'pixel', 'موبايل']),
+  original('laptops', 'Laptops', 'لابتوب', ['laptop', 'notebook', 'ultrabook', 'chromebook', 'macbook', 'thinkpad', 'لاب توب']),
+  original('graphics-cards', 'Graphics Cards', 'كروت شاشة', ['gpu', 'graphics card', 'video card', 'gfx card', 'rtx', 'geforce', 'radeon', 'كارت شاشة']),
+  original('processors', 'CPUs', 'معالجات', ['cpu', 'processor', 'desktop processor', 'ryzen', 'intel core', 'معالج']),
   original('monitors', 'Monitors', 'شاشات كمبيوتر', ['monitor', 'display', 'gaming monitor', 'computer screen', 'شاشة كمبيوتر']),
   original('televisions', 'TVs', 'تلفزيونات', ['tv', 'television', 'smart tv', 'oled tv', 'qled tv', 'تلفزيون', 'شاشة تلفزيون']),
-  original('headphones', 'Headphones', 'سماعات', ['headphones', 'earbuds', 'wireless headphones', 'noise cancelling', 'سماعة']),
-  original('tablets', 'Tablets', 'تابلت', ['tablet', 'ipad', 'android tablet', 'windows tablet', 'تابلت']),
-  original('smart-watches', 'Smart Watches', 'ساعات ذكية', ['smart watch', 'smartwatch', 'fitness watch', 'wearable', 'ساعة ذكية']),
-  original('gaming-consoles', 'Gaming Consoles', 'أجهزة ألعاب', ['console', 'gaming console', 'playstation', 'xbox', 'nintendo', 'بلايستيشن']),
+  original('headphones', 'Headphones', 'سماعات', ['headphones', 'earbuds', 'wireless headphones', 'noise cancelling', 'airpods', 'galaxy buds', 'سماعة']),
+  original('tablets', 'Tablets', 'تابلت', ['tablet', 'ipad', 'android tablet', 'windows tablet', 'galaxy tab', 'تابلت']),
+  original('smart-watches', 'Smart Watches', 'ساعات ذكية', ['smart watch', 'smartwatch', 'fitness watch', 'wearable', 'apple watch', 'galaxy watch', 'ساعة ذكية']),
+  original('gaming-consoles', 'Gaming Consoles', 'أجهزة ألعاب', ['console', 'gaming console', 'playstation', 'xbox', 'nintendo', 'ps5', 'ps4', 'بلايستيشن']),
   // Its specific terms (washer, refrigerator, air fryer) moved to the new
   // appliance leaves below, which the resolver now prefers.
   original('home-appliances', 'Home Appliances', 'أجهزة منزلية', ['appliance', 'home appliance', 'home appliances', 'أجهزة منزلية']),
@@ -152,7 +154,7 @@ export const categoryTree: CategoryDefinition[] = [
 
   // ─── Cameras, audio and gaming ────────────────────────────────────────
   group('cameras', 'Cameras & Drones', 'كاميرات ودرونز'),
-  leaf('cameras', 1, 'digital-cameras', 'Digital Cameras', 'كاميرات ديجيتال', ['mirrorless camera', 'dslr camera', 'digital camera', 'camera body', 'كاميرا ديجيتال', 'كاميرا']),
+  leaf('cameras', 1, 'digital-cameras', 'Digital Cameras', 'كاميرات ديجيتال', ['mirrorless camera', 'dslr camera', 'digital camera', 'camera body', 'camera', 'كاميرا ديجيتال', 'كاميرا']),
   leaf('cameras', 2, 'camera-lenses', 'Camera Lenses', 'عدسات كاميرات', ['camera lens', 'prime lens', 'zoom lens', 'telephoto lens', 'عدسة كاميرا']),
   leaf('cameras', 2, 'drones', 'Drones', 'درونز', ['drone', 'camera drone', 'quadcopter', 'fpv drone', 'درون']),
   leaf('cameras', 2, 'action-cameras', 'Action Cameras', 'كاميرات أكشن', ['action camera', 'gopro', '360 camera', 'كاميرا أكشن']),

@@ -60,6 +60,36 @@ export class IngestionRepository {
     return this.prisma.category.findMany({ where: { level: { gt: 0 } } });
   }
 
+  /**
+   * The leaf most existing products matching every word of `query` belong to,
+   * or null. The free-text resolver's fallback when no category term matches
+   * (e.g. "dyson v15"): the catalogue already knows where such products go.
+   * Words are letters and digits only, so LIKE wildcards cannot get in.
+   */
+  async dominantLeafCategoryForQuery(query: string): Promise<Category | null> {
+    const words = query
+      .toLowerCase()
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter((word) => word.length >= 2)
+      .slice(0, 5);
+    if (words.length === 0) return null;
+
+    const products = await this.prisma.canonicalProduct.findMany({
+      where: {
+        AND: words.map((word) => ({ title: { contains: word, mode: 'insensitive' as const } })),
+        category: { level: { gt: 0 } },
+      },
+      select: { categoryId: true },
+      take: 50,
+    });
+    if (products.length === 0) return null;
+
+    const counts = new Map<string, number>();
+    for (const { categoryId } of products) counts.set(categoryId, (counts.get(categoryId) ?? 0) + 1);
+    const [topId] = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+    return this.prisma.category.findUnique({ where: { id: topId } });
+  }
+
   // ─── Scraping job log ─────────────────────────────────────────────────
 
   async startJob(platformId: string, payload: Record<string, unknown>): Promise<string> {

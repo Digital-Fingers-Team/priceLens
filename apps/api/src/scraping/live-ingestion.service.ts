@@ -138,7 +138,11 @@ export class LiveIngestionService {
     // specific variants found here so they merge onto the same product.
     const touchedProductIds = new Set<string>();
 
-    const category = pickCategoryForQuery(trimmedQuery, await this.repository.findLeafCategories());
+    // A term match first; otherwise the leaf the catalogue already files such
+    // products under. Neither: the query is not scraped (no_matching_category).
+    const category =
+      pickCategoryForQuery(trimmedQuery, await this.repository.findLeafCategories()) ??
+      (await this.repository.dominantLeafCategoryForQuery(trimmedQuery));
 
     for (const platform of platforms) {
       const connector = this.usableConnector(platform, skippedPlatforms);

@@ -70,17 +70,17 @@ describe('ingestion helpers', () => {
   });
 
   describe('search queries', () => {
-    it('builds up to three distinct sweep queries per category', () => {
-      expect(buildQueriesForCategory(phones)).toEqual(['Smartphones', 'smartphones', 'phone']);
-      expect(buildQueriesForCategory(gpus)).toEqual(['Graphics Cards', 'graphics cards', 'gpu']);
+    it('builds up to three distinct sweep queries per category (case- and plural-insensitive)', () => {
+      expect(buildQueriesForCategory(phones)).toEqual(['Smartphones', 'phone', 'mobile']);
+      expect(buildQueriesForCategory(gpus)).toEqual(['Graphics Cards', 'gpu']);
     });
 
-    it('picks the category a free-text query belongs to, falling back to the first', () => {
+    it('picks the category a free-text query belongs to, or none', () => {
       const all = [phones, laptops, gpus];
       expect(pickCategoryForQuery('iphone 15 128gb phone', all)).toBe(phones);
       expect(pickCategoryForQuery('Gaming Laptop', all)).toBe(laptops);
       expect(pickCategoryForQuery('graphics card', all)).toBe(gpus);
-      expect(pickCategoryForQuery('air fryer', all)).toBe(phones);
+      expect(pickCategoryForQuery('air fryer', all)).toBeNull();
       expect(pickCategoryForQuery('anything', [])).toBeNull();
     });
 
