@@ -5,7 +5,7 @@ import { isAxiosError } from 'axios';
 import { ProductDetailClient } from './_product-detail-client';
 import { productApi } from '@/lib/api/product.api';
 import { getI18n, resolveLocale } from '@/lib/i18n/server';
-import { absoluteUrl, localizedAlternates } from '@/lib/seo';
+import { absoluteUrl, localizedAlternates, NOINDEX } from '@/lib/seo';
 import type { CanonicalProduct } from '@/types/product.types';
 import { serializeJsonLd } from '@/lib/utils/json-ld';
 import { breadcrumbJsonLd } from '@/lib/structured-data';
@@ -71,6 +71,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     title,
     description,
     alternates: localizedAlternates(locale, `/products/${slug}`),
+    // No store offers it right now (D-39, owner 2026-09-28): the page stays
+    // reachable by URL but asks search engines not to index an empty page.
+    // Search, browse and the sitemap already list only products with an offer.
+    ...((product.sourceListings?.length ?? 0) === 0 ? { robots: NOINDEX } : {}),
     openGraph: {
       title,
       description,
