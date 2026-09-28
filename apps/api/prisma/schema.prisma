@@ -158,6 +158,13 @@ model Category {
   level       Int      @default(0)
   searchTerms String[] @map("search_terms")
   createdAt   DateTime @default(now()) @map("created_at")
+  // Category expansion (2026-09-28): Arabic label, rollout wave (0 = the
+  // original categories, always swept), price floor override (0 = none,
+  // null = MIN_LISTING_PRICE_EGP) and the sweep rotation cursor.
+  nameAr      String?   @map("name_ar") @db.VarChar(128)
+  rolloutWave Int       @default(0) @map("rollout_wave")
+  minPriceEgp Decimal?  @map("min_price_egp") @db.Decimal(12, 2)
+  lastSweptAt DateTime? @map("last_swept_at")
 
   brandWatches BrandWatch[]
   parent   Category?          @relation("CategoryTree", fields: [parentId], references: [id])
@@ -166,6 +173,7 @@ model Category {
 
   @@index([parentId])
   @@index([slug])
+  @@index([rolloutWave])
   @@map("categories")
 }
 
