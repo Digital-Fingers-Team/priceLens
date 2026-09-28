@@ -85,3 +85,17 @@ Global config: `MIN_LISTING_PRICE_EGP` (default 5000).
 - Discovering categories from the stores' own pages.
 - Applying the EGP 5,000 floor to existing electronics categories.
 - Adding new stores.
+
+## Addendum (2026-09-28, while planning)
+
+Owner decisions taken before implementation:
+- Deploy tonight and enable wave 1, rolling back automatically if the server struggles.
+- A free-text search that matches no category does not scrape.
+- The floor applies to new categories only.
+
+Changes forced by the code:
+- **Tree shape.** Groups are level-0 roots and leaves are level 1, like the existing "electronics" root. There is no single global root. Every consumer that treats `level > 0` as a leaf keeps working.
+- **Wave semantics.** Wave 0 is the baseline and is always swept (the original 11 leaves). New leaves use wave 1 and up. `CATEGORY_SWEEP_MAX_WAVE` is the highest wave swept.
+- **Floor for existing categories.** The existing leaves get `min_price_egp = 0` (no floor) instead of a separate exclusion flag.
+- **Load control.** Separate queue priority and an empty-result back-off are dropped. The per-run cap plus oldest-first rotation (`last_swept_at`) already bound the load and stop an empty leaf from starving the others.
+- **Arabic names.** They are stored in a new `name_ar` column and served by `/categories`, instead of adding hundreds of entries to the web dictionaries.
