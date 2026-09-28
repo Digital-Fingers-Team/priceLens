@@ -119,6 +119,46 @@ describe('ingestion concurrency (integration)', () => {
     expect(await prisma.sourceListing.count({ where: { externalId: `${run}-xyz` } })).toBe(0);
   });
 
+  describe('price floor (step 4b)', () => {
+    it('drops a listing under the EGP floor without writing a row, and counts it per store', async () => {
+      processor.takeBelowFloorCount(platforms[0].slug);
+      const cheap = listing('cheap', 'Zentrofon Z903 Lite 4GB 64GB', 4999);
+      expect(await processor.process(platforms[0], category, cheap, platforms[0].slug)).toBeNull();
+      expect(await prisma.sourceListing.count({ where: { externalId: cheap.externalId } })).toBe(0);
+      expect(processor.takeBelowFloorCount(platforms[0].slug)).toBe(1);
+      expect(processor.takeBelowFloorCount(platforms[0].slug)).toBe(0);
+    });
+
+    it('keeps a listing priced exactly at the floor', async () => {
+      const edge = listing('edge', 'Zentrofon Z904 6GB 128GB', 5000);
+      expect(await processor.process(platforms[0], category, edge, platforms[0].slug)).not.toBeNull();
+    });
+
+    it('compares a foreign-currency price after conversion to EGP', async () => {
+      // 150 USD is ~7,500 EGP at the fallback rate: above the floor, although 150 < 5000.
+      const usd = listing('usd', 'Zentrofon Z905 8GB 256GB', 150, { currency: 'USD' });
+      expect(await processor.process(platforms[1], category, usd, platforms[1].slug)).not.toBeNull();
+    });
+
+    it('applies no floor to a category seeded with min_price_egp = 0', async () => {
+      const unfloored = await prisma.category.create({
+        data: { slug: `${run}-cables`, name: `Cables ${run}`, level: 1, searchTerms: [], minPriceEgp: 0 },
+      });
+      try {
+        const result = await processor.process(platforms[2], unfloored, listing('cable', 'Zentro USB-C cable 2m', 150), platforms[2].slug);
+        expect(result).not.toBeNull();
+        if (result) {
+          await prisma.matchDecision.deleteMany({ where: { sourceListing: { canonicalProductId: result.canonicalProductId } } });
+          await prisma.priceHistory.deleteMany({ where: { canonicalProductId: result.canonicalProductId } });
+          await prisma.sourceListing.deleteMany({ where: { canonicalProductId: result.canonicalProductId } });
+          await prisma.canonicalProduct.delete({ where: { id: result.canonicalProductId } });
+        }
+      } finally {
+        await prisma.category.delete({ where: { id: unfloored.id } });
+      }
+    });
+  });
+
   it('the candidate pool is deterministic and includes the whole model family (L-03)', async () => {
     const near = { normalizedTitle: 'zentrofon z900 5g 12gb ram 256gb black', model: null };
     const first = await repository.candidates.findInCategory(category.id, near);

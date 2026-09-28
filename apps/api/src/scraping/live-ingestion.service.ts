@@ -29,6 +29,11 @@ export interface IngestionSummary {
   queriesFailed: number;
   /** Listings that failed to process; the run moved on to the next one. */
   listingsFailed: number;
+  /**
+   * Listings dropped by the price floor (step 4b). Approximate when two jobs
+   * scrape the same store at once: the processor counts per store, not per job.
+   */
+  listingsBelowFloor: number;
 }
 
 export interface IngestionReport {
@@ -247,9 +252,11 @@ export class LiveIngestionService {
       priceHistoryEntries: 0,
       queriesFailed: 0,
       listingsFailed: 0,
+      listingsBelowFloor: 0,
     };
 
     const seenExternalIds = new Set<string>();
+    this.processor.takeBelowFloorCount(platform.slug);
 
     try {
       for (const { category, queries } of categoryQueries) {
@@ -307,9 +314,11 @@ export class LiveIngestionService {
         }
       }
 
+      summary.listingsBelowFloor = this.processor.takeBelowFloorCount(platform.slug);
       await this.repository.completeJob(jobId, summary);
       return summary;
     } catch (error) {
+      summary.listingsBelowFloor = this.processor.takeBelowFloorCount(platform.slug);
       this.logger.error(`Ingestion failed for platform ${platform.slug}`, error as Error);
       await this.repository.failJob(jobId, error instanceof Error ? error.message : String(error), summary);
       throw error;

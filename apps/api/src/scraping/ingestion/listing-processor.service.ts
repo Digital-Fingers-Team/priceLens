@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { MatchStatus } from '@prisma/client';
 import type { Category, Platform } from '@prisma/client';
 import { FuzzyMatcherService } from '../../matching/fuzzy-matcher.service';
@@ -14,7 +15,9 @@ import {
   checkMarketOutlier,
   detectJunkListing,
   findCanonicalMatch,
+  isBelowPriceFloor,
   listingKeys,
+  priceFloorFor,
   normalizeListing,
   toBasePrices,
 } from '../../matching/pipeline';
@@ -22,6 +25,8 @@ import type { RetailerListing } from '../interfaces/retailer-listing.interface';
 import { KeyedMutex } from '../../common/keyed-mutex';
 import { IngestionRepository } from './ingestion.repository';
 import { buildRawAttributes, inferTier, toDbDecimal, toJson, toSlug } from './listing-mapping';
+
+const DEFAULT_MIN_LISTING_PRICE_EGP = 5000;
 
 export interface ProcessedListing {
   createdCanonicalProduct: boolean;
@@ -49,6 +54,10 @@ export class ListingProcessor {
    * otherwise both find no match and both create it (audit 02, L-19).
    */
   private readonly familyLock = new KeyedMutex();
+  /** MIN_LISTING_PRICE_EGP; a category's own min_price_egp overrides it. */
+  private readonly globalFloor: number;
+  /** Listings dropped by the price floor since the last take, per store slug. */
+  private readonly belowFloor = new Map<string, number>();
 
   constructor(
     private readonly repository: IngestionRepository,
@@ -56,8 +65,17 @@ export class ListingProcessor {
     private readonly semantic: SemanticService,
     normalizer: NormalizerService,
     fuzzy: FuzzyMatcherService,
+    @Optional() config?: ConfigService,
   ) {
     this.tools = { normalizer, fuzzy };
+    this.globalFloor = config?.get<number>('retailers.minListingPriceEgp', DEFAULT_MIN_LISTING_PRICE_EGP) ?? DEFAULT_MIN_LISTING_PRICE_EGP;
+  }
+
+  /** How many listings the floor dropped for this store since the last call; resets it. */
+  takeBelowFloorCount(platformSlug: string): number {
+    const count = this.belowFloor.get(platformSlug) ?? 0;
+    this.belowFloor.delete(platformSlug);
+    return count;
   }
 
   async process(
@@ -82,6 +100,13 @@ export class ListingProcessor {
     );
     if (listing.priceUsd != null && price == null) {
       await this.reject(platform, listing, `no exchange rate for ${listing.currency}`);
+      return null;
+    }
+
+    // Step 4b: price floor. No row is written: below-floor listings are the
+    // bulk of every broad sweep, and a REJECTED row for each would be noise.
+    if (isBelowPriceFloor(price, priceFloorFor(category, this.globalFloor))) {
+      this.belowFloor.set(platform.slug, (this.belowFloor.get(platform.slug) ?? 0) + 1);
       return null;
     }
 

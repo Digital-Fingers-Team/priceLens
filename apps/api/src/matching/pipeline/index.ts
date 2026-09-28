@@ -29,6 +29,7 @@ export { detectJunkListing } from './steps/02-junk-filter';
 export { normalizeListing } from './steps/03-normalize';
 export { toBasePrices, keepAdvertisedPrice } from './steps/04-currency';
 export type { ConvertToBase, BasePrices } from './steps/04-currency';
+export { priceFloorFor, isBelowPriceFloor } from './steps/04b-price-floor';
 export { checkCategorySanity } from './steps/05-category-sanity';
 export { identifierLookupClauses, identifiersConflict } from './steps/06-identifier-match';
 export { findExactTitleMatch } from './steps/07-exact-title-match';
