@@ -30,6 +30,11 @@ describe('selectSweepCategories', () => {
     expect(selectSweepCategories(leaves, { maxWave: 2, maxNewPerRun: 15 }).some((l) => l.slug === 'sofas')).toBe(true);
   });
 
+  it('never sweeps a retired category (negative wave)', () => {
+    const withRetired = [...leaves, leaf('home-appliances', -1)];
+    expect(selectSweepCategories(withRetired, { maxWave: 4, maxNewPerRun: 50 }).some((l) => l.slug === 'home-appliances')).toBe(false);
+  });
+
   it('orders ties by slug, so a run is reproducible', () => {
     const tied = [leaf('b', 1), leaf('a', 1)];
     expect(selectSweepCategories(tied, { maxWave: 1, maxNewPerRun: 5 }).map((l) => l.slug)).toEqual(['a', 'b']);

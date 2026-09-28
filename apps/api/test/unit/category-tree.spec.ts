@@ -63,11 +63,18 @@ describe('category tree', () => {
     expect(Object.keys(RESOLVER_ALIASES).filter((slug) => !slugs.has(slug))).toEqual([]);
   });
 
-  it('keeps the original 11 leaves at wave 0 with no floor', () => {
-    for (const slug of ORIGINAL_LEAVES) {
+  it('keeps the original leaves at wave 0 with no floor', () => {
+    for (const slug of ORIGINAL_LEAVES.filter((s) => s !== 'home-appliances')) {
       const category = categoryTree.find((c) => c.slug === slug);
       expect([slug, category?.parentSlug, category?.rolloutWave, category?.minPriceEgp]).toEqual([slug, 'electronics', 0, 0]);
     }
+  });
+
+  it('retires the home-appliances catch-all (wave -1), whose products move to the specific leaves', () => {
+    // Review finding C1: sweeping it would keep creating fridges and washers
+    // that the new leaves also hold, and matching never compares across categories.
+    const category = categoryTree.find((c) => c.slug === 'home-appliances');
+    expect([category?.rolloutWave, category?.minPriceEgp]).toEqual([-1, 0]);
   });
 
   it('puts every new leaf in wave 1 or later, with no floor override', () => {
@@ -101,6 +108,7 @@ describe('planCategoryUpserts', () => {
   it('writes the rollout fields with explicit defaults', () => {
     const phones = plan.find((row) => row.slug === 'smartphones');
     expect(phones?.data).toMatchObject({ rolloutWave: 0, minPriceEgp: 0, level: 1 });
+    expect(plan.find((row) => row.slug === 'home-appliances')?.data).toMatchObject({ rolloutWave: -1, minPriceEgp: 0 });
     const root = plan.find((row) => row.slug === 'electronics');
     expect(root?.data).toMatchObject({ rolloutWave: 0, minPriceEgp: null, level: 0 });
   });

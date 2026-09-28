@@ -62,9 +62,12 @@ export const categoryTree: CategoryDefinition[] = [
   original('tablets', 'Tablets', 'تابلت', ['tablet', 'ipad', 'android tablet', 'windows tablet', 'تابلت']),
   original('smart-watches', 'Smart Watches', 'ساعات ذكية', ['smart watch', 'smartwatch', 'fitness watch', 'wearable', 'ساعة ذكية']),
   original('gaming-consoles', 'Gaming Consoles', 'أجهزة ألعاب', ['console', 'gaming console', 'playstation', 'xbox', 'nintendo', 'بلايستيشن']),
-  // Its specific terms (washer, refrigerator, air fryer) moved to the new
-  // appliance leaves below, which the resolver now prefers.
-  original('home-appliances', 'Home Appliances', 'أجهزة منزلية', ['appliance', 'home appliance', 'home appliances', 'أجهزة منزلية']),
+  // Retired (wave -1: never swept, never resolved). It was a catch-all for
+  // fridges, washers, air fryers...; those have leaves of their own now and
+  // its products are moved there (scripts/ops/recategorize-products.ts).
+  // Matching never compares across categories, so sweeping both would
+  // duplicate every appliance. Kept so its unmoved products stay browsable.
+  { ...original('home-appliances', 'Home Appliances', 'أجهزة منزلية', ['appliance', 'home appliance', 'home appliances', 'أجهزة منزلية']), rolloutWave: -1 },
 
   // ─── Large appliances ─────────────────────────────────────────────────
   group('large-appliances', 'Large Appliances', 'أجهزة منزلية كبيرة'),
