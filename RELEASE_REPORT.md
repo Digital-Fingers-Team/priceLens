@@ -28,13 +28,13 @@ None open. The P0/P1 items found in phase 11 are fixed and deployed:
 | QA-07 P0 (D-31) | every visitor had the same address; one rate-limit bucket | 3f23578 (proxy in the host network) |
 | QA-08 P1 (OPS-14) | the web's renders shared one bucket | a0ef2d9 |
 
-## What is live (baseline 2026-09-27 23:01 UTC)
+## What is live (baseline 2026-09-28 00:45 UTC)
 
 | Container | Version | Started |
 |---|---|---|
 | pricelens-api (`PROCESS_ROLE=api`, uid 1000) | 6e9b928 | 23:00:31 |
 | pricelens-worker (`PROCESS_ROLE=worker`, uid 1000, Chrome sandboxed) | 6e9b928 | 23:00:54 |
-| pricelens-web-green (127.0.0.1:3011) | dd1acec | 22:51:03 |
+| pricelens-web-blue (127.0.0.1:3010) | e63b6e7 | 09-28 00:31:23 |
 | pricelens-proxy (host network, nginx 1.27.5 + Brotli) | e0fb3cc image | 22:28:47 |
 | pricelens-postgres / pricelens-redis | unchanged | 09-27 04:34 / 09-25 |
 

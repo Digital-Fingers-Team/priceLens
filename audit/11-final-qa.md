@@ -72,7 +72,7 @@ Live production (read-only), after the 20:16/20:30/20:54 deploys:
 
 ## Summary
 
-- Production now runs the whole overhaul: API/worker 6e9b928 (Nest 11, non-root with Chrome's sandbox, JSON logs, queue dashboard), web dd1acec (green), proxy on the host network with Brotli; backups and the upstream watchdog run on timers.
+- Production now runs the whole overhaul: API/worker 6e9b928 (Nest 11, non-root with Chrome's sandbox, JSON logs, queue dashboard), web e63b6e7 (blue, 127.0.0.1:3010; redeployed 2026-09-28 00:31:23 UTC with the QA-18 mitigation), proxy on the host network with Brotli; backups and the upstream watchdog run on timers.
 - D-31 is done: the site sees real visitor addresses, and the web's own renders are rate-limited per visitor (OPS-14).
 - QA found and fixed four user-facing bugs: product pages turning into an error after a failed background refresh (QA-01), lost typed searches (QA-03), missing busy state on search navigation (QA-04), and English advice text in the Arabic UI (QA-06); plus parser misreads seen in production data (QA-05, QA-15).
 - Everything earlier phases marked Fixed that can be checked from outside was re-verified live (list above).
