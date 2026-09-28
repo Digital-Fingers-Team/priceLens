@@ -1,5 +1,6 @@
 import { categoryTree } from '../../seed/datasets/categoryTree';
 import { planCategoryUpserts } from '../../seed/categoryTreePlan';
+import { RESOLVER_ALIASES } from '../../src/scraping/ingestion/category-aliases';
 
 const leaves = categoryTree.filter((c) => c.level === 1);
 const ORIGINAL_LEAVES = [
@@ -44,6 +45,22 @@ describe('category tree', () => {
       }
     }
     expect(clashes).toEqual([]);
+  });
+
+  it('stores no resolver-only aliases or bare spec words as search terms', () => {
+    // Stored terms widen site search (search.service categorySearchTermsMatch): "iphone" as a
+    // smartphones term made every phone match "iphone" (review finding C2). "ram"/"ssd"/"camera"
+    // hijacked phone and laptop titles (I5).
+    const stored = new Set(categoryTree.flatMap((c) => c.searchTerms.map((term) => term.toLowerCase())));
+    for (const aliases of Object.values(RESOLVER_ALIASES)) {
+      expect(aliases.filter((alias) => stored.has(alias.toLowerCase()))).toEqual([]);
+    }
+    expect(['ram', 'ssd'].filter((word) => stored.has(word))).toEqual([]);
+  });
+
+  it('gives aliases only to categories that exist', () => {
+    const slugs = new Set(leaves.map((l) => l.slug));
+    expect(Object.keys(RESOLVER_ALIASES).filter((slug) => !slugs.has(slug))).toEqual([]);
   });
 
   it('keeps the original 11 leaves at wave 0 with no floor', () => {

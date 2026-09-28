@@ -50,18 +50,18 @@ const original = (slug: string, name: string, nameAr: string, searchTerms: strin
 export const categoryTree: CategoryDefinition[] = [
   // ─── Electronics (the original catalogue) ─────────────────────────────
   group('electronics', 'Electronics', 'إلكترونيات', ['electronics', 'tech', 'gadgets']),
-  // After the original terms: model-family words, so searches like
-  // "iphone 16" or "rtx 4070" still resolve now that terms match whole words.
-  original('smartphones', 'Smartphones', 'هواتف ذكية', ['phone', 'smartphone', 'mobile', 'cell phone', '5g phone', 'iphone', 'galaxy', 'redmi', 'pixel', 'موبايل']),
-  original('laptops', 'Laptops', 'لابتوب', ['laptop', 'notebook', 'ultrabook', 'chromebook', 'macbook', 'thinkpad', 'لاب توب']),
-  original('graphics-cards', 'Graphics Cards', 'كروت شاشة', ['gpu', 'graphics card', 'video card', 'gfx card', 'rtx', 'geforce', 'radeon', 'كارت شاشة']),
-  original('processors', 'CPUs', 'معالجات', ['cpu', 'processor', 'desktop processor', 'ryzen', 'intel core', 'معالج']),
+  // Model-family words (iphone, rtx, ps5...) live in the resolver's
+  // RESOLVER_ALIASES, not here: stored terms widen site search.
+  original('smartphones', 'Smartphones', 'هواتف ذكية', ['phone', 'smartphone', 'mobile', 'cell phone', '5g phone', 'موبايل']),
+  original('laptops', 'Laptops', 'لابتوب', ['laptop', 'notebook', 'ultrabook', 'chromebook', 'لاب توب']),
+  original('graphics-cards', 'Graphics Cards', 'كروت شاشة', ['gpu', 'graphics card', 'video card', 'gfx card', 'كارت شاشة']),
+  original('processors', 'CPUs', 'معالجات', ['cpu', 'processor', 'desktop processor', 'معالج']),
   original('monitors', 'Monitors', 'شاشات كمبيوتر', ['monitor', 'display', 'gaming monitor', 'computer screen', 'شاشة كمبيوتر']),
   original('televisions', 'TVs', 'تلفزيونات', ['tv', 'television', 'smart tv', 'oled tv', 'qled tv', 'تلفزيون', 'شاشة تلفزيون']),
-  original('headphones', 'Headphones', 'سماعات', ['headphones', 'earbuds', 'wireless headphones', 'noise cancelling', 'airpods', 'galaxy buds', 'سماعة']),
-  original('tablets', 'Tablets', 'تابلت', ['tablet', 'ipad', 'android tablet', 'windows tablet', 'galaxy tab', 'تابلت']),
-  original('smart-watches', 'Smart Watches', 'ساعات ذكية', ['smart watch', 'smartwatch', 'fitness watch', 'wearable', 'apple watch', 'galaxy watch', 'ساعة ذكية']),
-  original('gaming-consoles', 'Gaming Consoles', 'أجهزة ألعاب', ['console', 'gaming console', 'playstation', 'xbox', 'nintendo', 'ps5', 'ps4', 'بلايستيشن']),
+  original('headphones', 'Headphones', 'سماعات', ['headphones', 'earbuds', 'wireless headphones', 'noise cancelling', 'سماعة']),
+  original('tablets', 'Tablets', 'تابلت', ['tablet', 'ipad', 'android tablet', 'windows tablet', 'تابلت']),
+  original('smart-watches', 'Smart Watches', 'ساعات ذكية', ['smart watch', 'smartwatch', 'fitness watch', 'wearable', 'ساعة ذكية']),
+  original('gaming-consoles', 'Gaming Consoles', 'أجهزة ألعاب', ['console', 'gaming console', 'playstation', 'xbox', 'nintendo', 'بلايستيشن']),
   // Its specific terms (washer, refrigerator, air fryer) moved to the new
   // appliance leaves below, which the resolver now prefers.
   original('home-appliances', 'Home Appliances', 'أجهزة منزلية', ['appliance', 'home appliance', 'home appliances', 'أجهزة منزلية']),
@@ -136,8 +136,8 @@ export const categoryTree: CategoryDefinition[] = [
   leaf('computing', 2, 'printers', 'Printers', 'طابعات', ['printer', 'laser printer', 'ink tank printer', 'multifunction printer', 'طابعة']),
   leaf('computing', 2, 'projectors', 'Projectors', 'بروجكتور', ['projector', 'home theater projector', '4k projector', 'data show', 'بروجيكتور', 'داتا شو']),
   leaf('computing', 3, 'motherboards', 'Motherboards', 'مازربورد', ['motherboard', 'gaming motherboard', 'atx motherboard', 'ماذربورد']),
-  leaf('computing', 3, 'ssds-storage', 'SSDs & Storage', 'وحدات تخزين', ['ssd', 'nvme ssd', 'external hard drive', 'nas storage', 'هارد ديسك']),
-  leaf('computing', 3, 'memory-ram', 'Memory (RAM)', 'رامات', ['ram', 'ddr5 ram', 'ddr4 ram', 'desktop memory', 'رامات']),
+  leaf('computing', 3, 'ssds-storage', 'SSDs & Storage', 'وحدات تخزين', ['nvme ssd', 'sata ssd', 'external hard drive', 'nas storage', 'هارد ديسك']),
+  leaf('computing', 3, 'memory-ram', 'Memory (RAM)', 'رامات', ['ddr5 ram', 'laptop ram', 'ddr4 ram', 'desktop memory', 'رامات']),
   leaf('computing', 3, 'power-supplies', 'PC Power Supplies & Cases', 'باور سبلاي وكيسات', ['power supply', 'psu', 'pc case', 'computer case', 'باور سبلاي']),
   leaf('computing', 3, 'ups', 'UPS & Power Backup', 'أجهزة UPS', ['ups', 'uninterruptible power supply', 'power backup', 'يو بي اس']),
   leaf('computing', 4, 'scanners', 'Scanners', 'ماسحات ضوئية', ['scanner', 'document scanner', 'photo scanner', 'سكانر']),

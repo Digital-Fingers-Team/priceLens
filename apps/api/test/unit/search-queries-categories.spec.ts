@@ -5,7 +5,10 @@ import { buildQueriesForCategory, pickCategoryForQuery } from '../../src/scrapin
 /** The real tree as the resolver sees it: leaves only, as the repository returns them. */
 const leaves = categoryTree
   .filter((c) => c.level === 1)
-  .map((c) => ({ id: c.slug, slug: c.slug, name: c.name, searchTerms: c.searchTerms, level: 1 }) as unknown as Category);
+  .map(
+    (c) =>
+      ({ id: c.slug, slug: c.slug, name: c.name, searchTerms: c.searchTerms, level: 1, rolloutWave: c.rolloutWave ?? 0 }) as unknown as Category,
+  );
 
 const pick = (query: string) => pickCategoryForQuery(query, leaves)?.slug ?? null;
 
@@ -44,6 +47,18 @@ describe('pickCategoryForQuery against the curated tree', () => {
     expect(pick('macbook air m3')).toBe('laptops');
     expect(pick('rtx 4070 super')).toBe('graphics-cards');
     expect(pick('ps5 slim')).toBe('gaming-consoles');
+  });
+
+  it('does not let a spec word in a phone or laptop title pick a component category', () => {
+    // Review finding I5: bare "ram"/"ssd" terms filed phones and laptops as memory/storage.
+    expect(pick('samsung a55 8gb ram')).not.toBe('memory-ram');
+    expect(pick('hp victus 16gb ram 512gb ssd')).not.toBe('memory-ram');
+    expect(pick('lenovo ideapad 512gb ssd')).not.toBe('ssds-storage');
+  });
+
+  it('breaks a length tie toward the lower rollout wave', () => {
+    // "iphone" (smartphones, wave 0) and "camera" (digital-cameras, wave 1) are both 6 letters.
+    expect(pick('iphone 15 camera')).toBe('smartphones');
   });
 
   it('resolves Arabic queries', () => {

@@ -1,5 +1,6 @@
 import type { Category } from '@prisma/client';
 import type { NormalizerService } from '../../matching/normalizer.service';
+import { RESOLVER_ALIASES } from './category-aliases';
 
 /** Pure query builders for the ingestion runs. */
 
@@ -48,19 +49,27 @@ export function buildQueriesForCategory(category: Category): string[] {
  * Each category's name, slug words and search terms are matched as whole
  * words against the query (so "phone" is not found in "headphones"). The
  * category with the longest matching phrase wins -- "baby monitor" beats
- * "monitor" -- then the one with more matching phrases, then the first.
+ * "monitor" -- then the one with more matching phrases, then the lower
+ * rollout wave (the original categories), then the first. Model-family
+ * aliases (RESOLVER_ALIASES) count as phrases too.
  * There is no fallback: a search that fits no category is not scraped into
  * an arbitrary one (owner decision, 2026-09-28).
  */
-export function pickCategoryForQuery(query: string, categories: Category[]): Category | null {
+export function pickCategoryForQuery(
+  query: string,
+  categories: Category[],
+  aliases: Readonly<Record<string, readonly string[]>> = RESOLVER_ALIASES,
+): Category | null {
   const padded = ` ${phraseKey(query)} `;
   if (padded.trim() === '') return null;
 
-  let best: { category: Category; longest: number; hits: number } | null = null;
+  let best: { category: Category; longest: number; hits: number; wave: number } | null = null;
   for (const category of categories) {
     let longest = 0;
     let hits = 0;
-    for (const phrase of [category.name, category.slug.replace(/-/g, ' '), ...category.searchTerms]) {
+    const wave = category.rolloutWave ?? 0;
+    const phrases = [category.name, category.slug.replace(/-/g, ' '), ...category.searchTerms, ...(aliases[category.slug] ?? [])];
+    for (const phrase of phrases) {
       const key = phraseKey(phrase);
       if (key && padded.includes(` ${key} `)) {
         hits += 1;
@@ -68,8 +77,12 @@ export function pickCategoryForQuery(query: string, categories: Category[]): Cat
       }
     }
     if (hits === 0) continue;
-    if (!best || longest > best.longest || (longest === best.longest && hits > best.hits)) {
-      best = { category, longest, hits };
+    if (
+      !best ||
+      longest > best.longest ||
+      (longest === best.longest && (hits > best.hits || (hits === best.hits && wave < best.wave)))
+    ) {
+      best = { category, longest, hits, wave };
     }
   }
   return best?.category ?? null;
