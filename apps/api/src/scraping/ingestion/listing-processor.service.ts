@@ -11,6 +11,7 @@ import {
   MatchingTools,
   NEW_PRODUCT_CONFIDENCE,
   NormalizedListing,
+  SameProductJudge,
   checkCategorySanity,
   checkMarketOutlier,
   detectJunkListing,
@@ -27,6 +28,9 @@ import { IngestionRepository } from './ingestion.repository';
 import { buildRawAttributes, inferTier, toDbDecimal, toJson, toSlug } from './listing-mapping';
 
 const DEFAULT_MIN_LISTING_PRICE_EGP = 5000;
+
+/** Declines every ambiguous pair, so only rule-based matches go through. */
+const NO_JUDGE: SameProductJudge = { judgeSameProduct: async () => null };
 
 export interface ProcessedListing {
   createdCanonicalProduct: boolean;
@@ -103,12 +107,12 @@ export class ListingProcessor {
       return null;
     }
 
-    // Step 4b: price floor. No row is written: below-floor listings are the
+    // Step 4b: price floor. A listing under it may still update a product we
+    // already track (its price fell, or another store sells it cheaper), so
+    // it is matched -- without the LLM judge -- and only dropped when it
+    // would found a new product. Dropped listings write no row: they are the
     // bulk of every broad sweep, and a REJECTED row for each would be noise.
-    if (isBelowPriceFloor(price, priceFloorFor(category, this.globalFloor))) {
-      this.belowFloor.set(platform.slug, (this.belowFloor.get(platform.slug) ?? 0) + 1);
-      return null;
-    }
+    const belowFloor = isBelowPriceFloor(price, priceFloorFor(category, this.globalFloor));
 
     // Step 5: category sanity.
     if (price != null) {
@@ -118,6 +122,7 @@ export class ListingProcessor {
         this.tools,
       );
       if (insane) {
+        if (belowFloor) return this.dropBelowFloor(platform);
         await this.reject(platform, listing, insane);
         return null;
       }
@@ -126,8 +131,13 @@ export class ListingProcessor {
     const keys = listingKeys(input);
     const family = [category.id, keys.brand ?? '', keys.model ?? input.normalized.normalized].join('|');
     return this.familyLock.run(family, () =>
-      this.matchAndPersist(platform, category, listing, sourceSlug, input, price, advertisedPrice),
+      this.matchAndPersist(platform, category, listing, sourceSlug, input, price, advertisedPrice, belowFloor),
     );
+  }
+
+  private dropBelowFloor(platform: Platform): null {
+    this.belowFloor.set(platform.slug, (this.belowFloor.get(platform.slug) ?? 0) + 1);
+    return null;
   }
 
   private async matchAndPersist(
@@ -138,14 +148,20 @@ export class ListingProcessor {
     input: NormalizedListing<RetailerListing>,
     price: number | null,
     advertisedPrice: number | null,
+    belowFloor = false,
   ): Promise<ProcessedListing | null> {
-    // Steps 6-9: the product it belongs to, if any.
+    // Steps 6-9: the product it belongs to, if any. A below-floor listing
+    // does not get the (paid) LLM judge: most are accessories and cheap
+    // look-alikes, and only a clear match is worth keeping.
     const match = await findCanonicalMatch(
       input,
       category.id,
-      { candidates: this.repository.candidates, judge: this.semantic },
+      { candidates: this.repository.candidates, judge: belowFloor ? NO_JUDGE : this.semantic },
       this.tools,
     );
+    if (!match && belowFloor) {
+      return this.dropBelowFloor(platform);
+    }
 
     // Step 10: market outlier. Such a listing is not attached to the product,
     // and not turned into a product of its own either: its title says it is

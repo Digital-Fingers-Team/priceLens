@@ -147,6 +147,22 @@ describe('ingestion concurrency (integration)', () => {
       expect(await processor.process(platforms[0], category, edge, platforms[0].slug)).not.toBeNull();
     });
 
+    it('keeps updating a known listing whose price falls under the floor', async () => {
+      // Review finding I4: dropping it would freeze the old price on the site.
+      const edge = listing('edge', 'Zentrofon Z904 6GB 128GB', 4800);
+      const result = await processor.process(platforms[0], category, edge, platforms[0].slug);
+      expect(result).not.toBeNull();
+      const stored = await prisma.sourceListing.findFirstOrThrow({ where: { externalId: edge.externalId } });
+      expect(Number(stored.priceUsd)).toBe(4800);
+    });
+
+    it("keeps another store's cheaper offer for a product that already exists", async () => {
+      const known = await prisma.sourceListing.findFirstOrThrow({ where: { externalId: `${run}-edge` } });
+      const cheaper = listing('edge-b', 'Zentrofon Z904 6GB 128GB', 4700);
+      const result = await processor.process(platforms[2], category, cheaper, platforms[2].slug);
+      expect(result?.canonicalProductId).toBe(known.canonicalProductId);
+    });
+
     it('compares a foreign-currency price after conversion to EGP', async () => {
       // 150 USD is ~7,500 EGP at the fallback rate: above the floor, although 150 < 5000.
       const usd = listing('usd', 'Zentrofon Z905 8GB 256GB', 150, { currency: 'USD' });
