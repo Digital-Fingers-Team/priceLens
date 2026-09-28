@@ -8,11 +8,11 @@
  *   ts-node scripts/ops/repair-variant-mixes.ts --rollback <file>
  *
  * Run --apply only after the phase 02 matcher is deployed; the old one would
- * merge the variants back on the next ingestion. Rollback files go to the
- * repo-root backups/ directory (untracked).
+ * merge the variants back on the next ingestion. Rollback files go to
+ * BACKUP_DIR or the repo-root backups/ directory (see backup-dir.ts).
  */
-import { mkdirSync, readFileSync, writeFileSync } from 'fs';
-import { join, resolve } from 'path';
+import { readFileSync, writeFileSync } from 'fs';
+import { join } from 'path';
 import { PrismaClient } from '@prisma/client';
 import {
   applyVariantSplits,
@@ -20,6 +20,7 @@ import {
   rollbackVariantSplits,
   type RollbackEntry,
 } from '../../src/matching/repair/variant-repair';
+import { backupDir } from './backup-dir';
 
 function argValue(flag: string): string | undefined {
   const index = process.argv.indexOf(flag);
@@ -59,9 +60,9 @@ async function main() {
       return;
     }
 
+    // Before anything changes: the rollback file must be writable.
+    const dir = backupDir();
     const entries = await applyVariantSplits(prisma, reports);
-    const dir = resolve(__dirname, '../../../../backups');
-    mkdirSync(dir, { recursive: true });
     const file = join(dir, `repair-variant-mixes-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
     writeFileSync(file, JSON.stringify(entries, null, 2));
     console.log(`Applied: ${entries.length} new product(s). Rollback: --rollback ${file}`);

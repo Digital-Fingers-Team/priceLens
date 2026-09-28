@@ -9,12 +9,13 @@
  *   ts-node scripts/ops/backfill-normalized-titles.ts --rollback <file>
  *
  * Only rows whose value changes are written. Rollback files (the old values)
- * go to the repo-root backups/ directory (untracked).
+ * go to BACKUP_DIR or the repo-root backups/ directory (see backup-dir.ts).
  */
-import { mkdirSync, readFileSync, writeFileSync } from 'fs';
-import { join, resolve } from 'path';
+import { readFileSync, writeFileSync } from 'fs';
+import { join } from 'path';
 import { PrismaClient } from '@prisma/client';
 import { NormalizerService } from '../../src/matching/normalizer.service';
+import { backupDir } from './backup-dir';
 
 const BATCH = 500;
 
@@ -103,8 +104,7 @@ async function main() {
       return;
     }
 
-    const dir = resolve(__dirname, '../../../../backups');
-    mkdirSync(dir, { recursive: true });
+    const dir = backupDir();
     const file = join(dir, `backfill-normalized-titles-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
     writeFileSync(file, JSON.stringify(changes, null, 2));
     await write(prisma, changes, (change) => change.after);

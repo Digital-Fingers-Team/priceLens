@@ -17,6 +17,10 @@ browser profiles live (`.browser-profiles`, a persistent volume in production).
 | `repair-variant-mixes.ts` | Products mix RAM/storage variants (audit 00 F-17). Dry-run report by default; `--apply` splits them and writes a rollback file to `backups/`; `--rollback <file>` undoes it. Apply only after the phase 02 matcher is deployed. |
 | `backfill-normalized-titles.ts` | Search misses products stored before the current title normalizer (audit 03 B-21). Dry-run report by default; `--apply` recomputes `normalized_title` on products and listings and writes a rollback file to `backups/`; `--rollback <file>` undoes it. |
 
+Rollback files go to `BACKUP_DIR` or the repo-root `backups/`; the scripts check it is writable before changing anything. The image runs as an unprivileged user, so in the container use `BACKUP_DIR=/tmp/backups` and copy the file out afterwards, e.g.
+`podman exec -e BACKUP_DIR=/tmp/backups -w /repo/apps/api pricelens-worker npx ts-node --transpile-only scripts/ops/repair-variant-mixes.ts --product <slug> --apply`
+then `podman cp pricelens-worker:/tmp/backups/. ~/pricelens/backups/`.
+
 Usage lines are at the top of each file, e.g. `npx ts-node scripts/ops/diagnose-stores.ts noon "iphone 15"`.
 
 One-off data fixes that used to live in `scripts/` (backfills, merges and
