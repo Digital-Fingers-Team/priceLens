@@ -111,6 +111,7 @@ describe('LiveIngestionService sweep with a failing query (B-07)', () => {
       findActivePlatforms: jest.fn(async () => [platform]),
       findLeafCategories: jest.fn(async () => categories),
       markCategoriesSwept: jest.fn(async () => undefined),
+      dominantLeafCategoryForQuery: jest.fn(async () => null),
       startJob: jest.fn(async () => 'job-1'),
       completeJob: jest.fn(async () => undefined),
       failJob: jest.fn(async () => undefined),
@@ -200,6 +201,35 @@ describe('LiveIngestionService sweep with a failing query (B-07)', () => {
 
     expect(queries).toContain('Refrigerators');
     expect(repository.markCategoriesSwept).toHaveBeenCalledWith(['c3'], expect.any(Date));
+  });
+
+  it('does not scrape a search into a category whose wave is not enabled yet', async () => {
+    const queries: string[] = [];
+    const { service } = setup(async (query) => {
+      queries.push(query);
+      return [];
+    });
+
+    const report = await service.runQueryIngestion('lg fridge 400 liters', { platformSlugs: ['noon'] });
+
+    expect(queries).toEqual([]);
+    expect(report.skippedPlatforms).toEqual([{ slug: 'noon', reason: 'no_matching_category' }]);
+  });
+
+  it('scrapes a search into an enabled wave', async () => {
+    const queries: string[] = [];
+    const { service } = setup(
+      async (query) => {
+        queries.push(query);
+        return [];
+      },
+      undefined,
+      { 'retailers.categorySweepMaxWave': 1 },
+    );
+
+    await service.runQueryIngestion('lg fridge 400 liters', { platformSlugs: ['noon'] });
+
+    expect(queries).toEqual(['lg fridge 400 liters']);
   });
 });
 

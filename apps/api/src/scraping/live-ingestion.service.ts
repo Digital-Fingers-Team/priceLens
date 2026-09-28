@@ -129,6 +129,12 @@ export class LiveIngestionService {
    * The leaves this scheduled sweep covers: wave 0 always, plus the least
    * recently swept of the enabled waves (see selectSweepCategories).
    */
+  /** Wave 0 always; waves 1..CATEGORY_SWEEP_MAX_WAVE when enabled; negative waves (retired) never. */
+  private isWaveLive(category: Pick<Category, 'rolloutWave'>): boolean {
+    const wave = category.rolloutWave ?? 0;
+    return wave >= 0 && wave <= this.configService.get<number>('retailers.categorySweepMaxWave', 0);
+  }
+
   async sweepCategories(): Promise<Category[]> {
     return selectSweepCategories(await this.repository.findLeafCategories(), {
       maxWave: this.configService.get<number>('retailers.categorySweepMaxWave', 0),
@@ -162,9 +168,14 @@ export class LiveIngestionService {
 
     // A term match first; otherwise the leaf the catalogue already files such
     // products under. Neither: the query is not scraped (no_matching_category).
-    const category =
-      pickCategoryForQuery(trimmedQuery, await this.repository.findLeafCategories()) ??
-      (await this.repository.dominantLeafCategoryForQuery(trimmedQuery));
+    // Only categories whose wave is live count, so a wave that is off (or
+    // turned back off) gets no products from searches either.
+    const live = (await this.repository.findLeafCategories()).filter((leaf) => this.isWaveLive(leaf));
+    const fallback = async () => {
+      const found = await this.repository.dominantLeafCategoryForQuery(trimmedQuery);
+      return found && this.isWaveLive(found) ? found : null;
+    };
+    const category = pickCategoryForQuery(trimmedQuery, live) ?? (await fallback());
 
     for (const platform of platforms) {
       const connector = this.usableConnector(platform, skippedPlatforms);
