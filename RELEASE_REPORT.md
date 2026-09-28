@@ -2,19 +2,17 @@
 
 2026-09-28, end of phase 11 (final QA). Details: `audit/00-baseline.md` … `audit/11-final-qa.md`.
 
-## Verdict: Ready, with conditions
+## Verdict: Ready
 
 Production runs the whole overhaul and is serving normally. It is ready as a
 release: nothing is broken or unsafe for users. Three conditions stand, none
 of them a code change:
 
-1. **The worker still grows ~180-350 MB/h** (OPS-01). It is contained: its own
-   container, a graceful recycle at 1.2 GB with a heap snapshot, and the API is
-   unaffected by it. The cause is found once the first snapshot is analysed.
-2. **No alert reaches a person yet** (D-34). The monitor is built and tested;
-   it needs a delivery channel.
-3. **Two products still mix variants** in production data (D-37). The fix is a
-   reviewed one-off repair.
+(All three conditions of the first version of this report were resolved on
+2026-09-28: worker memory leak fixed at its cause, Telegram alerts on, the
+two mixed products split.) Remaining: Google has to re-crawl the site after
+the canonical fix (Search Console), and one pre-existing phone navigation
+glitch (QA-18).
 
 ## Blockers (P0/P1)
 
@@ -80,32 +78,27 @@ runs as an unprivileged user with Chrome's sandbox on.
 
 ## Decisions for Baraa (all phases, deduplicated)
 
-Open, each with a recommendation:
+All decided (owner, 2026-09-28 ~03:20 UTC), and done unless noted:
 
-- **D-37: split two mixed Lenovo LOQ products** (a 24 GB model inside a 16 GB
-  product; one an AMD model merged with an Intel one). *Recommend: yes*, those two
-  only, with the rollback file; skip the GTX 1060 wholesale listing.
-- **D-34: where alerts go.** *Recommend:* a Telegram bot
-  (`~/.config/pricelens/alerts.env`), then enable `pricelens-monitor.timer`.
-- **D-39: 9,860 of 19,489 products have no store offer.** *Recommend:* keep them
-  reachable by URL, out of search, browse and the sitemap until a store lists them.
-- **D-36: error tracking.** *Recommend:* Sentry's free tier (needs your account and DSN).
-- **D-38: prune old dangling images** (~35 GB, some from other projects). *Recommend:*
-  `podman image prune` at a convenient time; disk is 73%, alerts would fire at 85%.
-- **D-35 follow-up: off-box backup copies.** *Recommend:* object storage for the nightly dumps.
-- **CI required on `main`**: a repository setting only an admin can make
-  (Settings → Branches → require the CI checks).
-- **SEO-15 Arabic slugs:** *recommend* keeping Latin slugs in both languages.
-- **SEO-16 Search Console:** remove old soft-404 URLs, submit the sitemap (owner action).
-- **D-14 per-colour GTINs:** left as is (owner's answer); revisit if the colour filter shows split products.
-- **D-20 CSP nonces:** kept `'unsafe-inline'` (owner's answer): nonces would undo page caching.
+- **Worker memory (OPS-01)**: root cause fixed and live (75a707d): the browser
+  driver pinned every closed page through leftover CDP sessions (heap
+  snapshot, audit 11); each store's browser now recycles every 40 pages.
+  Worker memory since: 300-420 MB, no longer climbing.
+- **D-37** two mixed Lenovo LOQ products split (rollback file reconstructed:
+  `~/pricelens/backups/repair-variant-mixes-d37-2026-09-28-reconstructed.json`).
+- **D-39** products without an offer: out of search, browse and sitemap; their
+  pages are noindex (407c39b).
+- **D-38** dangling images pruned: disk 79% → 62%.
+- **D-34** Telegram alerts via @Pricelens1_bot; `pricelens-monitor.timer` on.
+  Its first run found the queue backlog fixed in 95cb145.
+- **D-36** Sentry: skipped for now. **SEO-15**: Latin slugs kept. **D-14**, **D-20**: left as they were.
 
-Settled during the overhaul (for the record): D-1–D-13, D-15–D-19, D-21–D-33,
-D-35 (on-box), D-31. See `~/pricelens-work/morning-list.md` and the audits.
+Owner actions left (settings, no decisions):
+- **CI required on `main`** (Settings → Branches; needs a repo admin).
+- **Search Console**: sitemap resubmitted 2026-09-28; request indexing of `/` and `/ar`, check the Pages report in a week.
 
 ## Known limitations and follow-ups
 
-- Worker heap growth (OPS-01): analyse the first recycle's heap snapshot.
 - Matching has no CPU-model guard (QA-16).
 - Category pages render per request (QA-11, 200-360 ms TTFB).
 - On phones a sort change occasionally does nothing (an aborted navigation inside Next, pre-existing, QA-18); trying again works.
