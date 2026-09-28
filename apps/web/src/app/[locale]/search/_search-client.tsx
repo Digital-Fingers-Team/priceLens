@@ -1,5 +1,5 @@
 'use client';
-import { useTransition } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ProductList } from '@/components/product/product-list';
 import { SearchBar } from '@/components/search/search-bar';
@@ -38,10 +38,21 @@ export function SearchPageClient({ initial }: { initial: InitialSearch | null })
 
   // A new search, filter, sort or page is a navigation: the server renders
   // the results (page.tsx) and the page swaps them in when they arrive. Until
-  // then the current results stay, dimmed and marked busy (audit 11).
-  const [navigating, startNavigation] = useTransition();
+  // the URL changes, the current results stay, dimmed and marked busy
+  // (audit 11). The flag also clears itself: an aborted navigation (QA-18)
+  // leaves the URL unchanged and must not leave the page dimmed.
+  const currentQuery = searchParams.toString();
+  const [navigating, setNavigating] = useState(false);
+  useEffect(() => setNavigating(false), [currentQuery]);
+  useEffect(() => {
+    if (!navigating) return;
+    const timer = setTimeout(() => setNavigating(false), 8_000);
+    return () => clearTimeout(timer);
+  }, [navigating]);
   function navigate(changes: Partial<SearchFiltersType>) {
-    startNavigation(() => router.push(searchHref(withChanges(filters, changes)), { scroll: false }));
+    const href = searchHref(withChanges(filters, changes));
+    if (new URLSearchParams(href.split('?')[1] ?? '').toString() !== currentQuery) setNavigating(true);
+    router.push(href, { scroll: false });
   }
   const busy = isFetching || navigating;
 
@@ -103,7 +114,10 @@ export function SearchPageClient({ initial }: { initial: InitialSearch | null })
             <>
               <div
                 aria-busy={busy || undefined}
-                className={cn(busy && !isLoading && 'pointer-events-none opacity-60 transition-opacity')}
+                className={cn(
+                  busy && !isLoading && 'opacity-60 transition-opacity',
+                  isFetching && !isLoading && 'pointer-events-none',
+                )}
               >
                 <ProductList products={data?.hits ?? []} isLoading={isLoading} skeletonCount={filters.limit ?? 20} />
               </div>

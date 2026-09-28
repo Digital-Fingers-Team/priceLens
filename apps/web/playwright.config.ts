@@ -11,7 +11,9 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './e2e',
   timeout: 60_000,
-  retries: 0,
+  // One retry in CI for the pre-existing, intermittent aborted navigation on
+  // phones (audit 11, QA-18); a retried test still shows as "flaky".
+  retries: process.env.CI ? 1 : 0,
   reporter: 'list',
   use: {
     baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:3000',
