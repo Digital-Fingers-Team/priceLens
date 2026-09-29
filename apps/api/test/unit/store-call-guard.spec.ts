@@ -203,6 +203,42 @@ describe('LiveIngestionService sweep with a failing query (B-07)', () => {
     expect(repository.markCategoriesSwept).toHaveBeenCalledWith(['c3'], expect.any(Date));
   });
 
+  it('does not pause a store that simply has nothing for a new-wave category', async () => {
+    // Prod, 2026-09-29 00:20: AliExpress returned nothing for five appliance
+    // queries in a row and its circuit opened, pausing it for users too.
+    const guardConfig = config({ 'retailers.connectorFailureThreshold': 2 });
+    const guard = new StoreCallGuard(guardConfig);
+    const repository = {
+      findActivePlatforms: jest.fn(async () => [platform]),
+      findLeafCategories: jest.fn(async () => categories),
+      markCategoriesSwept: jest.fn(async () => undefined),
+      startJob: jest.fn(async () => 'job-1'),
+      completeJob: jest.fn(async () => undefined),
+      failJob: jest.fn(async () => undefined),
+    } as unknown as IngestionRepository;
+    const processor = {
+      process: jest.fn(async () => null),
+      recordUnpriced: jest.fn(async () => undefined),
+      takeBelowFloorCount: jest.fn(() => 0),
+    } as unknown as ListingProcessor;
+    let n = 0;
+    const store = connector('noon', async (query) => (/fridge|refrigerator/i.test(query) ? [] : [listing(`l${++n}`)]));
+    const service = new LiveIngestionService(
+      repository,
+      processor,
+      new ConnectorRegistry([store]),
+      {} as NormalizerService,
+      config({ 'retailers.categorySweepMaxWave': 1 }),
+      guard,
+    );
+
+    const report = await service.runLiveIngestion({ platformSlugs: ['noon'] });
+
+    expect(guard.isPaused('noon')).toBe(false);
+    expect(report.skippedPlatforms).toEqual([]);
+    expect(repository.failJob).not.toHaveBeenCalled();
+  });
+
   it('does not scrape a search into a category whose wave is not enabled yet', async () => {
     const queries: string[] = [];
     const { service } = setup(async (query) => {

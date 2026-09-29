@@ -305,7 +305,14 @@ export class LiveIngestionService {
           // open) stops the run, by throwing out of the loop.
           let listings;
           try {
-            listings = await this.storeCalls.search(connector, query, limitPerQuery, searchOptions);
+            // An empty answer for an original (wave 0) category means the
+            // store is broken; for a new-wave category it usually means the
+            // store just doesn't sell it, and must not trip the circuit
+            // breaker (which pauses the store for users too).
+            listings = await this.storeCalls.search(connector, query, limitPerQuery, {
+              ...searchOptions,
+              emptyIsFailure: searchOptions.emptyIsFailure && (category.rolloutWave ?? 0) === 0,
+            });
           } catch (error) {
             if (error instanceof StoreUnavailableError) throw error;
             summary.queriesFailed += 1;
