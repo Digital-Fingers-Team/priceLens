@@ -1,11 +1,12 @@
 /**
- * Locales (audit 07, UI-04). English keeps today's un-prefixed URLs; Arabic
- * lives under /ar. middleware.ts rewrites un-prefixed paths to the [locale]
- * segment, so every page renders with a known locale and stays static.
+ * Locales (audit 07, UI-04). Arabic is the default (owner, 2026-09-29): it
+ * has the un-prefixed URLs and English lives under /en. middleware.ts
+ * rewrites un-prefixed paths to the [locale] segment, so every page renders
+ * with a known locale and stays static.
  */
 export const locales = ['en', 'ar'] as const;
 export type Locale = (typeof locales)[number];
-export const defaultLocale: Locale = 'en';
+export const defaultLocale: Locale = 'ar';
 
 export function isLocale(value: unknown): value is Locale {
   return typeof value === 'string' && (locales as readonly string[]).includes(value);

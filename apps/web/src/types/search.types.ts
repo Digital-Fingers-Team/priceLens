@@ -34,6 +34,7 @@ export interface SuggestionItem {
   id: string;
   slug: string;
   title: string;
+  titleAr?: string | null;
   brand: string | null;
 }
 /** GET /categories: a category that holds products. */

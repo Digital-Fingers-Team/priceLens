@@ -1,4 +1,5 @@
 'use client';
+import { productTitle } from '@/lib/product-title';
 import { BellRing, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { IconButton } from '@/components/ui/button';
@@ -10,7 +11,7 @@ import { cn } from '@/lib/utils/cn';
 import type { PriceAlert } from '@/types/product.types';
 
 export function AlertsSection() {
-  const { t, tf, tp, fmt } = useI18n();
+  const { t, tf, tp, fmt, locale } = useI18n();
   const { data: alerts, isLoading } = useAlerts();
   const { mutate: deleteAlert } = useDeleteAlert();
 
@@ -47,7 +48,7 @@ export function AlertsSection() {
               {isTriggered && <BellRing className="h-4 w-4 shrink-0 text-brand" aria-hidden />}
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <Link href={`/products/${alert.canonicalProduct.slug}`} dir="auto" className="line-clamp-1 text-sm font-medium text-fg hover:text-brand">
-                  {alert.canonicalProduct.title}
+                  {productTitle(alert.canonicalProduct, locale)}
                 </Link>
                 <p className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
                   {isTriggered && alert.triggeredPrice != null ? (
@@ -68,7 +69,7 @@ export function AlertsSection() {
               <IconButton
                 size="sm"
                 onClick={() => deleteAlert(alert.id)}
-                aria-label={tf(t.watchlist.deleteAlert, { title: alert.canonicalProduct.title })}
+                aria-label={tf(t.watchlist.deleteAlert, { title: productTitle(alert.canonicalProduct, locale) })}
               >
                 <Trash2 className="h-4 w-4" />
               </IconButton>

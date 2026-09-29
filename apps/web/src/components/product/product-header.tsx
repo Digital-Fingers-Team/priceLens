@@ -1,4 +1,5 @@
 'use client';
+import { productTitle } from '@/lib/product-title';
 import Image from 'next/image';
 import { ArrowUpRight, Bell, Heart, ImageOff } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -23,7 +24,7 @@ function attributeKey(key: string) {
 }
 
 export function ProductHeader({ product }: { product: CanonicalProduct }) {
-  const { t, tf, tp, fmt } = useI18n();
+  const { t, tf, tp, fmt, locale } = useI18n();
   const now = useNow();
   const categoryName = useCategoryName(product.category);
   const { isAuthenticated } = useAuthStore();
@@ -59,7 +60,7 @@ export function ProductHeader({ product }: { product: CanonicalProduct }) {
         {product.imageUrl ? (
           <Image
             src={product.imageUrl}
-            alt={product.title}
+            alt={productTitle(product, locale)}
             fill
             sizes="(max-width: 1024px) 100vw, 50vw"
             className="object-contain p-8"
@@ -82,7 +83,7 @@ export function ProductHeader({ product }: { product: CanonicalProduct }) {
             <Badge variant="neutral">{categoryName}</Badge>
           </div>
           <h1 dir="auto" className="text-xl font-semibold text-fg sm:text-2xl">
-            {product.title}
+            {productTitle(product, locale)}
           </h1>
           {attrs.length > 0 && (
             <dl className="flex flex-wrap gap-2">

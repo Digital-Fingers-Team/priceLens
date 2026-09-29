@@ -5,29 +5,30 @@ import { interpolate, plural } from './format';
 import { formatCurrency, formatRelativeTime } from '@/lib/utils/format';
 
 describe('locale paths', () => {
-  it('keeps English un-prefixed and prefixes Arabic', () => {
-    expect(localizePath('en', '/search?q=tv')).toBe('/search?q=tv');
-    expect(localizePath('ar', '/search?q=tv')).toBe('/ar/search?q=tv');
-    expect(localizePath('ar', '/')).toBe('/ar');
-    expect(localizePath('ar', '/?q=x')).toBe('/ar?q=x');
+  // Arabic is the default (owner, 2026-09-29): un-prefixed; English under /en.
+  it('keeps Arabic un-prefixed and prefixes English', () => {
+    expect(localizePath('ar', '/search?q=tv')).toBe('/search?q=tv');
+    expect(localizePath('en', '/search?q=tv')).toBe('/en/search?q=tv');
+    expect(localizePath('en', '/')).toBe('/en');
+    expect(localizePath('en', '/?q=x')).toBe('/en?q=x');
   });
 
   it('leaves external, protocol-relative and already-prefixed links alone', () => {
-    expect(localizePath('ar', 'https://noon.com/x')).toBe('https://noon.com/x');
-    expect(localizePath('ar', '//evil.example')).toBe('//evil.example');
-    expect(localizePath('ar', '/ar/search')).toBe('/ar/search');
-    expect(localizePath('ar', '#offers')).toBe('#offers');
+    expect(localizePath('en', 'https://noon.com/x')).toBe('https://noon.com/x');
+    expect(localizePath('en', '//evil.example')).toBe('//evil.example');
+    expect(localizePath('en', '/en/search')).toBe('/en/search');
+    expect(localizePath('en', '#offers')).toBe('#offers');
   });
 
   it('splits the locale off a path', () => {
-    expect(splitLocale('/ar/products/x')).toEqual({ locale: 'ar', path: '/products/x' });
-    expect(splitLocale('/ar')).toEqual({ locale: 'ar', path: '/' });
-    expect(splitLocale('/search')).toEqual({ locale: 'en', path: '/search' });
-    // A page built ahead of time reports its route path (audit 09).
-    expect(splitLocale('/en/pricing')).toEqual({ locale: 'en', path: '/pricing' });
+    expect(splitLocale('/en/products/x')).toEqual({ locale: 'en', path: '/products/x' });
     expect(splitLocale('/en')).toEqual({ locale: 'en', path: '/' });
-    // Not a locale: "/area" starts with "ar" but is a path.
-    expect(splitLocale('/area')).toEqual({ locale: 'en', path: '/area' });
+    expect(splitLocale('/search')).toEqual({ locale: 'ar', path: '/search' });
+    // A page built ahead of time reports its route path (audit 09).
+    expect(splitLocale('/ar/pricing')).toEqual({ locale: 'ar', path: '/pricing' });
+    expect(splitLocale('/ar')).toEqual({ locale: 'ar', path: '/' });
+    // Not a locale: "/english" starts with "en" but is a path.
+    expect(splitLocale('/english')).toEqual({ locale: 'ar', path: '/english' });
   });
 });
 

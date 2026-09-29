@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { categoriesApi } from '@/lib/api/categories.api';
 import { searchApi } from '@/lib/api/search.api';
-import { localizePath } from '@/lib/i18n/config';
+import { defaultLocale, localizePath } from '@/lib/i18n/config';
 import { absoluteUrl } from '@/lib/seo';
 
 // Indexable pages only (audit 09, SEO-04, SEO-12): no /watchlist or other
@@ -29,7 +29,7 @@ function bothLanguages(
   const languages = {
     en: absoluteUrl(localizePath('en', path)),
     ar: absoluteUrl(localizePath('ar', path)),
-    'x-default': absoluteUrl(localizePath('en', path)),
+    'x-default': absoluteUrl(localizePath(defaultLocale, path)),
   };
   return [
     { ...entry, url: languages.en, alternates: { languages } },

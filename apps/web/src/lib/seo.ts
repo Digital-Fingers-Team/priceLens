@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { localizePath, type Locale } from './i18n/config';
+import { defaultLocale, localizePath, type Locale } from './i18n/config';
 
 const SITE_NAME = 'Pricelens';
 
@@ -80,7 +80,7 @@ export function absoluteUrl(pathname: string) {
 /**
  * Canonical and hreflang for a page that exists in both languages (audit 09,
  * SEO-01, SEO-03). `path` is the English path; relative URLs resolve
- * against metadataBase. x-default is English, the un-prefixed site.
+ * against metadataBase. x-default is the default locale, the un-prefixed site.
  */
 export function localizedAlternates(locale: Locale, path: string): NonNullable<Metadata['alternates']> {
   return {
@@ -88,7 +88,7 @@ export function localizedAlternates(locale: Locale, path: string): NonNullable<M
     languages: {
       en: localizePath('en', path),
       ar: localizePath('ar', path),
-      'x-default': localizePath('en', path),
+      'x-default': localizePath(defaultLocale, path),
     },
   };
 }

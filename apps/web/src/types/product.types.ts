@@ -27,6 +27,8 @@ export interface CanonicalProduct {
   categoryId: string;
   category: Category;
   title: string;
+  /** Arabic title (AI-translated); null until translated. */
+  titleAr?: string | null;
   brand: string | null;
   model: string | null;
   gtin: string | null;

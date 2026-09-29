@@ -82,20 +82,20 @@ test('an unknown product is a real 404', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
 });
 
-test('the Arabic UI is right-to-left and keeps English URLs un-prefixed', async ({ page }) => {
-  await openHydrated(page, '/ar');
+test('the Arabic UI is the default, right-to-left and un-prefixed', async ({ page }) => {
+  await openHydrated(page, '/');
   await expect(page.locator('html')).toHaveAttribute('lang', 'ar');
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
   const box = page.getByRole('main').getByRole('searchbox').first();
   await box.fill('galaxy');
   await box.press('Enter');
-  await expect(page).toHaveURL(/\/ar\/search\?q=galaxy/);
-  await expect(page.getByRole('main').locator('a[href^="/ar/products/"]').first()).toBeVisible();
+  await expect(page).toHaveURL(/^[^?]*\/search\?q=galaxy/);
+  await expect(page.getByRole('main').locator('a[href^="/products/"]').first()).toBeVisible();
 
-  const res = await page.goto('/en/search?q=galaxy');
+  const res = await page.goto('/ar/search?q=galaxy');
   expect(res?.url()).toMatch(/\/search\?q=galaxy$/);
-  expect(res?.url()).not.toMatch(/\/en\//);
-  await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
+  expect(res?.url()).not.toMatch(/\/ar\//);
+  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
 });
 
 test('the theme toggle switches to dark and survives a reload', async ({ page, isMobile }) => {
@@ -129,7 +129,7 @@ test('no console errors or hydration warnings on key pages, signed out and signe
   // Twenty full page loads.
   test.setTimeout(360_000);
   const productPath = await firstProductPath(page);
-  const pages = ['/', '/search?q=galaxy', productPath, '/login', '/pricing', '/no-such-page', '/ar', `/ar${productPath}`];
+  const pages = ['/', '/search?q=galaxy', productPath, '/login', '/pricing', '/no-such-page', '/en', `/en${productPath}`];
 
   const visitAll = async () => {
     for (const path of pages) await openHydrated(page, path);

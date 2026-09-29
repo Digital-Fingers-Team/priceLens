@@ -1,4 +1,5 @@
 'use client';
+import { productTitle } from '@/lib/product-title';
 import Image from 'next/image';
 import { Heart, ImageOff } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -18,7 +19,7 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, priority = false }: ProductCardProps) {
-  const { t, tf, tp, fmt } = useI18n();
+  const { t, tf, tp, fmt, locale } = useI18n();
   const router = useRouter();
   const { isAuthenticated } = useAuthStore();
   const isWatched = useIsWatched(product.id);
@@ -74,7 +75,7 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
             so storage/RAM/color -- what tells variants apart -- stay visible. */}
         <h3 dir="auto" className="line-clamp-3 text-sm font-medium text-fg">
           <Link href={href} className="after:absolute after:inset-0 focus-visible:outline-none">
-            {product.title}
+            {productTitle(product, locale)}
             <LinkPending />
           </Link>
         </h3>
@@ -115,10 +116,10 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
         aria-pressed={isAuthenticated ? isWatched : undefined}
         aria-label={
           !isAuthenticated
-            ? tf(t.product.signInToSave, { title: product.title })
+            ? tf(t.product.signInToSave, { title: productTitle(product, locale) })
             : isWatched
-              ? tf(t.product.removeFromWatchlist, { title: product.title })
-              : tf(t.product.addToWatchlist, { title: product.title })
+              ? tf(t.product.removeFromWatchlist, { title: productTitle(product, locale) })
+              : tf(t.product.addToWatchlist, { title: productTitle(product, locale) })
         }
       >
         <Heart className={cn('h-4 w-4', isWatched && 'fill-current')} aria-hidden />

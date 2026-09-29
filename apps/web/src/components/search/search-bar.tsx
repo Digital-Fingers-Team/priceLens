@@ -1,4 +1,5 @@
 'use client';
+import { productTitle } from '@/lib/product-title';
 import { useState, useRef, useEffect } from 'react';
 import { Search, X } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
@@ -18,7 +19,7 @@ interface SearchBarProps {
 /** The search field is the brand's one pill ("bubble") shape. */
 export function SearchBar({ initialValue = '', size = 'default', onSearch, className }: SearchBarProps) {
   const router = useRouter();
-  const { t, href } = useI18n();
+  const { t, href, locale } = useI18n();
   const [query, setQuery] = useState(initialValue);
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIdx, setHighlightedIdx] = useState(-1);
@@ -172,7 +173,7 @@ export function SearchBar({ initialValue = '', size = 'default', onSearch, class
                     <Search className="h-4 w-4 shrink-0 text-muted" aria-hidden />
                     <span className="flex flex-col gap-1">
                       <span className="font-medium" dir="auto">
-                        {s.title}
+                        {productTitle(s, locale)}
                       </span>
                       {s.brand && <span className="text-xs text-muted">{s.brand}</span>}
                     </span>

@@ -3,10 +3,11 @@ import { defaultLocale, isLocale } from '@/lib/i18n/config';
 
 /**
  * Locale routing (audit 07). The pages live under app/[locale]:
- *  - `/ar/...` is served as is;
- *  - `/en/...` redirects to the un-prefixed URL (one canonical address);
- *  - everything else is English and is rewritten to `/en/...` internally,
- *    so today's URLs do not change.
+ *  - `/en/...` is served as is;
+ *  - `/ar/...` redirects to the un-prefixed URL (one canonical address, and
+ *    links shared before Arabic became the default keep working);
+ *  - everything else is Arabic, the default, and is rewritten to `/ar/...`
+ *    internally.
  * No Accept-Language guessing: a shared link shows the language it names.
  */
 export function middleware(request: NextRequest) {

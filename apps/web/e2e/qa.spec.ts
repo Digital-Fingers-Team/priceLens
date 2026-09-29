@@ -71,7 +71,7 @@ for (const scheme of ['light', 'dark'] as const) {
       const paths = ['/', '/search?q=galaxy', '/search', product, category, '/pricing', '/login', '/deal-hunter'];
 
       const problems: string[] = [];
-      for (const prefix of ['', '/ar']) {
+      for (const prefix of ['', '/en']) {
         for (const path of paths) {
           const url = `${prefix}${path === '/' && prefix ? '' : path}`;
           const failures = await watchForFailures(page, async () => {
@@ -81,7 +81,7 @@ for (const scheme of ['light', 'dark'] as const) {
           problems.push(...failures.map((f) => `${url}: ${f}`));
 
           const dir = await page.locator('html').getAttribute('dir');
-          if (dir !== (prefix ? 'rtl' : 'ltr')) problems.push(`${url}: dir=${dir}`);
+          if (dir !== (prefix ? 'ltr' : 'rtl')) problems.push(`${url}: dir=${dir}`);
 
           const h1 = await page.locator('h1').count();
           if (h1 !== 1) problems.push(`${url}: ${h1} h1`);
@@ -202,7 +202,7 @@ test('a failed background price refresh keeps the product on screen', async ({ p
 });
 
 test('the Arabic pricing page names the plans in Arabic', async ({ page }) => {
-  await openHydrated(page, '/ar/pricing');
+  await openHydrated(page, '/pricing');
   await expect(page.getByRole('heading', { level: 2, name: 'مجاني' })).toBeVisible();
   await expect(page.getByRole('main')).not.toContainText('Compare prices, track a handful of products');
 });

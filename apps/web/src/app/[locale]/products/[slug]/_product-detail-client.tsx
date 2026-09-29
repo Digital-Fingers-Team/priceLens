@@ -1,4 +1,5 @@
 'use client';
+import { productTitle } from '@/lib/product-title';
 import dynamic from 'next/dynamic';
 import { PriceChartSkeleton } from '@/components/charts/price-chart-skeleton';
 import { IntelligencePanel } from '@/components/intelligence/intelligence-panel';
@@ -37,7 +38,7 @@ const PriceChart = dynamic(() => import('@/components/charts/price-chart').then(
 });
 
 export function ProductDetailClient({ slug, initialProduct, fetchedAt }: ProductDetailClientProps) {
-  const { t, tf, tp, fmt } = useI18n();
+  const { t, tf, tp, fmt, locale } = useI18n();
   const { data: product, isLoading, refetch } = useProduct(slug, initialProduct, fetchedAt);
   const { data: stats } = usePriceStats(product?.id ?? '');
 
@@ -93,7 +94,7 @@ export function ProductDetailClient({ slug, initialProduct, fetchedAt }: Product
             items={[
               { label: t.seo.home, href: '/' },
               { label: categoryName, href: `/categories/${product.category.slug}` },
-              { label: product.title },
+              { label: productTitle(product, locale) },
             ]}
           />
           <ProductHeader product={product} />
@@ -133,9 +134,9 @@ export function ProductDetailClient({ slug, initialProduct, fetchedAt }: Product
 
         {/* Secondary: after the comparison, not between the price and the stores. */}
         <ShareActions
-          title={product.title}
+          title={productTitle(product, locale)}
           path={`/products/${product.slug}`}
-          summary={tf(t.share.summary, { title: product.title, price: fmt.currency(product.priceStats.min, currency) })}
+          summary={tf(t.share.summary, { title: productTitle(product, locale), price: fmt.currency(product.priceStats.min, currency) })}
         />
       </div>
     </RenderedAtProvider>

@@ -92,7 +92,7 @@ describe('OfferList', () => {
   it('offers a color filter when offers name two or more colors, and writes it to the URL', () => {
     render(<OfferList listings={offers} />);
     fireEvent.click(screen.getByRole('button', { name: 'lilac' }));
-    expect(replace).toHaveBeenCalledWith('/products/galaxy-a57?color=lilac', { scroll: false });
+    expect(replace).toHaveBeenCalledWith('/en/products/galaxy-a57?color=lilac', { scroll: false });
     expect(rowNames()).toEqual(['Amazon']);
   });
 

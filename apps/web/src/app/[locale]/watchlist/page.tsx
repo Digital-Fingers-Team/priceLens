@@ -1,4 +1,5 @@
 'use client';
+import { productTitle } from '@/lib/product-title';
 import Image from 'next/image';
 import { useEffect } from 'react';
 import { Bell, Heart, ImageOff, Trash2 } from 'lucide-react';
@@ -37,7 +38,7 @@ export default function WatchlistPage() {
 }
 
 function WatchlistContent() {
-  const { t, tf, tp, fmt } = useI18n();
+  const { t, tf, tp, fmt, locale } = useI18n();
   const { data: items, isLoading, isError } = useWatchlist();
   const { mutate: toggleWatchlist } = useToggleWatchlist();
   const openAlertModal = useUiStore((s) => s.openAlertModal);
@@ -94,7 +95,7 @@ function WatchlistContent() {
               </Link>
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <Link href={`/products/${product.slug}`} dir="auto" className="line-clamp-1 text-sm font-medium text-fg hover:text-brand">
-                  {product.title}
+                  {productTitle(product, locale)}
                 </Link>
                 <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
                   {item.bestPrice != null ? (
@@ -114,7 +115,7 @@ function WatchlistContent() {
                   variant="ghost"
                   size="sm"
                   leftIcon={<Trash2 className="h-4 w-4" aria-hidden />}
-                  aria-label={tf(t.product.removeFromWatchlist, { title: product.title })}
+                  aria-label={tf(t.product.removeFromWatchlist, { title: productTitle(product, locale) })}
                   onClick={() => toggleWatchlist({ productId: product.id, isWatched: true })}
                 >
                   {t.watchlist.remove}

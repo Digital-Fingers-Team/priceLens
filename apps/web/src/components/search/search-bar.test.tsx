@@ -34,7 +34,7 @@ describe('SearchBar', () => {
     renderSearchBar();
     fireEvent.change(input(), { target: { value: '  iphone 15 & case ' } });
     fireEvent.click(screen.getByRole('button', { name: 'Search' }));
-    expect(push).toHaveBeenCalledWith('/search?q=iphone%2015%20%26%20case');
+    expect(push).toHaveBeenCalledWith('/en/search?q=iphone%2015%20%26%20case');
   });
 
   it('does not navigate for a blank query', () => {
@@ -53,7 +53,7 @@ describe('SearchBar', () => {
 
     fireEvent.click(await screen.findByText('Samsung Galaxy A57 256GB'));
     expect(suggest).toHaveBeenCalledWith('galaxy');
-    expect(push).toHaveBeenCalledWith('/products/samsung-galaxy-a57-256gb');
+    expect(push).toHaveBeenCalledWith('/en/products/samsung-galaxy-a57-256gb');
   });
 
   it('follows the URL (back/forward) while the box is untouched', () => {

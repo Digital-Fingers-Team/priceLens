@@ -3,12 +3,12 @@ import { formatCurrency, formatNumber } from './format';
 
 describe('formatCurrency', () => {
   // Intl separates the currency code and the amount with a no-break space.
-  it('defaults to EGP with two decimals', () => {
-    expect(formatCurrency(26325)).toBe('EGP\u00a026,325.00');
+  it('defaults to EGP with two decimals (English)', () => {
+    expect(formatCurrency(26325, 'EGP', 'en')).toBe('EGP\u00a026,325.00');
   });
 
   it('uses the listing currency when given', () => {
-    expect(formatCurrency(19.5, 'USD')).toBe('$19.50');
+    expect(formatCurrency(19.5, 'USD', 'en')).toBe('$19.50');
   });
 
   it('shows a dash for a missing price instead of 0', () => {
@@ -17,7 +17,7 @@ describe('formatCurrency', () => {
   });
 
   it('keeps a real zero', () => {
-    expect(formatCurrency(0)).toBe('EGP\u00a00.00');
+    expect(formatCurrency(0, 'EGP', 'en')).toBe('EGP\u00a00.00');
   });
 });
 

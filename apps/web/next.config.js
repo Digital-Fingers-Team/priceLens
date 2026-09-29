@@ -63,14 +63,14 @@ const nextConfig = {
   },
   async rewrites() {
     return {
-      // English product pages, un-prefixed (see middleware.ts). A config
-      // rewrite changes the path Next matches against its prerender manifest,
-      // so these pages are cached like /ar/products/... (ISR, audit 08).
-      // The share images too: their URL is /en/products/<slug>/opengraph-image,
+      // Arabic (default-locale) product pages, un-prefixed (see middleware.ts).
+      // A config rewrite changes the path Next matches against its prerender
+      // manifest, so these pages are cached like /en/products/... (ISR, audit 08).
+      // The share images too: their URL is /ar/products/<slug>/opengraph-image,
       // which redirects here (audit 09, SEO-10).
       beforeFiles: [
-        { source: '/products/:slug', destination: '/en/products/:slug' },
-        { source: '/products/:slug/:image(opengraph-image|twitter-image)', destination: '/en/products/:slug/:image' },
+        { source: '/products/:slug', destination: '/ar/products/:slug' },
+        { source: '/products/:slug/:image(opengraph-image|twitter-image)', destination: '/ar/products/:slug/:image' },
       ],
     };
   },

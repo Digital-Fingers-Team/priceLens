@@ -1,3 +1,4 @@
+import { productTitle } from '@/lib/product-title';
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { cache } from 'react';
@@ -57,9 +58,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const listingCount = product._count?.sourceListings ?? product.sourceListings?.length ?? 0;
   const min = product.priceStats.min;
-  const title = tf(t.product.metaTitle, { title: product.title });
+  const title = tf(t.product.metaTitle, { title: productTitle(product, locale) });
   const description = [
-    tp(t.product.metaCompare, listingCount, { title: product.title }),
+    tp(t.product.metaCompare, listingCount, { title: productTitle(product, locale) }),
     min != null ? tf(t.product.metaFrom, { price: fmt.currency(min, product.priceStats.currency) }) : null,
     product.brand ? tf(t.product.metaBrand, { brand: product.brand }) : null,
   ]
@@ -117,7 +118,7 @@ export default async function ProductPage({ params }: PageProps) {
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Product',
-    name: product.title,
+    name: productTitle(product, locale),
     url: absoluteUrl(href(`/products/${slug}`)),
     ...(product.imageUrl ? { image: product.imageUrl } : {}),
     ...(product.brand ? { brand: { '@type': 'Brand', name: product.brand } } : {}),
@@ -151,7 +152,7 @@ export default async function ProductPage({ params }: PageProps) {
             breadcrumbJsonLd([
               { name: t.seo.home, path: href('/') },
               { name: categoryName, path: href(`/categories/${product.category.slug}`) },
-              { name: product.title, path: href(`/products/${slug}`) },
+              { name: productTitle(product, locale), path: href(`/products/${slug}`) },
             ]),
           ),
         }}
