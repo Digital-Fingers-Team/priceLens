@@ -13,13 +13,13 @@ async function openMobileMenu(page: Page) {
 }
 
 test('search → results → product page', async ({ page }) => {
-  await openHydrated(page, '/');
+  await openHydrated(page, '/en');
   const search = page.getByRole('main').getByPlaceholder('Search products, brands, models...');
   await search.fill('galaxy');
   await search.press('Enter');
 
   await expect(page).toHaveURL(/\/search\?q=galaxy/);
-  const firstResult = page.getByRole('main').locator('a[href^="/products/"]').first();
+  const firstResult = page.getByRole('main').locator('a[href^="/en/products/"]').first();
   await expect(firstResult).toBeVisible();
 
   await firstResult.click();
@@ -29,8 +29,8 @@ test('search → results → product page', async ({ page }) => {
 });
 
 test('empty search browses the catalog instead of a blank page', async ({ page }) => {
-  await openHydrated(page, '/search');
-  await expect(page.getByRole('main').locator('a[href^="/products/"]').first()).toBeVisible();
+  await openHydrated(page, '/en/search');
+  await expect(page.getByRole('main').locator('a[href^="/en/products/"]').first()).toBeVisible();
 });
 
 test('login and logout', async ({ page, request, isMobile }) => {
@@ -42,7 +42,7 @@ test('login and logout', async ({ page, request, isMobile }) => {
   });
   expect(registered.status()).toBe(201);
 
-  await openHydrated(page, '/login');
+  await openHydrated(page, '/en/login');
   const form = page.getByRole('main');
   await form.getByLabel('Email').fill(email);
   await form.getByLabel('Password', { exact: true }).fill(password);

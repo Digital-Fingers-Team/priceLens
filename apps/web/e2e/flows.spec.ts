@@ -36,15 +36,15 @@ async function collectConsoleProblems(page: Page, run: () => Promise<void>) {
 }
 
 async function firstProductPath(page: Page): Promise<string> {
-  await openHydrated(page, '/search?q=galaxy');
-  const href = await page.getByRole('main').locator('a[href^="/products/"]').first().getAttribute('href');
+  await openHydrated(page, '/en/search?q=galaxy');
+  const href = await page.getByRole('main').locator('a[href^="/en/products/"]').first().getAttribute('href');
   expect(href).toBeTruthy();
   return href!;
 }
 
 test('filters and sort live in the URL, and back/forward restores them', async ({ page }) => {
-  await openHydrated(page, '/search?q=galaxy');
-  await expect(page.getByRole('main').locator('a[href^="/products/"]').first()).toBeVisible();
+  await openHydrated(page, '/en/search?q=galaxy');
+  await expect(page.getByRole('main').locator('a[href^="/en/products/"]').first()).toBeVisible();
 
   // Sort sits on the results bar (audit 06, U-05); one choice sets both.
   await page.getByLabel('Sort', { exact: true }).selectOption('minPriceUsd');
@@ -77,7 +77,7 @@ test('product page links out to the store in a new tab, through the click tracke
 });
 
 test('an unknown product is a real 404', async ({ page }) => {
-  const res = await page.goto('/products/no-such-product-phase05-check');
+  const res = await page.goto('/en/products/no-such-product-phase05-check');
   expect(res?.status()).toBe(404);
   await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
 });
@@ -100,7 +100,7 @@ test('the Arabic UI is the default, right-to-left and un-prefixed', async ({ pag
 
 test('the theme toggle switches to dark and survives a reload', async ({ page, isMobile }) => {
   test.skip(isMobile, 'the toggle is in the desktop navbar');
-  await openHydrated(page, '/');
+  await openHydrated(page, '/en');
   // Cycles system → light → dark.
   const toggle = page.getByRole('banner').getByRole('button', { name: /^Theme: / }).first();
   await expect(toggle).toHaveAccessibleName(/^Theme: system/);
@@ -117,7 +117,7 @@ test.describe('without JavaScript', () => {
   test.use({ javaScriptEnabled: false });
 
   test('the search form still searches', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/en');
     const box = page.getByRole('main').getByRole('searchbox', { name: 'Search products' });
     await box.fill('galaxy');
     await box.press('Enter');
@@ -144,7 +144,7 @@ test('no console errors or hydration warnings on key pages, signed out and signe
     data: { email, password, username: `e2e${suffix}`.slice(0, 20) },
   });
   expect(registered.status()).toBe(201);
-  await openHydrated(page, '/login');
+  await openHydrated(page, '/en/login');
   await page.getByRole('main').getByLabel('Email').fill(email);
   await page.getByRole('main').getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('main').getByRole('button', { name: 'Sign in' }).click();

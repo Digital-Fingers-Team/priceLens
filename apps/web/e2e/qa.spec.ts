@@ -35,17 +35,19 @@ async function watchForFailures(page: Page, run: () => Promise<void>) {
 }
 
 async function firstProductPath(page: Page): Promise<string> {
-  await openHydrated(page, '/search?q=galaxy');
-  const href = await page.getByRole('main').locator('a[href^="/products/"]').first().getAttribute('href');
+  await openHydrated(page, '/en/search?q=galaxy');
+  const href = await page.getByRole('main').locator('a[href^="/en/products/"]').first().getAttribute('href');
   expect(href).toBeTruthy();
-  return href!;
+  // Without the language prefix: callers add the one they test.
+  return href!.replace(/^\/en(?=\/)/, '');
 }
 
 async function firstCategoryPath(page: Page): Promise<string> {
-  await openHydrated(page, '/');
-  const href = await page.locator('a[href^="/categories/"]').first().getAttribute('href');
+  await openHydrated(page, '/en');
+  const href = await page.locator('a[href^="/en/categories/"]').first().getAttribute('href');
   expect(href).toBeTruthy();
-  return href!;
+  // Without the language prefix: callers add the one they test.
+  return href!.replace(/^\/en(?=\/)/, '');
 }
 
 /** Relative luminance of the body background, 0 (black) to 1 (white). */
@@ -115,7 +117,7 @@ test('odd search input is shown as text, never run, and never breaks the page', 
   const problems: string[] = [];
   for (const q of inputs) {
     const failures = await watchForFailures(page, async () => {
-      const response = await openHydrated(page, `/search?q=${encodeURIComponent(q)}`);
+      const response = await openHydrated(page, `/en/search?q=${encodeURIComponent(q)}`);
       if (response?.status() !== 200) problems.push(`${q.slice(0, 20)}: HTTP ${response?.status()}`);
     });
     problems.push(...failures.map((f) => `${q.slice(0, 20)}: ${f}`));
@@ -128,8 +130,8 @@ test('odd search input is shown as text, never run, and never breaks the page', 
 });
 
 test('back and refresh in the middle of a flow keep the user where they were', async ({ page }) => {
-  await openHydrated(page, '/search?q=galaxy');
-  const firstResult = page.getByRole('main').locator('a[href^="/products/"]').first();
+  await openHydrated(page, '/en/search?q=galaxy');
+  const firstResult = page.getByRole('main').locator('a[href^="/en/products/"]').first();
   await firstResult.click();
   await expect(page).toHaveURL(/\/products\//, NAV);
   await page.reload();
@@ -137,13 +139,13 @@ test('back and refresh in the middle of a flow keep the user where they were', a
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   await page.goBack();
   await expect(page).toHaveURL(/\/search\?q=galaxy/, NAV);
-  await expect(page.getByRole('main').locator('a[href^="/products/"]').first()).toBeVisible();
+  await expect(page.getByRole('main').locator('a[href^="/en/products/"]').first()).toBeVisible();
   await page.goForward();
   await expect(page).toHaveURL(/\/products\//, NAV);
 });
 
 test('quick repeated searches end on the last one', async ({ page }) => {
-  await openHydrated(page, '/search?q=galaxy');
+  await openHydrated(page, '/en/search?q=galaxy');
   const box = page.getByRole('main').getByRole('searchbox', { name: 'Search products' });
   for (const q of ['iphone', 'xiaomi', 'galaxy a57']) {
     await box.fill(q);
@@ -154,7 +156,7 @@ test('quick repeated searches end on the last one', async ({ page }) => {
 });
 
 test('a slow search keeps the current results on screen, marked busy, until the new ones arrive', async ({ page }) => {
-  await openHydrated(page, '/search?q=galaxy');
+  await openHydrated(page, '/en/search?q=galaxy');
   // A search is a navigation the server renders (search/page.tsx); slow it down.
   await page.route(/\/search\?.*_rsc=/, async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 3_000));
@@ -165,14 +167,14 @@ test('a slow search keeps the current results on screen, marked busy, until the 
   await box.press('Enter');
   const busy = page.getByRole('main').locator('[aria-busy="true"]');
   await expect(busy.first()).toBeVisible();
-  await expect(busy.first().locator('a[href^="/products/"]').first()).toBeVisible();
+  await expect(busy.first().locator('a[href^="/en/products/"]').first()).toBeVisible();
   await expect(page).toHaveURL(/[?&]q=iphone/, NAV);
   await expect(busy).toHaveCount(0, NAV);
-  await expect(page.getByRole('main').locator('a[href^="/products/"]').first()).toBeVisible();
+  await expect(page.getByRole('main').locator('a[href^="/en/products/"]').first()).toBeVisible();
 });
 
 test('searching again while the API is down keeps the results on screen', async ({ page }) => {
-  await openHydrated(page, '/search?q=galaxy');
+  await openHydrated(page, '/en/search?q=galaxy');
   const failed = page.waitForEvent('requestfailed', {
     predicate: (r) => /\/api\/v1\/search\?/.test(r.url()),
     ...NAV,
@@ -182,7 +184,7 @@ test('searching again while the API is down keeps the results on screen', async 
   await page.getByRole('main').getByRole('searchbox', { name: 'Search products' }).press('Enter');
   await failed;
   await page.waitForTimeout(8_000); // past the retries
-  await expect(page.getByRole('main').locator('a[href^="/products/"]').first()).toBeVisible();
+  await expect(page.getByRole('main').locator('a[href^="/en/products/"]').first()).toBeVisible();
   await expect(page.getByRole('main').getByRole('alert')).toHaveCount(0);
 });
 

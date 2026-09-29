@@ -268,6 +268,9 @@ model CanonicalProduct {
   // by trigram distance (<->), which only a GiST index can serve (B-22).
   @@index([normalizedTitle(ops: raw("gin_trgm_ops"))], map: "canonical_products_title_trgm_idx", type: Gin)
   @@index([normalizedTitle(ops: raw("gist_trgm_ops"))], map: "canonical_products_title_trgm_gist_idx", type: Gist)
+  // Nearest titles within one category (reconciliation's look-alike search):
+  // migration 20260929100000, needs btree_gist for category_id.
+  @@index([categoryId, normalizedTitle(ops: raw("gist_trgm_ops"))], map: "canonical_products_category_title_trgm_gist_idx", type: Gist)
   // Search and type-ahead: LIKE '%term%' on the generated search_text (audit 08, P-04).
   @@index([searchText(ops: raw("gin_trgm_ops"))], map: "canonical_products_search_text_trgm_idx", type: Gin)
   @@map("canonical_products")
