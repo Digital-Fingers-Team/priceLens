@@ -5,6 +5,7 @@ import type { CSSProperties } from 'react';
 import { productApi } from '@/lib/api/product.api';
 import { isLocale, type Locale } from '@/lib/i18n/config';
 import { getI18n } from '@/lib/i18n/server';
+import { rtlUnits } from '@/lib/og/arabic-shape';
 import { productTitle } from '@/lib/product-title';
 import designTokens from '../../../../../design-tokens';
 
@@ -40,42 +41,16 @@ function loadFonts() {
   return fonts;
 }
 
-// Satori shapes and orders the letters inside a word but not the words in a
-// line, so an Arabic line is split into words laid out in a row-reverse flex
-// box. Runs of Latin words ("Galaxy A57") keep their left-to-right order.
-const ARABIC = /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/;
-const LATIN_OR_DIGIT = /[A-Za-z0-9]/;
-const BIDI_MARKS = /[\u200E\u200F\u061C]/g;
-
-/** An RTL line's words in the DOM order a row-reverse box displays correctly. */
-function rtlWords(text: string): string[] {
-  const words = text.replace(BIDI_MARKS, '').split(/\s+/).filter(Boolean);
-  const kind = words.map((w) => (ARABIC.test(w) ? 'r' : LATIN_OR_DIGIT.test(w) ? 'l' : 'n'));
-  // Punctuation between two Latin words belongs to their run ("A57 - 5G").
-  kind.forEach((k, i) => {
-    if (k === 'n' && kind[i - 1] === 'l' && kind[i + 1] === 'l') kind[i] = 'l';
-  });
-  const out: string[] = [];
-  let run: string[] = [];
-  words.forEach((w, i) => {
-    if (kind[i] === 'l') {
-      run.push(w);
-    } else {
-      out.push(...run.reverse(), w);
-      run = [];
-    }
-  });
-  out.push(...run.reverse());
-  return out;
-}
-
+/** A line of text; an RTL one is laid out word by word from the right (lib/og/arabic-shape.ts). */
 function Line({ text, rtl, style }: { text: string; rtl: boolean; style: CSSProperties }) {
   if (!rtl) return <div style={{ display: 'flex', ...style }}>{text}</div>;
+  const units = rtlUnits(text);
   return (
     <div style={{ display: 'flex', flexDirection: 'row-reverse', flexWrap: 'wrap', ...style }}>
-      {rtlWords(text).map((w, i) => (
-        <div key={i} style={{ display: 'flex', marginLeft: i === 0 ? 0 : '0.25em' }}>
-          {w}
+      {units.map((unit, i) => (
+        // The space before the next word, which sits to the left.
+        <div key={i} style={{ display: 'flex', marginLeft: i < units.length - 1 ? '0.25em' : 0 }}>
+          {unit}
         </div>
       ))}
     </div>
