@@ -4,6 +4,7 @@ import { AlibabaConnector } from './alibaba.connector';
 import { AliExpressConnector } from './aliexpress.connector';
 import { AmazonConnector } from './amazon.connector';
 import { CarrefourConnector } from './carrefour.connector';
+import { Dream2000Connector } from './dream2000.connector';
 import { ElarabyConnector } from './elaraby.connector';
 import { JumiaConnector } from './jumia.connector';
 import { NoonConnector } from './noon.connector';
@@ -26,6 +27,7 @@ export const CONNECTOR_CLASSES = [
   CarrefourConnector,
   TwoBConnector,
   ElarabyConnector,
+  Dream2000Connector,
 ] as const;
 
 /** Injection token for the list of connector instances, in CONNECTOR_CLASSES order. */

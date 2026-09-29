@@ -119,4 +119,6 @@ export default registerAs('retailers', () => ({
   twoBBaseUrl: process.env.TWOB_BASE_URL ?? 'https://2b.com.eg',
   elarabyEnabled: process.env.ELARABY_ENABLED !== 'false',
   elarabyBaseUrl: process.env.ELARABY_BASE_URL ?? 'https://www.elarabygroup.com',
+  dream2000Enabled: process.env.DREAM2000_ENABLED !== 'false',
+  dream2000BaseUrl: process.env.DREAM2000_BASE_URL ?? 'https://dream2000.com',
 }));

@@ -94,6 +94,7 @@ export class AffiliateService {
       carrefour: this.configService.get<string>('retailers.carrefourBaseUrl'),
       '2b': this.configService.get<string>('retailers.twoBBaseUrl'),
       elaraby: this.configService.get<string>('retailers.elarabyBaseUrl'),
+      dream2000: this.configService.get<string>('retailers.dream2000BaseUrl'),
     };
     return bases[platformSlug];
   }
