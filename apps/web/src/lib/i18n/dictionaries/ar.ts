@@ -421,6 +421,7 @@ export const ar: Dictionary = {
     instapayHint: 'من تطبيق أي بنك',
     copy: 'نسخ',
     copied: 'تم النسخ',
+    openInstapay: 'ادفع عبر إنستاباي',
     codeNote: 'إذا طلب التطبيق ملاحظة، اكتب {code}.',
     method: 'كيف دفعت؟',
     reference: 'رقم العملية',

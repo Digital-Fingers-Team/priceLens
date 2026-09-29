@@ -95,6 +95,7 @@ export interface ManualPayment {
 export interface PaymentDestinations {
   walletNumber: string | null;
   instapayAddress: string | null;
+  instapayLink: string | null;
 }
 
 export interface AdminManualPayment extends ManualPayment {

@@ -20,6 +20,9 @@ export default registerAs('billing', () => ({
   // and types the transfer reference; the owner approves in /admin/payments.
   walletNumber: (process.env.BILLING_WALLET_NUMBER ?? '').trim(),
   instapayAddress: (process.env.BILLING_INSTAPAY_ADDRESS ?? '').trim(),
+  // The owner's InstaPay payment link (https://ipn.eg/S/...): opens the app
+  // with the recipient filled in. Shown only with an InstaPay address.
+  instapayLink: (process.env.BILLING_INSTAPAY_LINK ?? '').trim(),
   // Where a new payment is announced (the owner's own chat, not a user's).
   ownerTelegramBotToken: process.env.BILLING_OWNER_TELEGRAM_BOT_TOKEN ?? '',
   ownerTelegramChatId: process.env.BILLING_OWNER_TELEGRAM_CHAT_ID ?? '',

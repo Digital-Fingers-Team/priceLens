@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Check, CheckCircle2, Clock, Copy, Landmark, Smartphone, XCircle } from 'lucide-react';
+import { Check, CheckCircle2, Clock, Copy, ExternalLink, Landmark, Smartphone, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { buttonClassName } from '@/components/ui/button-styles';
@@ -163,6 +163,7 @@ function PayForm({ payment, destinations }: { payment: ManualPayment; destinatio
               label={t.pay.instapay}
               hint={t.pay.instapayHint}
               value={destinations.instapayAddress}
+              link={destinations.instapayLink}
             />
           )}
         </div>
@@ -241,7 +242,19 @@ function PayForm({ payment, destinations }: { payment: ManualPayment; destinatio
   );
 }
 
-function Destination({ icon, label, hint, value }: { icon: React.ReactNode; label: string; hint: string; value: string }) {
+function Destination({
+  icon,
+  label,
+  hint,
+  value,
+  link,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  hint: string;
+  value: string;
+  link?: string | null;
+}) {
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
   return (
@@ -273,6 +286,12 @@ function Destination({ icon, label, hint, value }: { icon: React.ReactNode; labe
           {copied ? t.pay.copied : t.pay.copy}
         </Button>
       </div>
+      {link && (
+        <a href={link} target="_blank" rel="noopener noreferrer" className={buttonClassName({ className: 'w-full' })}>
+          {t.pay.openInstapay}
+          <ExternalLink className="h-4 w-4" aria-hidden />
+        </a>
+      )}
     </div>
   );
 }

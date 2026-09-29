@@ -352,6 +352,7 @@ export const en = {
     instapayHint: 'From any bank app',
     copy: 'Copy',
     copied: 'Copied',
+    openInstapay: 'Pay with InstaPay',
     codeNote: 'If your app asks for a note, write {code}.',
     method: 'How did you pay?',
     reference: 'Transfer number',

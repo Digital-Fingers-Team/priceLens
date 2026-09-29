@@ -65,6 +65,15 @@ describe('ManualPaymentsService', () => {
     await expect(svc.startOrder('u1', 'plus_monthly')).rejects.toBeInstanceOf(UpgradeRequiredException);
   });
 
+  it('shows only an InstaPay https link, and only with an InstaPay address', () => {
+    const link = 'https://ipn.eg/S/owner/instapay/9dz3DS';
+    expect(setup({ settings: { 'billing.instapayAddress': 'owner@instapay', 'billing.instapayLink': link } }).svc.destinations()?.instapayLink).toBe(link);
+    expect(setup({ settings: { 'billing.instapayLink': link } }).svc.destinations()?.instapayLink).toBeNull();
+    for (const bad of ['javascript:alert(1)', 'https://evil.example/S/x', 'http://ipn.eg/S/x']) {
+      expect(setup({ settings: { 'billing.instapayAddress': 'owner@instapay', 'billing.instapayLink': bad } }).svc.destinations()?.instapayLink).toBeNull();
+    }
+  });
+
   it('does not sell Enterprise by wallet', async () => {
     const { svc } = setup();
     expect(svc.isSellable(plus)).toBe(true);

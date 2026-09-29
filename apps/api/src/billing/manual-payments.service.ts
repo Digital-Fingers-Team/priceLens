@@ -25,6 +25,7 @@ const DAY_MS = 86_400_000;
 export interface PaymentDestinations {
   walletNumber: string | null;
   instapayAddress: string | null;
+  instapayLink: string | null;
 }
 
 type PaymentWithPlan = ManualPayment & { plan: Plan };
@@ -54,7 +55,10 @@ export class ManualPaymentsService {
   destinations(): PaymentDestinations | null {
     const walletNumber = this.config.get<string>('billing.walletNumber', '') || null;
     const instapayAddress = this.config.get<string>('billing.instapayAddress', '') || null;
-    return walletNumber || instapayAddress ? { walletNumber, instapayAddress } : null;
+    const link = this.config.get<string>('billing.instapayLink', '');
+    // Only InstaPay's own https links: this ends up as an href on the page.
+    const instapayLink = instapayAddress && /^https:\/\/ipn\.eg\/[\w/.-]+$/.test(link) ? link : null;
+    return walletNumber || instapayAddress ? { walletNumber, instapayAddress, instapayLink } : null;
   }
 
   get isEnabled(): boolean {

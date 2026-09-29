@@ -284,6 +284,8 @@ describe('Every endpoint (e2e)', () => {
     // The free user pays, and is put back on Free at the end (later tests
     // rely on it); registering another user would hit the sign-up limit.
     const payerToken = free.token;
+    // Unique per run: a transfer number counts once, also across runs on one database.
+    const ref = String(Date.now());
 
     const plans = await call('GET', '/api/v1/billing/plans', 200);
     expect(plans.body.data.manualPaymentsEnabled).toBe(true);
@@ -305,22 +307,22 @@ describe('Every endpoint (e2e)', () => {
     await call('POST', '/api/v1/billing/payments/{id}/submit', 404, {
       token: pro.token,
       params,
-      body: { method: 'WALLET', reference: 'TX-9001' },
+      body: { method: 'WALLET', reference: `TX-${ref}` },
     });
-    await call('POST', '/api/v1/billing/payments/{id}/submit', 400, { token: payerToken, params, body: { method: 'CARD', reference: 'TX-9001' } });
+    await call('POST', '/api/v1/billing/payments/{id}/submit', 400, { token: payerToken, params, body: { method: 'CARD', reference: `TX-${ref}` } });
     const sent = await call('POST', '/api/v1/billing/payments/{id}/submit', 201, {
       token: payerToken,
       params,
-      body: { method: 'WALLET', reference: 'tx 9001', payerAccount: '01111111111' },
+      body: { method: 'WALLET', reference: `tx ${ref}`, payerAccount: '01111111111' },
     });
-    expect(sent.body.data).toMatchObject({ status: 'SUBMITTED', reference: 'TX9001' });
+    expect(sent.body.data).toMatchObject({ status: 'SUBMITTED', reference: `TX${ref}` });
 
     // The same receipt cannot pay for a second order.
     const other = await call('POST', '/api/v1/billing/payments', 201, { token: pro.token, body: { planKey: 'plus_monthly' } });
     await call('POST', '/api/v1/billing/payments/{id}/submit', 409, {
       token: pro.token,
       params: { id: other.body.data.payment.id },
-      body: { method: 'WALLET', reference: 'TX-9001' },
+      body: { method: 'WALLET', reference: `TX-${ref}` },
     });
     await call('POST', '/api/v1/billing/payments/{id}/cancel', 201, { token: pro.token, params: { id: other.body.data.payment.id } });
     await call('POST', '/api/v1/billing/payments/{id}/cancel', 409, { token: pro.token, params: { id: other.body.data.payment.id } });
