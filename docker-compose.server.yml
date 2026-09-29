@@ -97,6 +97,12 @@ services:
     # deploy, silently re-blocking Alibaba/Amazon until someone re-solved them.
     volumes:
       - browser_profiles:/repo/apps/api/.browser-profiles
+    # noVNC into the scrapers' own browser window, to solve a store CAPTCHA
+    # (e.g. Alibaba) in the live profile. Loopback only -- reach it through an
+    # SSH tunnel (ssh -L 6081:127.0.0.1:6081 pricelens). Nothing listens
+    # unless ENABLE_NOVNC=true and VNC_PASSWORD are set (entrypoint.api.sh).
+    ports:
+      - "127.0.0.1:6081:6080"
     networks:
       - internal
       - external
