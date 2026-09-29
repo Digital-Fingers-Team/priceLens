@@ -38,6 +38,8 @@ exports[`Matching pipeline characterization (e2e) ingestion reports 1`] = `
       {
         "canonicalProductsCreated": 1,
         "canonicalProductsMatched": 0,
+        "listingsBelowFloor": 0,
+        "listingsBelowFloorByCategory": {},
         "listingsDiscovered": 1,
         "listingsFailed": 0,
         "listingsUpserted": 1,
@@ -50,6 +52,8 @@ exports[`Matching pipeline characterization (e2e) ingestion reports 1`] = `
       {
         "canonicalProductsCreated": 1,
         "canonicalProductsMatched": 1,
+        "listingsBelowFloor": 0,
+        "listingsBelowFloorByCategory": {},
         "listingsDiscovered": 2,
         "listingsFailed": 0,
         "listingsUpserted": 2,
@@ -62,6 +66,8 @@ exports[`Matching pipeline characterization (e2e) ingestion reports 1`] = `
       {
         "canonicalProductsCreated": 0,
         "canonicalProductsMatched": 1,
+        "listingsBelowFloor": 0,
+        "listingsBelowFloorByCategory": {},
         "listingsDiscovered": 1,
         "listingsFailed": 0,
         "listingsUpserted": 1,
@@ -74,6 +80,8 @@ exports[`Matching pipeline characterization (e2e) ingestion reports 1`] = `
       {
         "canonicalProductsCreated": 1,
         "canonicalProductsMatched": 0,
+        "listingsBelowFloor": 0,
+        "listingsBelowFloorByCategory": {},
         "listingsDiscovered": 1,
         "listingsFailed": 0,
         "listingsUpserted": 1,
@@ -91,6 +99,8 @@ exports[`Matching pipeline characterization (e2e) ingestion reports 1`] = `
       {
         "canonicalProductsCreated": 1,
         "canonicalProductsMatched": 0,
+        "listingsBelowFloor": 0,
+        "listingsBelowFloorByCategory": {},
         "listingsDiscovered": 1,
         "listingsFailed": 0,
         "listingsUpserted": 1,
@@ -103,6 +113,8 @@ exports[`Matching pipeline characterization (e2e) ingestion reports 1`] = `
       {
         "canonicalProductsCreated": 2,
         "canonicalProductsMatched": 2,
+        "listingsBelowFloor": 0,
+        "listingsBelowFloorByCategory": {},
         "listingsDiscovered": 3,
         "listingsFailed": 0,
         "listingsUpserted": 4,
@@ -115,6 +127,8 @@ exports[`Matching pipeline characterization (e2e) ingestion reports 1`] = `
       {
         "canonicalProductsCreated": 2,
         "canonicalProductsMatched": 2,
+        "listingsBelowFloor": 0,
+        "listingsBelowFloorByCategory": {},
         "listingsDiscovered": 3,
         "listingsFailed": 0,
         "listingsUpserted": 4,
@@ -127,6 +141,8 @@ exports[`Matching pipeline characterization (e2e) ingestion reports 1`] = `
       {
         "canonicalProductsCreated": 1,
         "canonicalProductsMatched": 0,
+        "listingsBelowFloor": 0,
+        "listingsBelowFloorByCategory": {},
         "listingsDiscovered": 1,
         "listingsFailed": 0,
         "listingsUpserted": 1,
@@ -144,6 +160,8 @@ exports[`Matching pipeline characterization (e2e) ingestion reports 1`] = `
       {
         "canonicalProductsCreated": 3,
         "canonicalProductsMatched": 5,
+        "listingsBelowFloor": 0,
+        "listingsBelowFloorByCategory": {},
         "listingsDiscovered": 4,
         "listingsFailed": 0,
         "listingsUpserted": 8,
@@ -156,6 +174,8 @@ exports[`Matching pipeline characterization (e2e) ingestion reports 1`] = `
       {
         "canonicalProductsCreated": 5,
         "canonicalProductsMatched": 5,
+        "listingsBelowFloor": 0,
+        "listingsBelowFloorByCategory": {},
         "listingsDiscovered": 8,
         "listingsFailed": 0,
         "listingsUpserted": 10,
@@ -168,6 +188,8 @@ exports[`Matching pipeline characterization (e2e) ingestion reports 1`] = `
       {
         "canonicalProductsCreated": 3,
         "canonicalProductsMatched": 13,
+        "listingsBelowFloor": 0,
+        "listingsBelowFloorByCategory": {},
         "listingsDiscovered": 11,
         "listingsFailed": 0,
         "listingsUpserted": 16,
@@ -180,6 +202,8 @@ exports[`Matching pipeline characterization (e2e) ingestion reports 1`] = `
       {
         "canonicalProductsCreated": 1,
         "canonicalProductsMatched": 10,
+        "listingsBelowFloor": 0,
+        "listingsBelowFloorByCategory": {},
         "listingsDiscovered": 8,
         "listingsFailed": 0,
         "listingsUpserted": 11,
@@ -197,6 +221,8 @@ exports[`Matching pipeline characterization (e2e) ingestion reports 1`] = `
       {
         "canonicalProductsCreated": 0,
         "canonicalProductsMatched": 1,
+        "listingsBelowFloor": 0,
+        "listingsBelowFloorByCategory": {},
         "listingsDiscovered": 0,
         "listingsFailed": 0,
         "listingsUpserted": 1,
@@ -209,6 +235,8 @@ exports[`Matching pipeline characterization (e2e) ingestion reports 1`] = `
       {
         "canonicalProductsCreated": 0,
         "canonicalProductsMatched": 2,
+        "listingsBelowFloor": 0,
+        "listingsBelowFloorByCategory": {},
         "listingsDiscovered": 3,
         "listingsFailed": 0,
         "listingsUpserted": 2,
@@ -221,6 +249,8 @@ exports[`Matching pipeline characterization (e2e) ingestion reports 1`] = `
       {
         "canonicalProductsCreated": 0,
         "canonicalProductsMatched": 0,
+        "listingsBelowFloor": 0,
+        "listingsBelowFloorByCategory": {},
         "listingsDiscovered": 1,
         "listingsFailed": 0,
         "listingsUpserted": 0,
@@ -233,6 +263,8 @@ exports[`Matching pipeline characterization (e2e) ingestion reports 1`] = `
       {
         "canonicalProductsCreated": 0,
         "canonicalProductsMatched": 1,
+        "listingsBelowFloor": 0,
+        "listingsBelowFloorByCategory": {},
         "listingsDiscovered": 1,
         "listingsFailed": 0,
         "listingsUpserted": 1,

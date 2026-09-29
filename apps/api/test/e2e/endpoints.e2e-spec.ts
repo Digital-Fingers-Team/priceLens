@@ -13,8 +13,7 @@ import { AppModule } from '../../src/app.module';
 import { configureApp } from '../../src/app.setup';
 import { PrismaService } from '../../src/database/prisma.service';
 import { LiveIngestionService } from '../../src/scraping/live-ingestion.service';
-import { NoonConnector } from '../../src/scraping/connectors/noon.connector';
-import { JumiaConnector } from '../../src/scraping/connectors/jumia.connector';
+import { clearTestRedis, offlineStores } from './offline-stores';
 import { IngestionQueue } from '../../src/workers/ingestion-queue.service';
 import { AFFILIATE_CONVERSION_QUEUE } from '../../src/affiliate/affiliate.constants';
 import type { RetailerConnector } from '../../src/scraping/interfaces/retailer-connector.interface';
@@ -152,17 +151,16 @@ describe('Every endpoint (e2e)', () => {
   }
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
-      .overrideProvider(NoonConnector)
-      .useValue(
-        fakeConnector('noon', [
-          listing('endpoints-noon-phone', 'Apple iPhone 15 128GB Black', 42999),
-          listing('endpoints-noon-phone-2', 'Apple iPhone 15 256GB Blue', 49999),
-        ]),
-      )
-      .overrideProvider(JumiaConnector)
-      .useValue(fakeConnector('jumia', [listing('endpoints-jumia-phone', 'Apple iPhone 15 (128 GB) - Black', 41499, 'https://www.jumia.com.eg')]))
-      .compile();
+    await clearTestRedis();
+    const moduleRef = await offlineStores(Test.createTestingModule({ imports: [AppModule] }), {
+      noon: fakeConnector('noon', [
+        listing('endpoints-noon-phone', 'Apple iPhone 15 128GB Black', 42999),
+        listing('endpoints-noon-phone-2', 'Apple iPhone 15 256GB Blue', 49999),
+      ]),
+      jumia: fakeConnector('jumia', [
+        listing('endpoints-jumia-phone', 'Apple iPhone 15 (128 GB) - Black', 41499, 'https://www.jumia.com.eg'),
+      ]),
+    }).compile();
 
     app = moduleRef.createNestApplication<NestExpressApplication>({ rawBody: true });
     configureApp(app);
@@ -179,7 +177,7 @@ describe('Every endpoint (e2e)', () => {
 
     prisma = app.get(PrismaService);
     await prisma.$executeRawUnsafe(
-      'TRUNCATE canonical_products, source_listings, price_history, match_decisions, review_queue CASCADE',
+      'TRUNCATE canonical_products, source_listings, price_history, match_decisions, review_queue, page_views CASCADE',
     );
     await upsertCategories(prisma as unknown as PrismaClient);
     await generateStores(prisma as unknown as PrismaClient);
@@ -519,6 +517,47 @@ describe('Every endpoint (e2e)', () => {
     await call('POST', '/api/v1/affiliate/conversions/poll', 403, { token: free.token });
     await call('GET', '/api/v1/affiliate/conversions', 200, { token: admin.token });
     await call('GET', '/api/v1/affiliate/conversions/summary', 200, { token: admin.token });
+    expectNoProblems();
+  });
+
+  it('analytics', async () => {
+    const browser = { 'User-Agent': 'Mozilla/5.0 (Linux; Android 14) Mobile Safari' };
+    const view = {
+      id: '0b7e8f1c-3a52-4c1e-9d6f-2a1b3c4d5e6f',
+      visitorId: '1c8f9a2d-4b63-4d2f-8e7a-3b2c4d5e6f70',
+      sessionId: '2d9a0b3e-5c74-4e3a-9f8b-4c3d5e6f7081',
+      path: `/products/${productSlug}`,
+      referrer: 'https://www.google.com/',
+    };
+    await call('POST', '/api/v1/analytics/views', 204, { headers: browser, body: view });
+    // A crawler that runs script is not a visitor.
+    await call('POST', '/api/v1/analytics/views', 204, {
+      headers: { 'User-Agent': 'Googlebot/2.1' },
+      body: { ...view, id: '3e0b1c4f-6d85-4f4b-8a9c-5d4e6f708192' },
+    });
+    await call('POST', '/api/v1/analytics/views', 400, { headers: browser, body: { ...view, id: 'not-a-uuid' } });
+    await call('POST', '/api/v1/analytics/views/{id}/duration', 204, {
+      headers: browser,
+      params: { id: view.id },
+      body: { durationMs: 42000 },
+    });
+    await call('POST', '/api/v1/analytics/views/{id}/duration', 400, {
+      headers: browser,
+      params: { id: view.id },
+      body: { durationMs: -1 },
+    });
+
+    const stored = await prisma.pageView.findMany();
+    expect(stored.map((v) => [v.route, v.productSlug, v.device, v.referrerHost, v.durationMs])).toEqual([
+      ['product', productSlug, 'mobile', 'google.com', 42000],
+    ]);
+
+    const summary = await call('GET', '/api/v1/analytics/summary', 200, { token: admin.token, query: { days: 7 } });
+    expect(summary.body.data.traffic).toMatchObject({ views: 1, visitors: 1 });
+    expect(summary.body.data.engagement.products[0]).toMatchObject({ slug: productSlug, totalMs: 42000 });
+    await call('GET', '/api/v1/analytics/summary', 400, { token: admin.token, query: { days: 5 } });
+    await call('GET', '/api/v1/analytics/summary', 403, { token: free.token });
+    await call('GET', '/api/v1/analytics/summary', 401);
     expectNoProblems();
   });
 

@@ -1,6 +1,8 @@
 import type { PrismaClient } from '@prisma/client';
 import type { Client } from 'pg';
+import { planCategoryUpserts } from '../categoryTreePlan';
 import { categories } from '../datasets/categories';
+import { categoryTree } from '../datasets/categoryTree';
 import { productCatalogs } from '../datasets';
 import { createCanonicalProduct } from '../factories/canonicalProductFactory';
 import type { CanonicalProductSeed, CatalogProductInput, ProductModelDefinition, SeedConfig } from '../types';
@@ -27,6 +29,19 @@ const PRODUCT_COLUMNS = [
   'updated_at',
 ];
 
+const treeRows = new Map(planCategoryUpserts(categoryTree).map((row) => [row.slug, row]));
+
+/**
+ * Rollout wave and price floor as the curated tree (pnpm seed:categories)
+ * sets them. A category the tree does not list gets no floor, like the
+ * original electronics categories: without this every seeded category fell
+ * back to MIN_LISTING_PRICE_EGP and cheap fixture phones were dropped.
+ */
+function treeSettings(slug: string) {
+  const row = treeRows.get(slug);
+  return { rolloutWave: row?.data.rolloutWave ?? 0, minPriceEgp: row ? row.data.minPriceEgp : 0 };
+}
+
 export async function upsertCategories(prisma: PrismaClient): Promise<Map<string, string>> {
   const result = new Map<string, string>();
   const roots = categories.filter((category) => !category.parentSlug);
@@ -39,12 +54,14 @@ export async function upsertCategories(prisma: PrismaClient): Promise<Map<string
         name: category.name,
         level: category.level,
         searchTerms: category.searchTerms,
+        ...treeSettings(category.slug),
       },
       create: {
         slug: category.slug,
         name: category.name,
         level: category.level,
         searchTerms: category.searchTerms,
+        ...treeSettings(category.slug),
       },
     });
     result.set(category.slug, created.id);
@@ -60,6 +77,7 @@ export async function upsertCategories(prisma: PrismaClient): Promise<Map<string
         parentId,
         level: category.level,
         searchTerms: category.searchTerms,
+        ...treeSettings(category.slug),
       },
       create: {
         slug: category.slug,
@@ -67,6 +85,7 @@ export async function upsertCategories(prisma: PrismaClient): Promise<Map<string
         parentId,
         level: category.level,
         searchTerms: category.searchTerms,
+        ...treeSettings(category.slug),
       },
     });
     result.set(category.slug, created.id);

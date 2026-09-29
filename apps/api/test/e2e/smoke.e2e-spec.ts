@@ -6,8 +6,7 @@ import { AppModule } from '../../src/app.module';
 import { configureApp } from '../../src/app.setup';
 import { PrismaService } from '../../src/database/prisma.service';
 import { LiveIngestionService } from '../../src/scraping/live-ingestion.service';
-import { NoonConnector } from '../../src/scraping/connectors/noon.connector';
-import { JumiaConnector } from '../../src/scraping/connectors/jumia.connector';
+import { clearTestRedis, offlineStores } from './offline-stores';
 import type { RetailerConnector } from '../../src/scraping/interfaces/retailer-connector.interface';
 import type { RetailerListing } from '../../src/scraping/interfaces/retailer-listing.interface';
 import { upsertCategories } from '../../seed/generators/generateProducts';
@@ -58,12 +57,11 @@ describe('Smoke (e2e)', () => {
   let prisma: PrismaService;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
-      .overrideProvider(NoonConnector)
-      .useValue(fakeConnector('noon', NOON_LISTINGS))
-      .overrideProvider(JumiaConnector)
-      .useValue(fakeConnector('jumia', JUMIA_LISTINGS))
-      .compile();
+    await clearTestRedis();
+    const moduleRef = await offlineStores(Test.createTestingModule({ imports: [AppModule] }), {
+      noon: fakeConnector('noon', NOON_LISTINGS),
+      jumia: fakeConnector('jumia', JUMIA_LISTINGS),
+    }).compile();
 
     app = moduleRef.createNestApplication<NestExpressApplication>({ rawBody: true });
     process.env.NEXT_PUBLIC_SITE_URL = SITE_ORIGIN;

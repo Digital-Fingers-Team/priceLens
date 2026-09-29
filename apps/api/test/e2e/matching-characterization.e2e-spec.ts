@@ -5,15 +5,12 @@ import { AppModule } from '../../src/app.module';
 import { PrismaService } from '../../src/database/prisma.service';
 import { LiveIngestionService } from '../../src/scraping/live-ingestion.service';
 import { StoreCoverageService } from '../../src/scraping/store-coverage.service';
-import { AmazonConnector } from '../../src/scraping/connectors/amazon.connector';
-import { NoonConnector } from '../../src/scraping/connectors/noon.connector';
-import { JumiaConnector } from '../../src/scraping/connectors/jumia.connector';
-import { TwoBConnector } from '../../src/scraping/connectors/twob.connector';
 import type { RetailerConnector } from '../../src/scraping/interfaces/retailer-connector.interface';
 import type { RetailerListing } from '../../src/scraping/interfaces/retailer-listing.interface';
 import type { IngestionReport } from '../../src/scraping/live-ingestion.service';
 import { upsertCategories } from '../../seed/generators/generateProducts';
 import { generateStores } from '../../seed/generators/generateStores';
+import { clearTestRedis, offlineStores } from './offline-stores';
 
 /**
  * Characterization suite for the ingestion + matching pipeline.
@@ -215,16 +212,16 @@ describe('Matching pipeline characterization (e2e)', () => {
   let state: Awaited<ReturnType<typeof captureState>>;
 
   beforeAll(async () => {
+    await clearTestRedis();
     for (const [key, value] of Object.entries(ENV_OVERRIDES)) {
       savedEnv[key] = process.env[key];
       process.env[key] = value;
     }
 
-    let builder = Test.createTestingModule({ imports: [AppModule] });
-    const classes = { amazon: AmazonConnector, jumia: JumiaConnector, noon: NoonConnector, '2b': TwoBConnector };
-    for (const slug of STORES) {
-      builder = builder.overrideProvider(classes[slug]).useValue(makeConnector(slug, current));
-    }
+    const builder = offlineStores(
+      Test.createTestingModule({ imports: [AppModule] }),
+      Object.fromEntries(STORES.map((slug) => [slug, makeConnector(slug, current)])),
+    );
     const moduleRef = await builder.compile();
     app = moduleRef.createNestApplication();
     await app.init();
