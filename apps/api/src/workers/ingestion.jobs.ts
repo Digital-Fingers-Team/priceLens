@@ -18,6 +18,7 @@ export const RUN_COMPETITOR_DETECTION_JOB = 'run-competitor-detection';
 export const RUN_MAP_SWEEP_JOB = 'run-map-sweep';
 export const RUN_LAUNCH_DETECTION_JOB = 'run-launch-detection';
 export const RUN_WEEKLY_REPORTS_JOB = 'run-weekly-reports';
+export const RUN_TITLE_TRANSLATION_JOB = 'run-title-translation';
 
 /** run-live-ingestion: a category sweep over some or all stores. */
 export interface LiveIngestionJobData {

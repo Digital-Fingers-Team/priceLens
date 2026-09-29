@@ -28,6 +28,7 @@ export interface SuggestionItem {
   id: string;
   slug: string;
   title: string;
+  titleAr: string | null;
   brand: string | null;
 }
 
@@ -191,7 +192,7 @@ export class SearchService {
     );
 
     return this.prisma.$queryRaw<SuggestionItem[]>(Prisma.sql`
-      SELECT cp.id, cp.slug, cp.title, cp.brand
+      SELECT cp.id, cp.slug, cp.title, cp.title_ar AS "titleAr", cp.brand
       FROM canonical_products cp
       WHERE EXISTS (
           SELECT 1 FROM source_listings sl

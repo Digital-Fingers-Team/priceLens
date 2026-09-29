@@ -26,6 +26,8 @@ export default registerAs('search', () => ({
   reconciliationScheduleEnabled: (process.env.RECONCILIATION_SCHEDULE_ENABLED ?? 'true') !== 'false',
   reconciliationCron: process.env.RECONCILIATION_CRON ?? '0 * * * *',
   reconciliationDryRun: (process.env.RECONCILIATION_DRY_RUN ?? 'true') !== 'false',
+  // Arabic titles for new products (TitleTranslationService), 200 per run.
+  titleTranslationCron: process.env.TITLE_TRANSLATION_CRON ?? '*/15 * * * *',
   // Minimum title-trigram similarity (pg_trgm, 0..1) between two canonical
   // products before the pair is even considered a candidate worth asking the
   // LLM about. Tuned low on purpose: a genuine cross-store duplicate of the

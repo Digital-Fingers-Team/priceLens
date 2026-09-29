@@ -13,6 +13,11 @@ const OVERLOADED_RETRY_DELAYS_MS = [1_000, 3_000];
 const CALL_TIMEOUT_MS = 45_000;
 /** Titles asked about in one judgeMany request. */
 const BATCH_SIZE = 8;
+/** Room for a model that thinks before answering; a verdict itself is a few bytes. */
+const JUDGEMENT_MAX_TOKENS = 256;
+/** ~20 translated titles, plus thinking. */
+const TRANSLATION_MAX_TOKENS = 4096;
+const ARABIC_LETTER = /[ء-ي]/;
 
 /** A provider answered with an HTTP error status. */
 class ProviderHttpError extends Error {
@@ -34,7 +39,7 @@ interface Slot {
   model: string;
   /** For logs: provider, model and position -- never the key. */
   label: string;
-  ask: (prompt: string) => Promise<string | null>;
+  ask: (prompt: string, maxTokens: number) => Promise<string | null>;
   pausedUntil: number;
 }
 
@@ -142,6 +147,42 @@ export class SemanticService {
   }
 
   /**
+   * Product titles in Arabic, as Egyptian stores write them, for the Arabic
+   * site. One request for the whole list (callers send up to ~20). Answers
+   * are in order; null for a title without a usable translation, and all
+   * null when no slot answers or the reply is malformed.
+   */
+  async translateToArabic(titles: string[]): Promise<Array<string | null>> {
+    const none = titles.map(() => null);
+    if (this.slots.length === 0 || titles.length === 0) return none;
+    const numbered = titles.map((title, index) => `${index + 1}. "${title}"`).join('\n');
+    const prompt = `Translate these product titles from Egyptian online stores into Arabic, the way Amazon.eg, noon and B.TECH write their Arabic listings.
+Write the product type and descriptive words in Arabic, and well-known brand names in Arabic script as Egyptian stores do (e.g. سامسونج، شاومي، ابل، ال جي، توشيبا). Keep model names and codes, numbers, units (GB, TB, mAh, W, Hz, inch) and technology names (Wi-Fi, 5G, OLED) exactly as written in Latin letters. Do not add or drop information. A title that is already Arabic is returned unchanged.
+
+${numbered}
+
+Respond with ONLY this JSON object and nothing else: {"ar": [${titles.length} Arabic titles, in order]}`;
+
+    const answer = await this.askSlots(
+      prompt,
+      (content) => {
+        if (!content) return null;
+        try {
+          const parsed = JSON.parse(content.trim().replace(/^```(?:json)?\s*|\s*```$/g, '')) as { ar?: unknown };
+          return Array.isArray(parsed.ar) && parsed.ar.length === titles.length ? (parsed.ar as unknown[]) : null;
+        } catch {
+          return null;
+        }
+      },
+      TRANSLATION_MAX_TOKENS,
+    );
+    if (!answer) return none;
+    return answer.value.map((value) =>
+      typeof value === 'string' && ARABIC_LETTER.test(value) ? value.trim() : null,
+    );
+  }
+
+  /**
    * The first slot that answers, failing over as described on the class.
    * Each call starts one slot further along, so calls made at the same time
    * go to different keys instead of queueing on one quota.
@@ -149,12 +190,13 @@ export class SemanticService {
   private async askSlots<T>(
     prompt: string,
     parse: (content: string | null) => T | null,
+    maxTokens = JUDGEMENT_MAX_TOKENS,
   ): Promise<{ value: T; model: string } | null> {
     const start = this.nextSlot++ % this.slots.length;
     for (const slot of [...this.slots.slice(start), ...this.slots.slice(0, start)]) {
       if (Date.now() < slot.pausedUntil) continue;
       try {
-        const value = parse(await this.askWithRetry(slot, prompt));
+        const value = parse(await this.askWithRetry(slot, prompt, maxTokens));
         return value === null ? null : { value, model: `${slot.name}:${slot.model}` };
       } catch (err) {
         const rateLimited = err instanceof ProviderHttpError && err.status === 429;
@@ -176,10 +218,10 @@ export class SemanticService {
   sleep: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   /** An overloaded provider (5xx) usually answers a moment later: retry it a couple of times. */
-  private async askWithRetry(slot: Slot, prompt: string): Promise<string | null> {
+  private async askWithRetry(slot: Slot, prompt: string, maxTokens: number): Promise<string | null> {
     for (let attempt = 0; ; attempt += 1) {
       try {
-        return await slot.ask(prompt);
+        return await slot.ask(prompt, maxTokens);
       } catch (err) {
         const overloaded = err instanceof ProviderHttpError && err.status >= 500;
         if (!overloaded || attempt >= OVERLOADED_RETRY_DELAYS_MS.length) throw err;
@@ -204,7 +246,7 @@ export class SemanticService {
           name: 'gemini',
           model,
           label: `gemini key #${keyIndex + 1} ${model}`,
-          ask: (prompt) => this.askGemini(geminiBase, key, model, prompt),
+          ask: (prompt, maxTokens) => this.askGemini(geminiBase, key, model, prompt, maxTokens),
           pausedUntil: 0,
         });
       }
@@ -218,21 +260,26 @@ export class SemanticService {
         name: 'openrouter',
         model,
         label: `openrouter ${model}`,
-        ask: (prompt) => this.askOpenRouter(baseUrl, openRouterKey, model, prompt),
+        ask: (prompt, maxTokens) => this.askOpenRouter(baseUrl, openRouterKey, model, prompt, maxTokens),
         pausedUntil: 0,
       });
     }
     return slots;
   }
 
-  private async askGemini(baseUrl: string, key: string, model: string, prompt: string): Promise<string | null> {
+  private async askGemini(
+    baseUrl: string,
+    key: string,
+    model: string,
+    prompt: string,
+    maxTokens: number,
+  ): Promise<string | null> {
     const response = await fetch(`${baseUrl}/models/${encodeURIComponent(model)}:generateContent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
       body: JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        // Room for a model that thinks before answering; the answer itself is a few bytes.
-        generationConfig: { temperature: 0, maxOutputTokens: 256, responseMimeType: 'application/json' },
+        generationConfig: { temperature: 0, maxOutputTokens: maxTokens, responseMimeType: 'application/json' },
       }),
       signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
     });
@@ -243,7 +290,13 @@ export class SemanticService {
     return data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? '').join('') || null;
   }
 
-  private async askOpenRouter(baseUrl: string, key: string, model: string, prompt: string): Promise<string | null> {
+  private async askOpenRouter(
+    baseUrl: string,
+    key: string,
+    model: string,
+    prompt: string,
+    maxTokens: number,
+  ): Promise<string | null> {
     const response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
@@ -251,11 +304,11 @@ export class SemanticService {
         model,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0,
-        // The answer is a few bytes of JSON, but some models (e.g. Gemini,
-        // which reserves an internal "thinking" budget by default) will
-        // otherwise request a huge max_tokens and fail with a 402 credits
-        // error on a low-balance account before producing any output.
-        max_tokens: 120,
+        // Explicit and small: some models (e.g. Gemini, which reserves an
+        // internal "thinking" budget by default) will otherwise request a huge
+        // max_tokens and fail with a 402 credits error on a low-balance
+        // account before producing any output.
+        max_tokens: Math.min(maxTokens, 2048),
         response_format: { type: 'json_object' },
       }),
       signal: AbortSignal.timeout(CALL_TIMEOUT_MS),

@@ -1,5 +1,5 @@
 import { Process, Processor } from '@nestjs/bull';
-import { Logger } from '@nestjs/common';
+import { Logger, Optional } from '@nestjs/common';
 import { Job } from 'bull';
 import { LiveIngestionService } from '../scraping/live-ingestion.service';
 import { StoreCoverageService } from '../scraping/store-coverage.service';
@@ -11,6 +11,7 @@ import { CompetitorDetectionService } from '../seller/competitor-detection.servi
 import { MapMonitoringService } from '../brand/map-monitoring.service';
 import { LaunchDetectionService } from '../brand/launch-detection.service';
 import { MarketReportsService } from '../brand/market-reports.service';
+import { TitleTranslationService } from '../matching/title-translation.service';
 
 import {
   INGESTION_QUEUE,
@@ -28,6 +29,7 @@ import {
   RUN_STORE_EXPANSION_JOB,
   RUN_SUBSCRIPTION_MAINTENANCE_JOB,
   RUN_WEEKLY_REPORTS_JOB,
+  RUN_TITLE_TRANSLATION_JOB,
   ReconciliationJobData,
   StoreCoverageSweepJobData,
   StoreExpansionJobData,
@@ -51,7 +53,14 @@ export class IngestionProcessor {
     private readonly launchDetectionService: LaunchDetectionService,
     private readonly marketReportsService: MarketReportsService,
     private readonly scrapeSlots: ScrapeSlots,
+    @Optional() private readonly titleTranslation?: TitleTranslationService,
   ) {}
+
+  /** Arabic titles for products that have none yet; 200 per run (10 AI requests). */
+  @Process(RUN_TITLE_TRANSLATION_JOB)
+  async handleTitleTranslation() {
+    return this.titleTranslation?.translatePending(200);
+  }
 
   /** Runs a scrape job once one of the scrape slots is free (scrape-slots.ts). */
   private scrape<T>(job: Job, work: () => Promise<T>): Promise<T> {

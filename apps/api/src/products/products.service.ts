@@ -365,6 +365,7 @@ export class ProductsService {
         level: product.category.level,
       },
       title: product.title,
+      titleAr: product.titleAr ?? null,
       brand: product.brand,
       model: product.model,
       gtin: product.gtin,

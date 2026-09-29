@@ -5,10 +5,20 @@ import { FxRatesService } from './fx-rates.service';
 import { NormalizerService } from './normalizer.service';
 import { ReconciliationService } from './reconciliation.service';
 import { SemanticService } from './semantic.service';
+import { TitleTranslationService } from './title-translation.service';
+
+const SERVICES = [
+  NormalizerService,
+  FuzzyMatcherService,
+  SemanticService,
+  ReconciliationService,
+  FxRatesService,
+  TitleTranslationService,
+];
 
 @Module({
   imports: [DatabaseModule],
-  providers: [NormalizerService, FuzzyMatcherService, SemanticService, ReconciliationService, FxRatesService],
-  exports: [NormalizerService, FuzzyMatcherService, SemanticService, ReconciliationService, FxRatesService],
+  providers: SERVICES,
+  exports: SERVICES,
 })
 export class MatchingModule {}

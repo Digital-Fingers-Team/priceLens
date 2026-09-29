@@ -208,6 +208,9 @@ model CanonicalProduct {
   categoryId      String  @map("category_id")
   slug            String  @unique
   title           String
+  // The title in Arabic for the Arabic site, translated by the AI
+  // (TitleTranslationService); null until then, and the site shows `title`.
+  titleAr         String? @map("title_ar")
   normalizedTitle String  @map("normalized_title")
   brand           String?
   model           String?
@@ -228,7 +231,7 @@ model CanonicalProduct {
   // written); only raw SQL reads them. The defaults are the generation
   // expressions as Prisma introspects them, so migrate diff reports no drift.
   searchTitle String? @default(dbgenerated("regexp_replace(translate(lower(title), 'أإآٱىةؤئ٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹'::text, 'اااايهوي01234567890123456789'::text), '[ً-ٰٟـ]'::text, ''::text, 'g'::text)")) @map("search_title") @ignore
-  searchText  String? @default(dbgenerated("regexp_replace(translate(lower(((((title || COALESCE((' '::text || brand), ''::text)) || COALESCE((' '::text || model), ''::text)) || ' '::text) || slug)), 'أإآٱىةؤئ٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹'::text, 'اااايهوي01234567890123456789'::text), '[ً-ٰٟـ]'::text, ''::text, 'g'::text)")) @map("search_text") @ignore
+  searchText  String? @default(dbgenerated("regexp_replace(translate(lower((((((title || COALESCE((' '::text || title_ar), ''::text)) || COALESCE((' '::text || brand), ''::text)) || COALESCE((' '::text || model), ''::text)) || ' '::text) || slug)), 'أإآٱىةؤئ٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹'::text, 'اااايهوي01234567890123456789'::text), '[ً-ٰٟـ]'::text, ''::text, 'g'::text)")) @map("search_text") @ignore
 
   tier        ProductTier @default(MID_RANGE)
   isVerified  Boolean     @default(false) @map("is_verified")

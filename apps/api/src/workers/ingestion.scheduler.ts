@@ -14,6 +14,7 @@ import {
   RUN_MAP_SWEEP_JOB,
   RUN_LAUNCH_DETECTION_JOB,
   RUN_WEEKLY_REPORTS_JOB,
+  RUN_TITLE_TRANSLATION_JOB,
 } from './ingestion.jobs';
 import { retryUntilDone } from '../common/redis-resilience';
 import { JOB_PRIORITY } from './ingestion-queue.service';
@@ -28,6 +29,7 @@ const COMPETITOR_DETECTION_JOB_ID = 'scheduled-competitor-detection';
 const MAP_SWEEP_JOB_ID = 'scheduled-map-sweep';
 const LAUNCH_DETECTION_JOB_ID = 'scheduled-launch-detection';
 const WEEKLY_REPORTS_JOB_ID = 'scheduled-weekly-reports';
+const TITLE_TRANSLATION_JOB_ID = 'scheduled-title-translation';
 
 @Injectable()
 export class IngestionScheduler implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -145,10 +147,20 @@ export class IngestionScheduler implements OnApplicationBootstrap, OnApplication
       { jobId: WEEKLY_REPORTS_JOB_ID, priority: JOB_PRIORITY.scheduled, repeat: { cron: reportsCron } },
     );
 
+    // Arabic titles for new products (TitleTranslationService); a no-op once
+    // every product has one.
+    const translationCron = this.configService.get<string>('search.titleTranslationCron', '*/15 * * * *');
+    await this.queue.add(
+      RUN_TITLE_TRANSLATION_JOB,
+      {},
+      { jobId: TITLE_TRANSLATION_JOB_ID, priority: JOB_PRIORITY.scheduled, repeat: { cron: translationCron } },
+    );
+
     this.logger.log(
       `Scheduled notification retry (${retryCron}), subscription maintenance (${maintenanceCron}), ` +
         `competitor detection (${detectionCron}), MAP sweep (${mapCron}), ` +
-        `launch detection (${launchCron}) and weekly reports (${reportsCron})`,
+        `launch detection (${launchCron}), weekly reports (${reportsCron}) ` +
+        `and Arabic titles (${translationCron})`,
     );
   }
 

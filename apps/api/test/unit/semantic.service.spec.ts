@@ -125,6 +125,38 @@ describe('SemanticService when Gemini is busy', () => {
     });
   });
 
+  describe('translateToArabic: product titles for the Arabic site', () => {
+    const translated = (ar: unknown) =>
+      ({
+        ok: true,
+        status: 200,
+        json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify({ ar }) }] } }] }),
+      }) as Response;
+
+    it('translates a list of titles in one request, in order', async () => {
+      global.fetch = jest.fn().mockResolvedValue(translated(['سامسونج جالاكسي S26', 'غسالة LG'])) as never;
+      const semantic = service();
+
+      expect(await semantic.translateToArabic(['Samsung Galaxy S26', 'LG Washing Machine'])).toEqual([
+        'سامسونج جالاكسي S26',
+        'غسالة LG',
+      ]);
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      const prompt = JSON.parse(((global.fetch as jest.Mock).mock.calls[0][1] as RequestInit).body as string).contents[0]
+        .parts[0].text as string;
+      expect(prompt).toContain('2. "LG Washing Machine"');
+    });
+
+    it('answers nothing when the reply does not have one Arabic title per input', async () => {
+      global.fetch = jest.fn().mockResolvedValueOnce(translated(['واحد'])).mockResolvedValueOnce(translated(['واحد', 'Two'])) as never;
+      const semantic = service();
+
+      expect(await semantic.translateToArabic(['One', 'Two'])).toEqual([null, null]);
+      // An entry left in English is not a translation.
+      expect(await semantic.translateToArabic(['One', 'Two'])).toEqual(['واحد', null]);
+    });
+  });
+
   it('sends calls made at the same time to different keys', async () => {
     const keys: string[] = [];
     global.fetch = jest.fn(async (_url: string, init: RequestInit) => {

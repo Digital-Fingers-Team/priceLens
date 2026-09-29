@@ -169,6 +169,7 @@ export class WatchlistService {
           select: {
             id: true,
             title: true,
+            titleAr: true,
             slug: true,
             imageUrl: true,
           },
@@ -295,6 +296,7 @@ export class WatchlistService {
     slug: string;
     categoryId: string;
     title: string;
+    titleAr?: string | null;
     brand: string | null;
     model: string | null;
     gtin: string | null;
@@ -345,6 +347,7 @@ export class WatchlistService {
       categoryId: product.categoryId,
       category: product.category,
       title: product.title,
+      titleAr: product.titleAr ?? null,
       brand: product.brand,
       model: product.model,
       gtin: product.gtin,
