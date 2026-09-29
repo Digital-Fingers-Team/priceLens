@@ -130,15 +130,19 @@ export class ReconciliationService {
       const modelB = this.normalizer.extractAttributes(b.title).model?.trim().toLowerCase();
       const rulesSay = !!modelA && !!modelB && modelA === modelB && !this.normalizer.isAccessory(a.title);
 
-      // The AI judge has the last word whenever it answers: a "no" blocks
-      // even a merge the rules approve (it tells "Pro" from "Pro+", and RAM
-      // written in ways the rules miss). While it cannot answer, the rules
-      // decide alone and the merge is logged as unreviewed, for the judge to
-      // review once it is back (reviewUnreviewedMerges).
+      // Only the AI judge's "yes" merges (owner decision, 2026-09-29): the
+      // rules only choose which pairs to ask about. Titles one character
+      // apart ("X3"/"X5") and shared spec codes ("AX3000") look identical to
+      // them. While the judge cannot answer, the pair waits for the next run.
+      // `rulesSay` is kept for the dry-run log.
       const aiSays = await this.semantic.judgeSameProduct(a.title, b.title);
-      if (aiSays === false) continue;
-      if (aiSays === null && !rulesSay) continue;
-      const decidedBy: MergeDecision = aiSays === true ? 'ai' : 'rules';
+      if (aiSays !== true) {
+        if (dryRun && aiSays === null && rulesSay) {
+          this.logger.log(`[dry-run] rules agree on "${a.title}" / "${b.title}", waiting for the judge`);
+        }
+        continue;
+      }
+      const decidedBy: MergeDecision = 'ai';
 
       // Keep the older canonical (stable ids, older price history), merge the newer in.
       const [keep, merge] = a.createdAt <= b.createdAt ? [a, b] : [b, a];

@@ -17,9 +17,14 @@ import type { GoldenListing } from './matching-golden.fixtures';
  * ingestion does (same functions, same order), with an in-memory catalog in
  * place of Postgres, and scores the outcome pairwise against the labels.
  *
- * The judge is "unavailable" (returns null), so step 9 uses its
- * deterministic fuzzy fallback. That is the conservative configuration:
- * with an LLM configured, only the judge can add merges on top of it.
+ * Since 2026-09-29 the AI judge decides every step-9 merge (owner decision:
+ * near-identical titles like "X3"/"X5", and spec codes like "AX3000", must
+ * not merge on score alone). So there are two judges:
+ *  - `oracleJudge(listings)` answers from the golden labels. Recall then
+ *    measures what the rules still own: whether the true product survives
+ *    the guards and reaches the judge's shortlist.
+ *  - `unavailableJudge` (the default) answers nothing: only identifier and
+ *    exact-title matches (steps 6-7) may merge, and must never be wrong.
  *
  * Steps 5 and 10 are left out on purpose: they reject by price against the
  * category and the product's other stores, which the golden set (titles
@@ -43,7 +48,19 @@ export interface GoldenScore {
   assignments: Map<string, string | null>;
 }
 
-const unavailableJudge: SameProductJudge = { judgeSameProduct: async () => null };
+export const unavailableJudge: SameProductJudge = { judgeSameProduct: async () => null };
+
+/** A judge that knows the labels: "same" exactly when both titles share a truth. */
+export function oracleJudge(listings: GoldenListing[]): SameProductJudge {
+  const truth = new Map(listings.map((listing) => [listing.title, listing.truth]));
+  return {
+    judgeSameProduct: async (titleA, titleB) => {
+      const a = truth.get(titleA);
+      const b = truth.get(titleB);
+      return a !== undefined && b !== undefined ? a === b : null;
+    },
+  };
+}
 
 export function defaultTools(): MatchingTools {
   return { normalizer: new NormalizerService(), fuzzy: new FuzzyMatcherService() };
@@ -65,7 +82,11 @@ class MemoryCatalog implements CandidateSource<CatalogCandidate> {
   }
 }
 
-export async function runGolden(listings: GoldenListing[], tools: MatchingTools = defaultTools()): Promise<GoldenScore> {
+export async function runGolden(
+  listings: GoldenListing[],
+  tools: MatchingTools = defaultTools(),
+  judge: SameProductJudge = unavailableJudge,
+): Promise<GoldenScore> {
   const catalog = new MemoryCatalog();
   const assignments = new Map<string, string | null>();
 
@@ -83,7 +104,7 @@ export async function runGolden(listings: GoldenListing[], tools: MatchingTools 
       identifiers: { gtin: golden.gtin ?? null, upc: null, ean: null, mpn: null },
     };
     const input = normalizeListing(listing, tools);
-    const match = await findCanonicalMatch(input, golden.category, { candidates: catalog, judge: unavailableJudge }, tools);
+    const match = await findCanonicalMatch(input, golden.category, { candidates: catalog, judge }, tools);
     if (match) {
       assignments.set(golden.id, match.id);
       continue;

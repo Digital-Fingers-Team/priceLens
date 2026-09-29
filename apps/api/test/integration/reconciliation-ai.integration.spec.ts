@@ -7,9 +7,9 @@ import { ReconciliationService } from '../../src/matching/reconciliation.service
 
 /**
  * Reconciliation with an AI judge that comes and goes, on real Postgres:
- * - judge unavailable: the code rules merge alone, logged as unreviewed;
- * - judge back: it reviews those merges and undoes the ones it rejects,
- *   restoring the product, its listings and their price history;
+ * - judge unavailable: nothing merges (owner decision 2026-09-29);
+ * - merges the rules made alone before that decision are still reviewed by
+ *   the judge (reviewUnreviewedMerges) and undone when it says no;
  * - judge available: its "no" blocks a merge the rules approve, and its
  *   "yes" merges a pair the rules could not decide.
  */
@@ -98,63 +98,31 @@ describe('reconciliation with the AI judge (integration)', () => {
     await prisma.$disconnect();
   });
 
-  it('merges on the rules while the judge is down, then undoes what the judge rejects', async () => {
+  it('merges nothing while the judge is down, however strongly the rules agree (owner decision 2026-09-29)', async () => {
     judge.available = false;
     const older = await product(`Infinix Zero 40 8GB RAM 256GB Black ${run}`, 'Infinix', new Date('2026-01-01'));
     const newer = await product(`Infinix Zero 40 8GB RAM 256GB Blue ${run}`, 'Infinix', new Date('2026-02-01'));
 
-    const first = await service().reconcile();
-    const merge = first.merges.find((m) => m.mergeId === newer.id);
-    expect(merge).toMatchObject({ keepId: older.id, decidedBy: 'rules' });
-    expect(await prisma.canonicalProduct.findUnique({ where: { id: newer.id } })).toBeNull();
-    const logged = await prisma.productMerge.findFirstOrThrow({ where: { mergedProductId: newer.id } });
-    expect(logged).toMatchObject({ decidedBy: 'rules', aiVerdict: null, movedListingIds: [newer.listingId] });
+    const report = await service().reconcile();
 
-    // The judge is back and says the two are different products.
-    judge.available = true;
-    answer(newer.title, older.title, false);
-    await service().reconcile();
-
-    const restored = await prisma.canonicalProduct.findUniqueOrThrow({ where: { id: newer.id } });
-    expect(restored.title).toBe(newer.title);
-    const listing = await prisma.sourceListing.findUniqueOrThrow({ where: { id: newer.listingId } });
-    expect(listing.canonicalProductId).toBe(newer.id);
-    expect(await prisma.priceHistory.count({ where: { canonicalProductId: newer.id } })).toBe(1);
-    expect(await prisma.priceHistory.count({ where: { canonicalProductId: older.id } })).toBe(1);
-    expect(await prisma.productMerge.findUniqueOrThrow({ where: { id: logged.id } })).toMatchObject({
-      aiVerdict: false,
-      undoneAt: expect.any(Date),
-    });
-
-    // And the pair is not merged again: the judge's "no" stands, even while
-    // the judge is down and the rules alone would merge it.
-    const again = await service().reconcile();
-    expect(again.merges.some((m) => m.mergeId === newer.id || m.keepId === newer.id)).toBe(false);
-    judge.available = false;
-    const whileDown = await service().reconcile();
-    expect(whileDown.merges.some((m) => m.mergeId === newer.id || m.keepId === newer.id)).toBe(false);
+    expect(report.merges.some((m) => m.mergeId === newer.id || m.keepId === newer.id)).toBe(false);
+    expect(await prisma.canonicalProduct.count({ where: { id: { in: [older.id, newer.id] } } })).toBe(2);
+    expect(await prisma.productMerge.count({ where: { mergedProductId: newer.id } })).toBe(0);
   });
 
-  it('the judge approves a rules merge on review, and merges a pair the rules could not decide', async () => {
-    judge.available = false;
+  it('merges on the judge\'s "yes", including a pair the rules could not read', async () => {
+    judge.available = true;
     const a = await product(`Infinix Note 50 8GB RAM 256GB Black ${run}`, 'Infinix', new Date('2026-01-01'));
     const b = await product(`Infinix Note 50 8GB RAM 256GB Gold ${run}`, 'Infinix', new Date('2026-02-01'));
-    await service().reconcile();
-    const logged = await prisma.productMerge.findFirstOrThrow({ where: { mergedProductId: b.id } });
-
-    judge.available = true;
     answer(b.title, a.title, true);
     // No model the rules can read in either title; only the judge can say.
     const c = await product(`Infinix flagship phone 8GB RAM 256GB edition one ${run}`, 'Infinix', new Date('2026-01-01'));
     const d = await product(`Infinix flagship phone 8GB RAM 256GB edition one special ${run}`, 'Infinix', new Date('2026-02-01'));
     answer(c.title, d.title, true);
+
     const report = await service().reconcile();
 
-    expect(report.review).toMatchObject({ approved: expect.any(Number), undone: 0 });
-    expect(await prisma.productMerge.findUniqueOrThrow({ where: { id: logged.id } })).toMatchObject({
-      aiVerdict: true,
-      undoneAt: null,
-    });
+    expect(report.merges.find((m) => m.mergeId === b.id)).toMatchObject({ keepId: a.id, decidedBy: 'ai' });
     expect(report.merges.find((m) => m.mergeId === d.id)).toMatchObject({ keepId: c.id, decidedBy: 'ai' });
   });
 

@@ -350,10 +350,14 @@ describe('matching pipeline', () => {
     const ranked = (...scores: number[]): Array<RankedCandidate> =>
       scores.map((score, i) => ({ candidate: candidate(`r${i}`), score }));
 
-    it('auto-accepts a model-agreement score without asking the judge', async () => {
-      const fake = judge([false]);
-      expect(await decideMatch('x', [{ candidate: c1, score: MODEL_AGREEMENT_SCORE }], fake)).toBe(c1);
-      expect(fake.calls).toBe(0);
+    it('asks the judge even when the model or a product code agrees: its "no" blocks the merge', async () => {
+      // Owner decision 2026-09-29: "AX3000" (a Wi-Fi class) merged a Ruijie
+      // router, a TP-Link access point and two Xiaomi mesh systems. A strong
+      // score only picks who to ask; the AI decides.
+      const no = judge([false]);
+      expect(await decideMatch('x', [{ candidate: c1, score: MODEL_AGREEMENT_SCORE }], no)).toBeNull();
+      expect(no.calls).toBe(1);
+      expect(await decideMatch('x', [{ candidate: c1, score: MODEL_AGREEMENT_SCORE }], judge([true]))).toBe(c1);
     });
 
     it('asks the judge in rank order and takes the first "same"', async () => {
@@ -368,11 +372,11 @@ describe('matching pipeline', () => {
       expect(fake.calls).toBe(MAX_JUDGED_CANDIDATES);
     });
 
-    it('falls back to the fuzzy threshold only when the judge is unavailable', async () => {
-      const top = [{ candidate: c1, score: FUZZY_MATCH_THRESHOLD }, { candidate: c2, score: 0.5 }];
-      expect(await decideMatch('x', top, judge([null]))).toBe(c1);
+    it('never merges while the judge is unavailable, however high the score', async () => {
+      // The listing founds its own product; reconciliation asks the judge later.
+      const top = [{ candidate: c1, score: MODEL_AGREEMENT_SCORE }, { candidate: c2, score: FUZZY_MATCH_THRESHOLD }];
+      expect(await decideMatch('x', top, judge([null]))).toBeNull();
       expect(await decideMatch('x', top, judge([false, false]))).toBeNull();
-      expect(await decideMatch('x', [{ candidate: c1, score: FUZZY_MATCH_THRESHOLD - 0.01 }], judge([null]))).toBeNull();
     });
 
     it('stops asking after the first unavailable answer', async () => {
@@ -420,16 +424,32 @@ describe('matching pipeline', () => {
       expect(fake.calls).toBe(0);
     });
 
-    it('otherwise ranks and decides', async () => {
+    it('otherwise ranks and lets the judge decide', async () => {
       const oppo = candidate('OPPO A6 Smartphone, 256 GB, Sapphire Blue, Dual SIM, 8 GB RAM');
+      const fake = judge([true]);
       expect(
         await findCanonicalMatch(
           input('OPPO A6 - 8GB RAM - 256GB - Sapphire Blue'),
           'cat',
-          { candidates: source(null, [candidate('Honor X9c 12GB 256GB'), oppo]), judge: judge([]) },
+          { candidates: source(null, [candidate('Honor X9c 12GB 256GB'), oppo]), judge: fake },
           tools,
         ),
       ).toBe(oppo);
+      expect(fake.calls).toBe(1);
+    });
+
+    it('does not merge different products that share a spec code (AX3000) when the judge says no', async () => {
+      // Prod, 2026-09-29: one page held a Ruijie router, a TP-Link access
+      // point, a TP-Link extender and two Xiaomi mesh systems.
+      const tplink = candidate('TP-LINK TL-WA3001 AX3000 Gigabit Wi-Fi 6 Access Point, Dual Band');
+      expect(
+        await findCanonicalMatch(
+          input('Ruijie RG-EW3000GX AX3000 Wi-Fi 6 Dual-band Gigabit Mesh Router'),
+          'cat',
+          { candidates: source(null, [tplink]), judge: judge([false]) },
+          tools,
+        ),
+      ).toBeNull();
     });
 
     it('returns null when nothing survives', async () => {

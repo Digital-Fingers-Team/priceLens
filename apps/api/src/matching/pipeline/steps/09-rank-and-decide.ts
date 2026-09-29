@@ -1,6 +1,5 @@
 import type { ExtractedAttributes } from '../../interfaces/matching.interfaces';
 import {
-  FUZZY_MATCH_THRESHOLD,
   MAX_JUDGED_CANDIDATES,
   MODEL_AGREEMENT_SCORE,
 } from '../thresholds';
@@ -199,42 +198,34 @@ function dropAmbiguousVariants<C extends CatalogCandidate>(
 /**
  * Step 9b -- decide.
  *
- * 1. The top survivor scores at least MODEL_AGREEMENT_SCORE: it cleared every
- *    guard and its model number matches, which is more reliable than the
- *    LLM (a small model rejected real duplicates worded differently). Accept.
- * 2. Otherwise ask the judge about the top MAX_JUDGED_CANDIDATES in order;
- *    the first "same" wins.
- * 3. If the judge could not be asked at all, fall back to the fuzzy score:
- *    accept the top survivor when it reaches FUZZY_MATCH_THRESHOLD.
- * 4. Otherwise no match: the listing founds a new product.
+ * The scores only choose and order who to ask; the AI judge decides every
+ * merge (owner decision, 2026-09-29). Titles that differ by one character
+ * ("X3" vs "X5") score as near-identical, and a shared "strong code" can be a
+ * spec rather than a model ("AX3000" merged a Ruijie router, a TP-Link access
+ * point and Xiaomi mesh systems).
+ *
+ * 1. Ask the judge about the top MAX_JUDGED_CANDIDATES in rank order; the
+ *    first "same" wins.
+ * 2. The judge cannot answer (every slot paused): no match. The listing
+ *    founds its own product, and reconciliation asks the judge later.
+ * 3. Otherwise no match: the listing founds a new product.
+ *
+ * Identifier and exact-title matches (steps 6-7) do not come here.
  */
 export async function decideMatch<C extends CatalogCandidate>(
   listingTitle: string,
   ranked: Array<RankedCandidate<C>>,
   judge: SameProductJudge,
 ): Promise<C | null> {
-  const top = ranked.slice(0, MAX_JUDGED_CANDIDATES);
-
-  if (top.length > 0 && top[0].score >= MODEL_AGREEMENT_SCORE) {
-    return top[0].candidate;
-  }
-
-  let judgeUnavailable = false;
-  for (const { candidate } of top) {
+  for (const { candidate } of ranked.slice(0, MAX_JUDGED_CANDIDATES)) {
     const verdict = await judge.judgeSameProduct(listingTitle, candidate.title);
     if (verdict === true) {
       return candidate;
     }
     if (verdict === null) {
       // Every remaining call would fail the same way.
-      judgeUnavailable = true;
-      break;
+      return null;
     }
   }
-
-  if (judgeUnavailable && ranked.length > 0 && ranked[0].score >= FUZZY_MATCH_THRESHOLD) {
-    return ranked[0].candidate;
-  }
-
   return null;
 }
