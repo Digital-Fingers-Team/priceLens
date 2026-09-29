@@ -22,46 +22,65 @@ class ProviderHttpError extends Error {
   }
 }
 
-interface Provider {
+
+/**
+ * One way to ask: a provider, one of its API keys and one model. Free-tier
+ * quotas are per key and per model, so each slot is paused on its own.
+ */
+interface Slot {
   name: 'gemini' | 'openrouter';
   model: string;
+  /** For logs: provider, model and position -- never the key. */
+  label: string;
   ask: (prompt: string) => Promise<string | null>;
+  pausedUntil: number;
+}
+
+/** A comma-separated setting as a list, first the single-value setting it extends. */
+function list(...values: Array<string | undefined>): string[] {
+  const items = values.flatMap((value) => (value ?? '').split(',')).map((item) => item.trim()).filter(Boolean);
+  return [...new Set(items)];
 }
 
 /**
  * The AI judge: asks a cloud model whether two listing titles are the same
- * product for sale. Gemini (GEMINI_API_KEY) is used when configured, else
- * OpenRouter (OPENROUTER_API_KEY), else there is no judge.
+ * product for sale.
+ *
+ * It holds a chain of slots: every Gemini key (GEMINI_API_KEY, then
+ * GEMINI_API_KEYS) with every model (GEMINI_MATCH_MODEL, then
+ * GEMINI_MATCH_MODELS), then OpenRouter (OPENROUTER_API_KEY). A call goes to
+ * the first slot that is not paused; a slot that fails is paused on its own
+ * and the next one is asked straight away, so one spent quota no longer
+ * stops the judge.
  *
  * Every answer is stored (match_judgements), so a pair is asked once, and a
- * stored answer is returned even while the provider is down. After a failed
- * call the provider is skipped for a few minutes.
+ * stored answer is returned even while every slot is down.
  *
- * Returns null when there is no answer (no provider, provider paused or
+ * Returns null when there is no answer (no slot, every slot paused or
  * failing, unparseable reply), so callers can tell "different" from
  * "couldn't ask" and fall back to their own rules.
  */
 @Injectable()
 export class SemanticService {
   private readonly logger = new Logger(SemanticService.name);
-  private readonly provider: Provider | null;
-  private pausedUntil = 0;
+  private readonly slots: Slot[];
   private warnedUnconfigured = false;
 
   constructor(
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
   ) {
-    this.provider = this.pickProvider();
+    this.slots = this.buildSlots();
   }
 
-  /** A provider is configured and not paused after a failure. */
+  /** Some slot is configured and not paused after a failure. */
   isAvailable(): boolean {
-    return this.provider !== null && Date.now() >= this.pausedUntil;
+    const now = Date.now();
+    return this.slots.some((slot) => now >= slot.pausedUntil);
   }
 
   async judgeSameProduct(titleA: string, titleB: string): Promise<boolean | null> {
-    if (!this.provider) {
+    if (this.slots.length === 0) {
       if (!this.warnedUnconfigured) {
         // Logged once per process: this fires for every candidate pair.
         this.warnedUnconfigured = true;
@@ -79,34 +98,34 @@ export class SemanticService {
       .catch(() => null);
     if (stored) return stored.same;
 
-    if (Date.now() < this.pausedUntil) return null;
-
-    try {
-      const same = this.parse(await this.askWithRetry(this.provider, this.prompt(titleA, titleB)));
-      if (same === null) return null;
-      await this.prisma.matchJudgement
-        .create({ data: { pairKey, titleA, titleB, same, model: `${this.provider.name}:${this.provider.model}` } })
-        .catch(() => undefined); // a concurrent caller stored the same pair first
-      return same;
-    } catch (err) {
-      const rateLimited = err instanceof ProviderHttpError && err.status === 429;
-      const pauseMs = rateLimited ? PAUSE_AFTER_RATE_LIMIT_MS : PAUSE_AFTER_FAILURE_MS;
-      this.pausedUntil = Date.now() + pauseMs;
-      this.logger.warn(
-        `${this.provider.name} match-judgement call failed, pausing it for ${pauseMs / 1000}s: ` + (err as Error).message,
-      );
-      return null;
+    const prompt = this.prompt(titleA, titleB);
+    for (const slot of this.slots) {
+      if (Date.now() < slot.pausedUntil) continue;
+      try {
+        const same = this.parse(await this.askWithRetry(slot, prompt));
+        if (same === null) return null;
+        await this.prisma.matchJudgement
+          .create({ data: { pairKey, titleA, titleB, same, model: `${slot.name}:${slot.model}` } })
+          .catch(() => undefined); // a concurrent caller stored the same pair first
+        return same;
+      } catch (err) {
+        const rateLimited = err instanceof ProviderHttpError && err.status === 429;
+        const pauseMs = rateLimited ? PAUSE_AFTER_RATE_LIMIT_MS : PAUSE_AFTER_FAILURE_MS;
+        slot.pausedUntil = Date.now() + pauseMs;
+        this.logger.warn(`${slot.label} match-judgement call failed, pausing it for ${pauseMs / 1000}s: ${(err as Error).message}`);
+      }
     }
+    return null;
   }
 
   /** Overridable in tests. */
   sleep: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   /** An overloaded provider (5xx) usually answers a moment later: retry it a couple of times. */
-  private async askWithRetry(provider: Provider, prompt: string): Promise<string | null> {
+  private async askWithRetry(slot: Slot, prompt: string): Promise<string | null> {
     for (let attempt = 0; ; attempt += 1) {
       try {
-        return await provider.ask(prompt);
+        return await slot.ask(prompt);
       } catch (err) {
         const overloaded = err instanceof ProviderHttpError && err.status >= 500;
         if (!overloaded || attempt >= OVERLOADED_RETRY_DELAYS_MS.length) throw err;
@@ -115,23 +134,41 @@ export class SemanticService {
     }
   }
 
-  private pickProvider(): Provider | null {
-    if (!this.config.get<boolean>('search.openRouterFallbackEnabled', true)) return null;
+  private buildSlots(): Slot[] {
+    if (!this.config.get<boolean>('search.openRouterFallbackEnabled', true)) return [];
+    const slots: Slot[] = [];
 
-    const geminiKey = this.config.get<string>('search.geminiApiKey', '');
-    if (geminiKey) {
-      const model = this.config.get<string>('search.geminiMatchModel', 'gemini-2.5-flash-lite');
-      const baseUrl = this.config.get<string>('search.geminiBaseUrl', 'https://generativelanguage.googleapis.com/v1beta');
-      return { name: 'gemini', model, ask: (prompt) => this.askGemini(baseUrl, geminiKey, model, prompt) };
-    }
+    const geminiKeys = list(this.config.get<string>('search.geminiApiKey', ''), this.config.get<string>('search.geminiApiKeys', ''));
+    const geminiModels = list(
+      this.config.get<string>('search.geminiMatchModel', 'gemini-2.5-flash-lite'),
+      this.config.get<string>('search.geminiMatchModels', ''),
+    );
+    const geminiBase = this.config.get<string>('search.geminiBaseUrl', 'https://generativelanguage.googleapis.com/v1beta');
+    geminiKeys.forEach((key, keyIndex) => {
+      for (const model of geminiModels) {
+        slots.push({
+          name: 'gemini',
+          model,
+          label: `gemini key #${keyIndex + 1} ${model}`,
+          ask: (prompt) => this.askGemini(geminiBase, key, model, prompt),
+          pausedUntil: 0,
+        });
+      }
+    });
 
     const openRouterKey = this.config.get<string>('search.openRouterApiKey', '');
     if (openRouterKey) {
       const model = this.config.get<string>('search.openRouterMatchModel', 'google/gemini-2.5-flash');
       const baseUrl = this.config.get<string>('search.openRouterBaseUrl', 'https://openrouter.ai/api/v1');
-      return { name: 'openrouter', model, ask: (prompt) => this.askOpenRouter(baseUrl, openRouterKey, model, prompt) };
+      slots.push({
+        name: 'openrouter',
+        model,
+        label: `openrouter ${model}`,
+        ask: (prompt) => this.askOpenRouter(baseUrl, openRouterKey, model, prompt),
+        pausedUntil: 0,
+      });
     }
-    return null;
+    return slots;
   }
 
   private async askGemini(baseUrl: string, key: string, model: string, prompt: string): Promise<string | null> {

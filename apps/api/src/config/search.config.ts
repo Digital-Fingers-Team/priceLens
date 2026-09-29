@@ -15,6 +15,10 @@ export default registerAs('search', () => ({
   // whichever provider is configured.
   geminiApiKey: process.env.GEMINI_API_KEY ?? '',
   geminiMatchModel: process.env.GEMINI_MATCH_MODEL ?? 'gemini-2.5-flash-lite',
+  // More keys and models for the match judge: each key x model is its own
+  // quota, tried in turn when one is spent (comma-separated).
+  geminiApiKeys: process.env.GEMINI_API_KEYS ?? '',
+  geminiMatchModels: process.env.GEMINI_MATCH_MODELS ?? '',
   geminiBaseUrl: process.env.GEMINI_BASE_URL ?? 'https://generativelanguage.googleapis.com/v1beta',
   // Background reconciliation job that re-checks EXISTING canonical products for
   // duplicates and merges them (fixes the "1 store" problem). Runs on a cron and
