@@ -76,6 +76,8 @@ COPY --from=build /repo/pnpm-workspace.yaml /repo/package.json /repo/pnpm-lock.y
 COPY --from=build /repo/apps/web/package.json apps/web/package.json
 COPY --from=build /repo/apps/web/.next apps/web/.next
 COPY --from=build /repo/apps/web/public apps/web/public
+# Fonts for the share cards (opengraph-image.tsx reads them at runtime).
+COPY --from=build /repo/apps/web/assets apps/web/assets
 COPY --from=build /repo/apps/web/next.config.js apps/web/next.config.js
 
 RUN NEXT_DIR=$(find /repo/node_modules/.pnpm -maxdepth 3 -type d -path '*/node_modules/next' | head -n 1) && \
