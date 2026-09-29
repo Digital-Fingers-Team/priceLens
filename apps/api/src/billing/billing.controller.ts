@@ -4,6 +4,7 @@ import { User, UserRole } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 import { CurrentUser, Public, Roles } from '../common/decorators';
 import { EntitlementsService } from './entitlements.service';
+import { ManualPaymentsService } from './manual-payments.service';
 import { PlansService } from './plans.service';
 import { StripeService } from './stripe.service';
 import { SubscriptionsService } from './subscriptions.service';
@@ -20,6 +21,7 @@ export class BillingController {
     private readonly subscriptions: SubscriptionsService,
     private readonly entitlements: EntitlementsService,
     private readonly stripe: StripeService,
+    private readonly manualPayments: ManualPaymentsService,
     private readonly config: ConfigService,
   ) {}
 
@@ -27,9 +29,15 @@ export class BillingController {
   @Public()
   @Get('plans')
   async listPlans() {
+    const plans = await this.plans.listPublic();
     return {
-      plans: await this.plans.listPublic(),
+      // A plan is also purchasable when it can be paid by wallet / InstaPay.
+      plans: plans.map((plan) => ({
+        ...plan,
+        purchasable: plan.purchasable || this.manualPayments.isSellable({ ...plan, isActive: true }),
+      })),
       checkoutEnabled: this.stripe.isConfigured,
+      manualPaymentsEnabled: this.manualPayments.isEnabled,
     };
   }
 
@@ -43,11 +51,15 @@ export class BillingController {
     const entitlements = await this.entitlements.getEntitlements(user.id);
 
     const usage = await this.entitlements.getUsage(user.id);
+    const subscription = await this.subscriptions.getActiveForUser(user.id);
 
     return {
       ...entitlements,
       usage,
+      // "wallet" plans do not renew by themselves; the page offers "Renew".
+      provider: subscription?.provider ?? null,
       checkoutEnabled: this.stripe.isConfigured,
+      manualPaymentsEnabled: this.manualPayments.isEnabled,
     };
   }
 

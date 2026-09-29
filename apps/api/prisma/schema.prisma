@@ -61,6 +61,21 @@ enum SubscriptionStatus {
   EXPIRED
 }
 
+// A wallet / InstaPay payment the owner confirms by hand (no card gateway:
+// the business is not registered, so Paymob and the like are out).
+enum ManualPaymentStatus {
+  AWAITING_PAYMENT // order made, the customer has not said they paid yet
+  SUBMITTED // the customer entered a transfer reference; the owner checks it
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum ManualPaymentMethod {
+  WALLET // Vodafone Cash, Orange Cash, Etisalat Cash, WE Pay
+  INSTAPAY
+}
+
 enum NotificationChannelType {
   IN_APP
   EMAIL
@@ -119,6 +134,7 @@ model User {
   reviewDecisions      ReviewDecision[]
   affiliateClicks      AffiliateClick[]
   subscriptions        Subscription[]
+  manualPayments       ManualPayment[]         @relation("ManualPaymentPayer")
   notificationChannels NotificationChannel[]
   notifications        Notification[]
   orgMemberships       OrganizationMember[]
@@ -705,7 +721,8 @@ model Plan {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  subscriptions Subscription[]
+  subscriptions  Subscription[]
+  manualPayments ManualPayment[]
 
   @@index([tier, isActive])
   @@map("plans")
@@ -769,6 +786,45 @@ model SubscriptionEvent {
   @@index([subscriptionId])
   @@index([userId, createdAt])
   @@map("subscription_events")
+}
+
+// One order for a wallet / InstaPay payment. The customer sends the money
+// themselves, then types the transfer reference; the owner matches it with
+// the SMS on their phone and approves, which grants the plan for its
+// interval. Amount and plan are copied at order time so a later price change
+// never alters what an open order asks for.
+model ManualPayment {
+  id     String @id @default(uuid())
+  // Short code shown to the customer ("PL-4821") to put in the transfer note.
+  code   String @unique @db.VarChar(16)
+  userId String @map("user_id")
+  planId String @map("plan_id")
+
+  amountMinor Int    @map("amount_minor")
+  currency    String @db.VarChar(3)
+
+  status ManualPaymentStatus @default(AWAITING_PAYMENT)
+
+  method       ManualPaymentMethod?
+  // Transfer reference from the wallet / InstaPay receipt.
+  reference    String? @db.VarChar(64)
+  // The number or InstaPay address the money came from.
+  payerAccount String? @map("payer_account") @db.VarChar(64)
+  submittedAt  DateTime? @map("submitted_at")
+
+  reviewedById String?   @map("reviewed_by_id")
+  reviewedAt   DateTime? @map("reviewed_at")
+  rejectReason String?   @map("reject_reason") @db.VarChar(255)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation("ManualPaymentPayer", fields: [userId], references: [id], onDelete: Cascade)
+  plan Plan @relation(fields: [planId], references: [id])
+
+  @@index([userId, status])
+  @@index([status, submittedAt])
+  @@map("manual_payments")
 }
 
 // ─── Notifications ───────────────────────────────────────────────────────────

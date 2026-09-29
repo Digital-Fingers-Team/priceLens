@@ -2,6 +2,8 @@ import { Global, Module } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module';
 import { BillingController } from './billing.controller';
 import { EntitlementsService } from './entitlements.service';
+import { ManualPaymentsController } from './manual-payments.controller';
+import { ManualPaymentsService } from './manual-payments.service';
 import { PlansService } from './plans.service';
 import { StripeService } from './stripe.service';
 import { StripeWebhookController } from './stripe-webhook.controller';
@@ -16,8 +18,8 @@ import { SubscriptionsService } from './subscriptions.service';
 @Global()
 @Module({
   imports: [DatabaseModule],
-  controllers: [BillingController, StripeWebhookController],
-  providers: [PlansService, SubscriptionsService, EntitlementsService, StripeService],
+  controllers: [BillingController, ManualPaymentsController, StripeWebhookController],
+  providers: [PlansService, SubscriptionsService, EntitlementsService, StripeService, ManualPaymentsService],
   exports: [PlansService, SubscriptionsService, EntitlementsService, StripeService],
 })
 export class BillingModule {}

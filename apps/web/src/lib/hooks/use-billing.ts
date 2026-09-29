@@ -7,11 +7,13 @@ import { useAuthStore } from '@/lib/store/auth.store';
 import { useUiStore } from '@/lib/store/ui.store';
 import { useI18n } from '@/lib/i18n/provider';
 import { useApiErrorMessage } from '@/lib/hooks/use-api-error';
-import type { Entitlements } from '@/types/billing.types';
+import type { Entitlements, ManualPaymentMethod, ManualPaymentStatus } from '@/types/billing.types';
 
 const billingKeys = {
   plans: ['billing', 'plans'] as const,
   me: ['billing', 'me'] as const,
+  payments: ['billing', 'payments'] as const,
+  adminPayments: (status?: ManualPaymentStatus) => ['billing', 'admin-payments', status ?? 'all'] as const,
 };
 
 export function usePlans() {
@@ -121,5 +123,91 @@ export function useCancelSubscription() {
     onError: (err: AxiosError) => {
       addToast(apiError(err, t.toast.cancelFailed), 'error');
     },
+  });
+}
+
+// ─── Wallet / InstaPay payments ─────────────────────────────────────────
+
+/** Opens (or reuses) the order for a plan; the API makes it idempotent. */
+export function useStartPayment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (planKey: string) => billingApi.startPayment(planKey),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: billingKeys.payments }),
+  });
+}
+
+/**
+ * The signed-in user's orders. Polls while one waits for the owner, so the
+ * page turns to "active" by itself once it is approved.
+ */
+export function useMyPayments() {
+  const isAuthenticated = useAuthStore((s) => Boolean(s.user));
+  const queryClient = useQueryClient();
+  return useQuery({
+    queryKey: billingKeys.payments,
+    queryFn: async () => {
+      const data = await billingApi.myPayments();
+      // An approval changes the plan: refresh it along with the orders.
+      if (data.payments.some((p) => p.status === 'APPROVED')) {
+        queryClient.invalidateQueries({ queryKey: billingKeys.me });
+      }
+      return data;
+    },
+    enabled: isAuthenticated,
+    refetchInterval: (query) =>
+      query.state.data?.payments.some((p) => p.status === 'SUBMITTED') ? 20_000 : false,
+  });
+}
+
+export function useSubmitPayment() {
+  const queryClient = useQueryClient();
+  const addToast = useUiStore((s) => s.addToast);
+  const { t } = useI18n();
+  const apiError = useApiErrorMessage();
+  return useMutation({
+    mutationFn: (input: { id: string; method: ManualPaymentMethod; reference: string; payerAccount?: string }) =>
+      billingApi.submitPayment(input.id, {
+        method: input.method,
+        reference: input.reference,
+        ...(input.payerAccount ? { payerAccount: input.payerAccount } : {}),
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: billingKeys.payments }),
+    onError: (err: AxiosError) => addToast(apiError(err, t.toast.paymentSubmitFailed), 'error'),
+  });
+}
+
+export function useCancelPayment() {
+  const queryClient = useQueryClient();
+  const addToast = useUiStore((s) => s.addToast);
+  const { t } = useI18n();
+  const apiError = useApiErrorMessage();
+  return useMutation({
+    mutationFn: (id: string) => billingApi.cancelPayment(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: billingKeys.payments }),
+    onError: (err: AxiosError) => addToast(apiError(err, t.toast.cancelFailed), 'error'),
+  });
+}
+
+export function useAdminPayments(status?: ManualPaymentStatus) {
+  return useQuery({
+    queryKey: billingKeys.adminPayments(status),
+    queryFn: () => billingApi.adminPayments(status),
+    refetchInterval: 30_000,
+  });
+}
+
+export function useReviewPayment() {
+  const queryClient = useQueryClient();
+  const addToast = useUiStore((s) => s.addToast);
+  const apiError = useApiErrorMessage();
+  return useMutation({
+    mutationFn: (input: { id: string; decision: 'approve' | 'reject'; reason?: string }) =>
+      input.decision === 'approve' ? billingApi.approvePayment(input.id) : billingApi.rejectPayment(input.id, input.reason),
+    onSuccess: (payment, input) => {
+      queryClient.invalidateQueries({ queryKey: ['billing', 'admin-payments'] });
+      addToast(`${payment.code} ${input.decision === 'approve' ? 'approved' : 'rejected'}`, 'success');
+    },
+    onError: (err: AxiosError) => addToast(apiError(err, 'Could not update the payment'), 'error'),
   });
 }

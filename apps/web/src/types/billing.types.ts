@@ -58,7 +58,49 @@ export interface Entitlements {
   cancelAtPeriodEnd: boolean;
   trialEndsAt: string | null;
   usage: { trackedProducts: number; activeAlerts: number };
+  /** "wallet" plans do not renew by themselves. */
+  provider: string | null;
   checkoutEnabled: boolean;
+  manualPaymentsEnabled: boolean;
+}
+
+export interface PlansResponse {
+  plans: Plan[];
+  checkoutEnabled: boolean;
+  manualPaymentsEnabled: boolean;
+}
+
+export type ManualPaymentStatus = 'AWAITING_PAYMENT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+export type ManualPaymentMethod = 'WALLET' | 'INSTAPAY';
+
+/** A wallet / InstaPay order, confirmed by hand by the owner. */
+export interface ManualPayment {
+  id: string;
+  code: string;
+  status: ManualPaymentStatus;
+  planKey: string;
+  planName: string;
+  tier: PlanTier;
+  intervalDays: number;
+  amountMinor: number;
+  amount: number;
+  currency: string;
+  method: ManualPaymentMethod | null;
+  reference: string | null;
+  submittedAt: string | null;
+  rejectReason: string | null;
+  createdAt: string;
+}
+
+export interface PaymentDestinations {
+  walletNumber: string | null;
+  instapayAddress: string | null;
+}
+
+export interface AdminManualPayment extends ManualPayment {
+  payerAccount: string | null;
+  reviewedAt: string | null;
+  user: { id: string; email: string; username: string; displayName: string | null };
 }
 
 /** Feature keys, mirroring FEATURES in the API. */

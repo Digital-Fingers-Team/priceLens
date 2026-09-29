@@ -2122,6 +2122,187 @@
         ]
       }
     },
+    "/api/v1/billing/payments": {
+      "post": {
+        "operationId": "ManualPaymentsController_start",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartManualPaymentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Open (or reuse) the order for a plan, with where to send the money.",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/billing/payments/mine": {
+      "get": {
+        "operationId": "ManualPaymentsController_mine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/billing/payments/{id}/submit": {
+      "post": {
+        "operationId": "ManualPaymentsController_submit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitManualPaymentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/billing/payments/{id}/cancel": {
+      "post": {
+        "operationId": "ManualPaymentsController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/billing/payments/admin": {
+      "get": {
+        "operationId": "ManualPaymentsController_adminList",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "REJECTED",
+                "AWAITING_PAYMENT",
+                "SUBMITTED",
+                "CANCELLED",
+                "APPROVED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/billing/payments/admin/{id}/approve": {
+      "post": {
+        "operationId": "ManualPaymentsController_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/billing/payments/admin/{id}/reject": {
+      "post": {
+        "operationId": "ManualPaymentsController_reject",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectManualPaymentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "billing"
+        ]
+      }
+    },
     "/api/v1/notifications": {
       "get": {
         "operationId": "NotificationsController_list",
@@ -3270,6 +3451,56 @@
           "userId",
           "planKey"
         ]
+      },
+      "StartManualPaymentDto": {
+        "type": "object",
+        "properties": {
+          "planKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "planKey"
+        ]
+      },
+      "SubmitManualPaymentDto": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "WALLET",
+              "INSTAPAY"
+            ]
+          },
+          "reference": {
+            "type": "string",
+            "description": "The transfer reference printed on the wallet / InstaPay receipt.",
+            "minLength": 4,
+            "maxLength": 64
+          },
+          "payerAccount": {
+            "type": "string",
+            "description": "The number or InstaPay address the money was sent from.",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "method",
+          "reference"
+        ]
+      },
+      "RejectManualPaymentDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "Shown to the customer.",
+            "maxLength": 255
+          }
+        }
       },
       "UpsertChannelDto": {
         "type": "object",

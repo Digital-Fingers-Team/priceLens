@@ -126,8 +126,7 @@ export default function PricingPage() {
                         {t.pricing.included}
                       </Button>
                     ) : !plan.purchasable ? (
-                      // Enterprise, or a plan an operator has not wired to a
-                      // Stripe price yet: an email to the owner (D-26; there
+                      // Enterprise, or a plan that cannot be paid online yet: an email to the owner (D-26; there
                       // is no /contact page).
                       <a
                         href={`mailto:${SALES_EMAIL}?subject=${encodeURIComponent(`Pricelens ${plan.name}`)}`}
@@ -145,6 +144,11 @@ export default function PricingPage() {
                             router.push(loginHref('/pricing'));
                             return;
                           }
+                          // No card checkout: pay by wallet / InstaPay instead.
+                          if (!data.checkoutEnabled && data.manualPaymentsEnabled) {
+                            router.push(`/account/pay/${plan.key}`);
+                            return;
+                          }
                           checkout(plan.key);
                         }}
                       >
@@ -156,7 +160,7 @@ export default function PricingPage() {
               );
             })}
           </div>
-          {!data.checkoutEnabled && <p className="text-center text-xs text-muted">{t.pricing.checkoutDisabled}</p>}
+          {!data.checkoutEnabled && !data.manualPaymentsEnabled && <p className="text-center text-xs text-muted">{t.pricing.checkoutDisabled}</p>}
         </>
       )}
     </div>

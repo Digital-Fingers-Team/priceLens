@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { buttonClassName } from '@/components/ui/button-styles';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useBillingPortal, useCancelSubscription, useMyBilling } from '@/lib/hooks/use-billing';
+import { useBillingPortal, useCancelSubscription, useMyBilling, useMyPayments } from '@/lib/hooks/use-billing';
 import { Link } from '@/lib/i18n/navigation';
 import { useI18n } from '@/lib/i18n/provider';
 import { cn } from '@/lib/utils/cn';
@@ -35,6 +35,8 @@ function BillingContent() {
   const { data, isLoading } = useMyBilling();
   const { mutate: openPortal, isPending: portalPending } = useBillingPortal();
   const { mutate: cancel, isPending: cancelPending } = useCancelSubscription();
+  const { data: payments } = useMyPayments();
+  const waiting = payments?.payments.find((p) => p.status === 'SUBMITTED');
 
   if (isLoading || !data) {
     return (
@@ -46,6 +48,8 @@ function BillingContent() {
   }
 
   const isPaid = data.tier !== 'FREE';
+  // Wallet / InstaPay plans end on their date unless paid again.
+  const isWallet = data.provider === 'wallet';
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-10 sm:px-6">
@@ -60,7 +64,7 @@ function BillingContent() {
             <h2 className="text-base font-semibold text-fg">{t.pricing.plans[data.tier]?.name ?? data.planName}</h2>
             {data.currentPeriodEnd && (
               <p className="text-xs text-muted">
-                {tf(data.cancelAtPeriodEnd ? t.account.accessEnds : t.account.renews, { date: fmt.date(data.currentPeriodEnd) })}
+                {tf(data.cancelAtPeriodEnd || isWallet ? t.account.accessEnds : t.account.renews, { date: fmt.date(data.currentPeriodEnd) })}
               </p>
             )}
           </div>
@@ -72,6 +76,12 @@ function BillingContent() {
         </CardHeader>
 
         <CardBody className="flex flex-col gap-6">
+          {waiting && (
+            <p className="rounded border border-info/40 bg-info-soft px-3 py-2 text-sm text-fg">
+              {tf(t.account.paymentWaiting, { amount: `${fmt.number(waiting.amount)} ${waiting.currency}` })}
+            </p>
+          )}
+          {isWallet && data.currentPeriodEnd && <p className="text-xs text-muted">{t.account.walletNoAutoRenew}</p>}
           {data.status === 'PAST_DUE' && (
             <p className="rounded border border-warning/40 bg-warning-soft px-3 py-2 text-sm text-fg">{t.account.pastDue}</p>
           )}
@@ -101,16 +111,21 @@ function BillingContent() {
           </dl>
 
           <div className="flex flex-wrap gap-2 border-t border-border pt-4">
-            {isPaid && data.checkoutEnabled && (
+            {isPaid && !isWallet && data.checkoutEnabled && (
               <Button variant="secondary" leftIcon={<CreditCard className="h-4 w-4" aria-hidden />} loading={portalPending} onClick={() => openPortal()}>
                 {t.account.paymentInvoices}
               </Button>
+            )}
+            {isWallet && (
+              <Link href={`/account/pay/${data.planKey}`} className={buttonClassName()}>
+                {t.account.renewNow}
+              </Link>
             )}
             <Link href="/pricing" className={buttonClassName({ variant: isPaid ? 'secondary' : 'primary' })}>
               {isPaid ? t.account.changePlan : t.billing.seePlans}
               <ArrowRight className="flip-rtl h-4 w-4" aria-hidden />
             </Link>
-            {isPaid && !data.cancelAtPeriodEnd && (
+            {isPaid && !isWallet && !data.cancelAtPeriodEnd && (
               <Button variant="danger" loading={cancelPending} onClick={() => cancel(false)}>
                 {t.account.cancelRenewal}
               </Button>

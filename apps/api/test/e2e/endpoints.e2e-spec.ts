@@ -2,6 +2,8 @@
 // address, far past the production per-minute limits it would otherwise hit.
 process.env.THROTTLE_LIMIT = '100000';
 process.env.THROTTLE_LIMIT_AUTH = '100000';
+// Wallet payments are on only with somewhere to send the money.
+process.env.BILLING_WALLET_NUMBER = '01000000000';
 
 import { Test } from '@nestjs/testing';
 import type { NestExpressApplication } from '@nestjs/platform-express';
@@ -275,6 +277,73 @@ describe('Every endpoint (e2e)', () => {
     await call('POST', '/api/v1/billing/cancel', 201, { token: pro.token, body: { immediately: false } });
     // Stripe signs its webhook; an unsigned call is refused.
     await call('POST', '/api/v1/billing/webhook/stripe', 400, { body: { type: 'checkout.session.completed' } });
+    expectNoProblems();
+  });
+
+  it('billing: a wallet payment, from order to approval', async () => {
+    // The free user pays, and is put back on Free at the end (later tests
+    // rely on it); registering another user would hit the sign-up limit.
+    const payerToken = free.token;
+
+    const plans = await call('GET', '/api/v1/billing/plans', 200);
+    expect(plans.body.data.manualPaymentsEnabled).toBe(true);
+    const byKey = Object.fromEntries(plans.body.data.plans.map((p: { key: string; purchasable: boolean }) => [p.key, p.purchasable]));
+    expect(byKey.plus_monthly).toBe(true);
+    expect(byKey.enterprise_monthly).not.toBe(true);
+
+    await call('POST', '/api/v1/billing/payments', 401, { body: { planKey: 'plus_monthly' } });
+    await call('POST', '/api/v1/billing/payments', 403, { token: payerToken, body: { planKey: 'enterprise_monthly' } });
+    const started = await call('POST', '/api/v1/billing/payments', 201, { token: payerToken, body: { planKey: 'plus_monthly' } });
+    const order = started.body.data.payment;
+    expect(order).toMatchObject({ status: 'AWAITING_PAYMENT', amountMinor: 12900, planKey: 'plus_monthly' });
+    expect(started.body.data.destinations.walletNumber).toBe('01000000000');
+    // A second click is the same order, not a new code.
+    const again = await call('POST', '/api/v1/billing/payments', 201, { token: payerToken, body: { planKey: 'plus_monthly' } });
+    expect(again.body.data.payment.id).toBe(order.id);
+
+    const params = { id: order.id };
+    await call('POST', '/api/v1/billing/payments/{id}/submit', 404, {
+      token: pro.token,
+      params,
+      body: { method: 'WALLET', reference: 'TX-9001' },
+    });
+    await call('POST', '/api/v1/billing/payments/{id}/submit', 400, { token: payerToken, params, body: { method: 'CARD', reference: 'TX-9001' } });
+    const sent = await call('POST', '/api/v1/billing/payments/{id}/submit', 201, {
+      token: payerToken,
+      params,
+      body: { method: 'WALLET', reference: 'tx 9001', payerAccount: '01111111111' },
+    });
+    expect(sent.body.data).toMatchObject({ status: 'SUBMITTED', reference: 'TX9001' });
+
+    // The same receipt cannot pay for a second order.
+    const other = await call('POST', '/api/v1/billing/payments', 201, { token: pro.token, body: { planKey: 'plus_monthly' } });
+    await call('POST', '/api/v1/billing/payments/{id}/submit', 409, {
+      token: pro.token,
+      params: { id: other.body.data.payment.id },
+      body: { method: 'WALLET', reference: 'TX-9001' },
+    });
+    await call('POST', '/api/v1/billing/payments/{id}/cancel', 201, { token: pro.token, params: { id: other.body.data.payment.id } });
+    await call('POST', '/api/v1/billing/payments/{id}/cancel', 409, { token: pro.token, params: { id: other.body.data.payment.id } });
+
+    const mine = await call('GET', '/api/v1/billing/payments/mine', 200, { token: payerToken });
+    expect(mine.body.data.payments[0].id).toBe(order.id);
+
+    await call('GET', '/api/v1/billing/payments/admin', 403, { token: payerToken });
+    const queue = await call('GET', '/api/v1/billing/payments/admin', 200, { token: admin.token, query: { status: 'SUBMITTED' } });
+    expect(queue.body.data.payments.map((p: { id: string }) => p.id)).toContain(order.id);
+
+    await call('POST', '/api/v1/billing/payments/admin/{id}/approve', 403, { token: payerToken, params });
+    await call('POST', '/api/v1/billing/payments/admin/{id}/approve', 201, { token: admin.token, params });
+    await call('POST', '/api/v1/billing/payments/admin/{id}/approve', 409, { token: admin.token, params });
+    await call('POST', '/api/v1/billing/payments/admin/{id}/reject', 409, { token: admin.token, params, body: { reason: 'late' } });
+    await call('POST', '/api/v1/billing/payments/admin/{id}/reject', 404, { token: admin.token, params: { id: MISSING_ID } });
+
+    const me = await call('GET', '/api/v1/billing/me', 200, { token: payerToken });
+    expect(me.body.data).toMatchObject({ planKey: 'plus_monthly', provider: 'wallet', status: 'ACTIVE' });
+    const days = (Date.parse(me.body.data.currentPeriodEnd) - Date.now()) / 86_400_000;
+    expect(days).toBeGreaterThan(29.9);
+    expect(days).toBeLessThan(30.1);
+    await call('POST', '/api/v1/billing/cancel', 201, { token: payerToken, body: { immediately: true } });
     expectNoProblems();
   });
 
