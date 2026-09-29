@@ -11,6 +11,8 @@ const PAUSE_AFTER_RATE_LIMIT_MS = 60 * 1000;
 /** Waits before retrying an overloaded (5xx) call; then the provider is paused. */
 const OVERLOADED_RETRY_DELAYS_MS = [1_000, 3_000];
 const CALL_TIMEOUT_MS = 45_000;
+/** Titles asked about in one judgeMany request. */
+const BATCH_SIZE = 8;
 
 /** A provider answered with an HTTP error status. */
 class ProviderHttpError extends Error {
@@ -65,6 +67,7 @@ export class SemanticService {
   private readonly logger = new Logger(SemanticService.name);
   private readonly slots: Slot[];
   private warnedUnconfigured = false;
+  private nextSlot = 0;
 
   constructor(
     private readonly config: ConfigService,
@@ -98,16 +101,61 @@ export class SemanticService {
       .catch(() => null);
     if (stored) return stored.same;
 
-    const prompt = this.prompt(titleA, titleB);
-    for (const slot of this.slots) {
+    const answer = await this.askSlots(this.prompt(titleA, titleB), (content) => this.parse(content));
+    if (!answer) return null;
+    await this.store(titleA, titleB, answer.value, answer.model);
+    return answer.value;
+  }
+
+  /**
+   * Several titles against one, up to BATCH_SIZE per request: the offer
+   * audit asks about a product's offers together, ingestion about a
+   * listing's candidates. Stored answers are not asked again. Answers are in
+   * the order of `others`, null where there is none.
+   */
+  async judgeMany(anchor: string, others: string[]): Promise<Array<boolean | null>> {
+    const verdicts: Array<boolean | null> = others.map(() => null);
+    if (this.slots.length === 0) return verdicts;
+
+    const unasked: number[] = [];
+    for (const [index, other] of others.entries()) {
+      const stored = await this.prisma.matchJudgement
+        .findUnique({ where: { pairKey: this.pairKey(anchor, other) }, select: { same: true } })
+        .catch(() => null);
+      if (stored) verdicts[index] = stored.same;
+      else unasked.push(index);
+    }
+
+    for (let start = 0; start < unasked.length; start += BATCH_SIZE) {
+      const chunk = unasked.slice(start, start + BATCH_SIZE);
+      const titles = chunk.map((index) => others[index]);
+      const answer = await this.askSlots(this.batchPrompt(anchor, titles), (content) =>
+        this.parseMany(content, titles.length),
+      );
+      if (!answer) continue;
+      for (const [position, index] of chunk.entries()) {
+        verdicts[index] = answer.value[position];
+        await this.store(anchor, others[index], answer.value[position], answer.model);
+      }
+    }
+    return verdicts;
+  }
+
+  /**
+   * The first slot that answers, failing over as described on the class.
+   * Each call starts one slot further along, so calls made at the same time
+   * go to different keys instead of queueing on one quota.
+   */
+  private async askSlots<T>(
+    prompt: string,
+    parse: (content: string | null) => T | null,
+  ): Promise<{ value: T; model: string } | null> {
+    const start = this.nextSlot++ % this.slots.length;
+    for (const slot of [...this.slots.slice(start), ...this.slots.slice(0, start)]) {
       if (Date.now() < slot.pausedUntil) continue;
       try {
-        const same = this.parse(await this.askWithRetry(slot, prompt));
-        if (same === null) return null;
-        await this.prisma.matchJudgement
-          .create({ data: { pairKey, titleA, titleB, same, model: `${slot.name}:${slot.model}` } })
-          .catch(() => undefined); // a concurrent caller stored the same pair first
-        return same;
+        const value = parse(await this.askWithRetry(slot, prompt));
+        return value === null ? null : { value, model: `${slot.name}:${slot.model}` };
       } catch (err) {
         const rateLimited = err instanceof ProviderHttpError && err.status === 429;
         const pauseMs = rateLimited ? PAUSE_AFTER_RATE_LIMIT_MS : PAUSE_AFTER_FAILURE_MS;
@@ -116,6 +164,12 @@ export class SemanticService {
       }
     }
     return null;
+  }
+
+  private async store(titleA: string, titleB: string, same: boolean, model: string): Promise<void> {
+    await this.prisma.matchJudgement
+      .create({ data: { pairKey: this.pairKey(titleA, titleB), titleA, titleB, same, model } })
+      .catch(() => undefined); // a concurrent caller stored the same pair first
   }
 
   /** Overridable in tests. */
@@ -201,7 +255,7 @@ export class SemanticService {
         // which reserves an internal "thinking" budget by default) will
         // otherwise request a huge max_tokens and fail with a 402 credits
         // error on a low-balance account before producing any output.
-        max_tokens: 50,
+        max_tokens: 120,
         response_format: { type: 'json_object' },
       }),
       signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
@@ -221,6 +275,18 @@ export class SemanticService {
     }
   }
 
+  /** One boolean per asked title, or null when the reply is not exactly that. */
+  private parseMany(content: string | null, count: number): boolean[] | null {
+    if (!content) return null;
+    try {
+      const parsed = JSON.parse(content.trim().replace(/^```(?:json)?\s*|\s*```$/g, '')) as { same?: unknown };
+      const same = parsed.same;
+      return Array.isArray(same) && same.length === count && same.every((v) => typeof v === 'boolean') ? same : null;
+    } catch {
+      return null;
+    }
+  }
+
   /** Order-independent: (a, b) and (b, a) are one pair. */
   private pairKey(titleA: string, titleB: string): string {
     const [first, second] = [titleA, titleB].map((title) => title.trim().toLowerCase().replace(/\s+/g, ' ')).sort();
@@ -229,11 +295,25 @@ export class SemanticService {
 
   private prompt(titleA: string, titleB: string): string {
     return `You are a strict product-matching assistant for an e-commerce price-comparison site.
-Given two product titles from two different online stores, decide if they describe the same product for sale — same brand, same model, same storage and RAM, same size or pack — just worded differently by each store's copywriter. Titles may be in English or Arabic. Marketing filler words (e.g. "Unlocked", "Official Warranty", "Genuine") don't matter and should be ignored. COLOR DOES NOT MATTER: the same model in a different color is the same product here, because the site shows every color of a model on one page. But different storage/RAM/capacity, a different model tier (e.g. "Pro" vs base, "Pro+" vs "Pro", "Ultra" vs base, "Max" vs base, "Mini" vs base), a different model number/code (e.g. "F6000" vs "H5000F"), new vs used/refurbished, a bundle vs the item alone, a spare part or accessory vs the device itself, or a different size or pack count (500ml vs 1L, 1 can vs 6 cans) means they are NOT the same product. If one title states the RAM or storage and the other does not, answer false.
+Given two product titles from two different online stores, decide if they describe the same product for sale — ${RULES}
 
 Product A: "${titleA}"
 Product B: "${titleB}"
 
 Respond with ONLY this JSON object and nothing else: {"same": true or false}`;
   }
+
+  private batchPrompt(anchor: string, titles: string[]): string {
+    const numbered = titles.map((title, index) => `${index + 1}. "${title}"`).join('\n');
+    return `You are a strict product-matching assistant for an e-commerce price-comparison site.
+Given product A and a numbered list of titles from different online stores, decide for EACH listed title whether it describes the same product for sale as product A — ${RULES}
+
+Product A: "${anchor}"
+Titles:
+${numbered}
+
+Respond with ONLY this JSON object and nothing else: {"same": [${titles.length} true/false values, one per numbered title, in order]}`;
+  }
 }
+
+const RULES = `same brand, same model, same storage and RAM, same size or pack — just worded differently by each store's copywriter. Titles may be in English or Arabic. Marketing filler words (e.g. "Unlocked", "Official Warranty", "Genuine") don't matter and should be ignored. COLOR DOES NOT MATTER: the same model in a different color is the same product here, because the site shows every color of a model on one page. But different storage/RAM/capacity, a different model tier (e.g. "Pro" vs base, "Pro+" vs "Pro", "Ultra" vs base, "Max" vs base, "Mini" vs base), a different model number/code (e.g. "F6000" vs "H5000F"), new vs used/refurbished, a bundle vs the item alone, a spare part or accessory vs the device itself, or a different size or pack count (500ml vs 1L, 1 can vs 6 cans) means they are NOT the same product. If one title states the RAM or storage and the other does not, answer false.`;

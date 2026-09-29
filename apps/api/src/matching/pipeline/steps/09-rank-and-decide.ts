@@ -217,8 +217,13 @@ export async function decideMatch<C extends CatalogCandidate>(
   ranked: Array<RankedCandidate<C>>,
   judge: SameProductJudge,
 ): Promise<C | null> {
-  for (const { candidate } of ranked.slice(0, MAX_JUDGED_CANDIDATES)) {
-    const verdict = await judge.judgeSameProduct(listingTitle, candidate.title);
+  const top = ranked.slice(0, MAX_JUDGED_CANDIDATES);
+  // A judge that answers several at once is asked about all of them in one request.
+  const batch = judge.judgeMany && top.length > 0
+    ? await judge.judgeMany(listingTitle, top.map(({ candidate }) => candidate.title))
+    : null;
+  for (const [index, { candidate }] of top.entries()) {
+    const verdict = batch ? batch[index] : await judge.judgeSameProduct(listingTitle, candidate.title);
     if (verdict === true) {
       return candidate;
     }

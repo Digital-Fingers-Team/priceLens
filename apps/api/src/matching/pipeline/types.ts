@@ -84,4 +84,6 @@ export interface CandidateSource<C extends CatalogCandidate = CatalogCandidate> 
  */
 export interface SameProductJudge {
   judgeSameProduct(titleA: string, titleB: string): Promise<boolean | null>;
+  /** Each of `others` against `anchor`, in as few requests as possible; answers in order. */
+  judgeMany?(anchor: string, others: string[]): Promise<Array<boolean | null>>;
 }

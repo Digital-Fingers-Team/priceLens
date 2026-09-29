@@ -388,6 +388,33 @@ describe('matching pipeline', () => {
     it('returns null with no survivors', async () => {
       expect(await decideMatch('x', [], judge([null]))).toBeNull();
     });
+
+    describe('with a judge that answers several at once', () => {
+      const batchJudge = (verdicts: Array<boolean | null>) => {
+        const asked: string[][] = [];
+        return {
+          asked,
+          judgeSameProduct: async () => {
+            throw new Error('asked one at a time');
+          },
+          judgeMany: async (_anchor: string, titles: string[]) => {
+            asked.push(titles);
+            return titles.map((_, i) => (i < verdicts.length ? verdicts[i] : false));
+          },
+        };
+      };
+
+      it(`asks about the top ${MAX_JUDGED_CANDIDATES} in one call and takes the first "same" in rank order`, async () => {
+        const top = ranked(...Array(12).fill(0.5));
+        const fake = batchJudge([false, false, true, true]);
+        expect(await decideMatch('x', top, fake)).toBe(top[2].candidate);
+        expect(fake.asked).toEqual([top.slice(0, MAX_JUDGED_CANDIDATES).map((r) => r.candidate.title)]);
+      });
+
+      it('stops at the first unanswered candidate, as when asking one at a time', async () => {
+        expect(await decideMatch('x', ranked(0.5, 0.4), batchJudge([null, true]))).toBeNull();
+      });
+    });
   });
 
   describe('steps 6-9 together: findCanonicalMatch', () => {

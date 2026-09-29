@@ -7,6 +7,7 @@
  *   ts-node scripts/ops/audit-product-offers.ts --product <slug>     # one product
  *   ts-node scripts/ops/audit-product-offers.ts --limit 500 --apply  # split, write a rollback file
  *   ts-node scripts/ops/audit-product-offers.ts --rollback <file>
+ *   --parallel 4: products asked about at the same time (default 4)
  *
  * Products with the most offers go first. Every verdict is stored
  * (match_judgements), so a dry run's questions are not paid for twice. The
@@ -66,38 +67,38 @@ async function main() {
     const reports: ProductRepairReport[] = [];
     let asked = 0;
     let stoppedEarly = false;
-    for (const product of products) {
-      if (product._count.sourceListings < 2) continue;
-      const listings = await prisma.sourceListing.findMany({
-        where: { canonicalProductId: product.id, matchStatus: { in: ACCEPTED } },
-        select: { id: true, rawTitle: true },
-        orderBy: { id: 'asc' },
-      });
-      const verdicts = new Map<string, boolean | null>();
-      for (const listing of planOfferAudit(product, listings, verdicts).toAsk) {
-        const verdict = await semantic.judgeSameProduct(listing.rawTitle, product.title);
-        asked += 1;
-        verdicts.set(listing.id, verdict);
-        if (verdict === null && !semantic.isAvailable()) {
-          stoppedEarly = true;
-          break;
+    // Each product's offers go to the judge in one request (up to 8 titles),
+    // and several products are asked at once, spread over the judge's slots.
+    const queue = products.filter((product) => product._count.sourceListings >= 2);
+    const concurrency = Math.max(1, parseInt(argValue('--parallel') ?? '4', 10));
+    const worker = async () => {
+      for (let product = queue.shift(); product && !stoppedEarly; product = queue.shift()) {
+        const listings = await prisma.sourceListing.findMany({
+          where: { canonicalProductId: product.id, matchStatus: { in: ACCEPTED } },
+          select: { id: true, rawTitle: true },
+          orderBy: { id: 'asc' },
+        });
+        const toAsk = planOfferAudit(product, listings, new Map()).toAsk;
+        const answers = await semantic.judgeMany(product.title, toAsk.map((listing) => listing.rawTitle));
+        asked += toAsk.length;
+        const verdicts = new Map(toAsk.map((listing, index) => [listing.id, answers[index]]));
+        if (answers.includes(null) && !semantic.isAvailable()) stoppedEarly = true;
+
+        const plan = planOfferAudit(product, listings, verdicts);
+        if (plan.splits.length > 0) {
+          reports.push({ productId: product.id, slug: product.slug, title: product.title, plan });
+          const lines = plan.splits.map(
+            (split) => `  split off: ${listings.find((listing) => listing.id === split.listingIds[0])?.rawTitle}`,
+          );
+          console.log(`\n${product.title}  (${product.slug})\n${lines.join('\n')}`);
         }
       }
-      const plan = planOfferAudit(product, listings, verdicts);
-      if (plan.splits.length > 0) {
-        reports.push({ productId: product.id, slug: product.slug, title: product.title, plan });
-        console.log(`\n${product.title}  (${product.slug})`);
-        for (const split of plan.splits) {
-          const moved = listings.find((listing) => listing.id === split.listingIds[0]);
-          console.log(`  split off: ${moved?.rawTitle}`);
-        }
-      }
-      if (stoppedEarly) break;
-    }
+    };
+    await Promise.all(Array.from({ length: concurrency }, worker));
 
     const offers = reports.reduce((sum, report) => sum + report.plan.splits.length, 0);
     console.log(
-      `\nChecked ${products.length} product(s), asked the judge ${asked} time(s): ` +
+      `\nChecked ${products.length} product(s), asked the judge about ${asked} offer(s): ` +
         `${offers} offer(s) on ${reports.length} product(s) do not belong.` +
         (stoppedEarly ? ' Stopped early: every judge slot is paused; run again later.' : ''),
     );
