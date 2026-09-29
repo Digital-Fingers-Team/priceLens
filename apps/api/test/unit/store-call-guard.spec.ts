@@ -142,9 +142,11 @@ describe('LiveIngestionService sweep with a failing query (B-07)', () => {
 
   it('skips the failed query and keeps sweeping the store', async () => {
     let n = 0;
-    const { service, repository } = setup(async () => {
+    let fails = 0;
+    const { service, repository } = setup(async (query) => {
       n++;
-      if (n <= 2) throw new Error('timeout'); // the first query fails twice (try + retry)
+      // The first category query fails twice (try + retry).
+      if (query === 'Smartphones' && ++fails <= 2) throw new Error('timeout');
       return [listing(`l${n}`)];
     });
 
@@ -201,6 +203,58 @@ describe('LiveIngestionService sweep with a failing query (B-07)', () => {
 
     expect(queries).toContain('Refrigerators');
     expect(repository.markCategoriesSwept).toHaveBeenCalledWith(['c3'], expect.any(Date));
+  });
+
+  it('keeps sweeping a healthy store that does not sell the first categories', async () => {
+    // Prod, 2026-09-29: Elaraby (an appliance store) answered nothing for the
+    // CPU and console queries the sweep starts with, and was paused before it
+    // reached the categories it sells. A broad probe proves it is not blocked.
+    const guard = new StoreCallGuard(config({ 'retailers.connectorFailureThreshold': 2 }));
+    const repository = {
+      findActivePlatforms: jest.fn(async () => [platform]),
+      findLeafCategories: jest.fn(async () => categories),
+      markCategoriesSwept: jest.fn(async () => undefined),
+      startJob: jest.fn(async () => 'job-1'),
+      completeJob: jest.fn(async () => undefined),
+      failJob: jest.fn(async () => undefined),
+    } as unknown as IngestionRepository;
+    const processor = {
+      process: jest.fn(async () => null),
+      recordUnpriced: jest.fn(async () => undefined),
+      takeBelowFloor: jest.fn(() => ({ total: 0, byCategory: {} })),
+    } as unknown as ListingProcessor;
+    const asked: string[] = [];
+    let n = 0;
+    const store = connector('noon', async (query) => {
+      asked.push(query);
+      return /samsung|fridge|refrigerator/i.test(query) ? [listing(`l${++n}`)] : [];
+    });
+    const service = new LiveIngestionService(
+      repository,
+      processor,
+      new ConnectorRegistry([store]),
+      {} as NormalizerService,
+      config({ 'retailers.categorySweepMaxWave': 1 }),
+      guard,
+    );
+
+    const report = await service.runLiveIngestion({ platformSlugs: ['noon'] });
+
+    expect(guard.isPaused('noon')).toBe(false);
+    expect(report.skippedPlatforms).toEqual([]);
+    expect(asked).toContain('Refrigerators');
+  });
+
+  it('still pauses a store whose probe comes back empty (a silently blocked store)', async () => {
+    const guard = new StoreCallGuard(config({ 'retailers.connectorFailureThreshold': 2 }));
+    const { service } = setup(async () => []);
+    // setup() builds its own guard; use one with a low threshold instead.
+    Object.assign(service, { storeCalls: guard });
+
+    const report = await service.runLiveIngestion({ platformSlugs: ['noon'] });
+
+    expect(guard.isPaused('noon')).toBe(true);
+    expect(report.skippedPlatforms.map((s) => s.slug)).toEqual(['noon']);
   });
 
   it('does not advance the rotation when no store was swept', async () => {

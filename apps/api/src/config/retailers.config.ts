@@ -10,7 +10,10 @@ export default registerAs('retailers', () => ({
   // The scheduled sweep covers wave 0 (the original categories) plus waves
   // 1..categorySweepMaxWave, at most maxCategorySweepsPerRun of those per run,
   // least recently swept first. 0 turns the new categories' sweep off.
-  categorySweepMaxWave: parseInt(process.env.CATEGORY_SWEEP_MAX_WAVE ?? '0', 10),
+  // A broad search every store answers; a store that answers it is not
+  // blocked, so its empty answers in that sweep don't pause it.
+  storeProbeQuery: process.env.STORE_PROBE_QUERY ?? 'samsung',
+  categorySweepMaxWave:parseInt(process.env.CATEGORY_SWEEP_MAX_WAVE ?? '0', 10),
   maxCategorySweepsPerRun: parseInt(process.env.MAX_CATEGORY_SWEEPS_PER_RUN ?? '15', 10),
   liveIngestionScheduleEnabled: process.env.LIVE_INGESTION_SCHEDULE_ENABLED !== 'false',
   liveIngestionCron: process.env.LIVE_INGESTION_CRON ?? '0 */6 * * *',

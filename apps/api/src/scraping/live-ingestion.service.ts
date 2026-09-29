@@ -134,6 +134,22 @@ export class LiveIngestionService {
    * The leaves this scheduled sweep covers: wave 0 always, plus the least
    * recently swept of the enabled waves (see selectSweepCategories).
    */
+  /**
+   * One broad search (STORE_PROBE_QUERY, "samsung" by default: every store
+   * we scrape sells Samsung). True when the store answered with listings. An
+   * empty probe counts as a failure; a paused store rethrows.
+   */
+  private async probeStore(connector: RetailerConnector): Promise<boolean> {
+    const probe = this.configService.get<string>('retailers.storeProbeQuery', 'samsung');
+    try {
+      const listings = await this.storeCalls.search(connector, probe, 1, { emptyIsFailure: true });
+      return listings.length > 0;
+    } catch (error) {
+      if (error instanceof StoreUnavailableError) throw error;
+      return false;
+    }
+  }
+
   private recordBelowFloor(summary: IngestionSummary, platformSlug: string): void {
     const { total, byCategory } = this.processor.takeBelowFloor(platformSlug);
     summary.listingsBelowFloor = total;
@@ -308,6 +324,12 @@ export class LiveIngestionService {
     this.processor.takeBelowFloor(platform.slug);
 
     try {
+      // A sweep counts empty answers as failures because a blocked connector
+      // returns [] instead of throwing. But a store that answers a broad probe
+      // is not blocked: its empty answers only mean it does not sell that
+      // category (Elaraby has no CPUs), and must not pause it.
+      const storeAnswers = searchOptions.emptyIsFailure ? await this.probeStore(connector) : false;
+
       for (const { category, queries } of categoryQueries) {
         for (const query of queries) {
           summary.queriesRun += 1;
@@ -323,7 +345,7 @@ export class LiveIngestionService {
             // breaker (which pauses the store for users too).
             listings = await this.storeCalls.search(connector, query, limitPerQuery, {
               ...searchOptions,
-              emptyIsFailure: searchOptions.emptyIsFailure && (category.rolloutWave ?? 0) === 0,
+              emptyIsFailure: searchOptions.emptyIsFailure && !storeAnswers && (category.rolloutWave ?? 0) === 0,
             });
           } catch (error) {
             if (error instanceof StoreUnavailableError) throw error;
