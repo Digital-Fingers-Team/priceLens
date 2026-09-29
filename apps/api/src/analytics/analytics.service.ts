@@ -218,7 +218,7 @@ export class AnalyticsService {
   /** Midnight in Cairo `days - 1` days ago, as a UTC timestamp (the columns hold UTC). */
   private async cairoDayStart(days: number): Promise<Date> {
     const [row] = await this.prisma.$queryRaw<Array<{ since: Date }>>(Prisma.sql`
-      SELECT ((date_trunc('day', now() AT TIME ZONE 'Africa/Cairo') - make_interval(days => ${days - 1}))
+      SELECT ((date_trunc('day', now() AT TIME ZONE 'Africa/Cairo') - make_interval(days => ${days - 1}::int))
               AT TIME ZONE 'Africa/Cairo') AT TIME ZONE 'UTC' AS since`);
     return row.since;
   }
