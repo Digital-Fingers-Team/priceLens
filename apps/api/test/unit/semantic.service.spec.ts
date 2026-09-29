@@ -169,6 +169,26 @@ describe('SemanticService when Gemini is busy', () => {
     expect(keys.sort()).toEqual(['second-key', 'test-key']);
   });
 
+  it('pauses an hour when the daily quota is spent, not a minute', async () => {
+    // Prod, 2026-09-29: every key hit "GenerateRequestsPerDayPerProjectPerModel";
+    // a one-minute pause retried each of them all day.
+    jest.useFakeTimers().setSystemTime(new Date('2026-09-29T15:00:00Z'));
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      json: async () => ({
+        error: { details: [{ violations: [{ quotaId: 'GenerateRequestsPerDayPerProjectPerModel-FreeTier' }] }] },
+      }),
+    } as Response) as never;
+    const semantic = service();
+
+    expect(await semantic.judgeSameProduct('a', 'b')).toBeNull();
+    jest.setSystemTime(new Date('2026-09-29T15:30:00Z'));
+    expect(semantic.isAvailable()).toBe(false);
+    jest.setSystemTime(new Date('2026-09-29T16:00:01Z'));
+    expect(semantic.isAvailable()).toBe(true);
+  });
+
   it('pauses only one minute after a rate limit (429)', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-09-29T09:00:00Z'));
     global.fetch = jest.fn().mockResolvedValue(answer(429)) as never;

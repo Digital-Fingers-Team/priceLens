@@ -2,8 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { SemanticService } from './semantic.service';
 
-/** Titles per AI request. */
-const BATCH_SIZE = 20;
+/** Titles per AI request: the free tier limits requests per day, not titles. */
+const BATCH_SIZE = 40;
 const ARABIC_LETTER = /[ء-ي]/;
 
 /**

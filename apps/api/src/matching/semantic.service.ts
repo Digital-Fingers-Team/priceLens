@@ -15,8 +15,8 @@ const CALL_TIMEOUT_MS = 45_000;
 const BATCH_SIZE = 8;
 /** Room for a model that thinks before answering; a verdict itself is a few bytes. */
 const JUDGEMENT_MAX_TOKENS = 256;
-/** ~20 translated titles, plus thinking. */
-const TRANSLATION_MAX_TOKENS = 4096;
+/** ~40 translated titles (~60 tokens each), plus thinking. */
+const TRANSLATION_MAX_TOKENS = 8192;
 const ARABIC_LETTER = /[ء-ي]/;
 
 /** A provider answered with an HTTP error status. */
@@ -24,10 +24,15 @@ class ProviderHttpError extends Error {
   constructor(
     provider: string,
     readonly status: number,
+    /** The provider said a per-day quota is spent (Gemini's quotaId names it). */
+    readonly dailyQuota = false,
   ) {
-    super(`${provider} HTTP ${status}`);
+    super(`${provider} HTTP ${status}${dailyQuota ? ' (daily quota spent)' : ''}`);
   }
 }
+
+/** A daily quota comes back hours later; asking every minute until then is noise. */
+const PAUSE_AFTER_DAILY_QUOTA_MS = 60 * 60 * 1000;
 
 
 /**
@@ -148,7 +153,7 @@ export class SemanticService {
 
   /**
    * Product titles in Arabic, as Egyptian stores write them, for the Arabic
-   * site. One request for the whole list (callers send up to ~20). Answers
+   * site. One request for the whole list (callers send up to ~40). Answers
    * are in order; null for a title without a usable translation, and all
    * null when no slot answers or the reply is malformed.
    */
@@ -200,7 +205,12 @@ Respond with ONLY this JSON object and nothing else: {"ar": [${titles.length} Ar
         return value === null ? null : { value, model: `${slot.name}:${slot.model}` };
       } catch (err) {
         const rateLimited = err instanceof ProviderHttpError && err.status === 429;
-        const pauseMs = rateLimited ? PAUSE_AFTER_RATE_LIMIT_MS : PAUSE_AFTER_FAILURE_MS;
+        const pauseMs =
+          err instanceof ProviderHttpError && err.dailyQuota
+            ? PAUSE_AFTER_DAILY_QUOTA_MS
+            : rateLimited
+              ? PAUSE_AFTER_RATE_LIMIT_MS
+              : PAUSE_AFTER_FAILURE_MS;
         slot.pausedUntil = Date.now() + pauseMs;
         this.logger.warn(`${slot.label} match-judgement call failed, pausing it for ${pauseMs / 1000}s: ${(err as Error).message}`);
       }
@@ -283,7 +293,10 @@ Respond with ONLY this JSON object and nothing else: {"ar": [${titles.length} Ar
       }),
       signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
     });
-    if (!response.ok) throw new ProviderHttpError('Gemini', response.status);
+    if (!response.ok) {
+      const body = response.status === 429 ? await response.json().catch(() => null) : null;
+      throw new ProviderHttpError('Gemini', response.status, /PerDay/.test(JSON.stringify(body ?? '')));
+    }
     const data = (await response.json()) as {
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
     };

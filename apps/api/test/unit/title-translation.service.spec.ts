@@ -22,12 +22,12 @@ function setup(products: Array<{ id: string; title: string }>, translate: (title
 }
 
 describe('TitleTranslationService', () => {
-  it('translates products without an Arabic title, in batches of 20', async () => {
-    const products = Array.from({ length: 25 }, (_, i) => ({ id: `p${i}`, title: `Product ${i}` }));
+  it('translates products without an Arabic title, in batches of 40 (the free quota counts requests)', async () => {
+    const products = Array.from({ length: 45 }, (_, i) => ({ id: `p${i}`, title: `Product ${i}` }));
     const { service, saved, asked } = setup(products, (titles) => titles.map((t) => `منتج ${t.split(' ')[1]}`));
 
-    expect(await service.translatePending(100)).toEqual({ translated: 25, failed: 0 });
-    expect(asked.map((batch) => batch.length)).toEqual([20, 5]);
+    expect(await service.translatePending(100)).toEqual({ translated: 45, failed: 0 });
+    expect(asked.map((batch) => batch.length)).toEqual([40, 5]);
     expect(saved.get('p7')).toBe('منتج 7');
   });
 
