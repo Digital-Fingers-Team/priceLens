@@ -60,8 +60,8 @@ export class ListingProcessor {
   private readonly familyLock = new KeyedMutex();
   /** MIN_LISTING_PRICE_EGP; a category's own min_price_egp overrides it. */
   private readonly globalFloor: number;
-  /** Listings dropped by the price floor since the last take, per store slug. */
-  private readonly belowFloor = new Map<string, number>();
+  /** Listings dropped by the price floor since the last take: store slug -> category slug -> count. */
+  private readonly belowFloor = new Map<string, Map<string, number>>();
 
   constructor(
     private readonly repository: IngestionRepository,
@@ -75,11 +75,12 @@ export class ListingProcessor {
     this.globalFloor = config?.get<number>('retailers.minListingPriceEgp', DEFAULT_MIN_LISTING_PRICE_EGP) ?? DEFAULT_MIN_LISTING_PRICE_EGP;
   }
 
-  /** How many listings the floor dropped for this store since the last call; resets it. */
-  takeBelowFloorCount(platformSlug: string): number {
-    const count = this.belowFloor.get(platformSlug) ?? 0;
+  /** What the floor dropped for this store since the last call, in total and per category; resets it. */
+  takeBelowFloor(platformSlug: string): { total: number; byCategory: Record<string, number> } {
+    const counts = this.belowFloor.get(platformSlug) ?? new Map<string, number>();
     this.belowFloor.delete(platformSlug);
-    return count;
+    const byCategory = Object.fromEntries(counts);
+    return { total: [...counts.values()].reduce((sum, n) => sum + n, 0), byCategory };
   }
 
   async process(
@@ -122,7 +123,7 @@ export class ListingProcessor {
         this.tools,
       );
       if (insane) {
-        if (belowFloor) return this.dropBelowFloor(platform);
+        if (belowFloor) return this.dropBelowFloor(platform, category);
         await this.reject(platform, listing, insane);
         return null;
       }
@@ -135,8 +136,10 @@ export class ListingProcessor {
     );
   }
 
-  private dropBelowFloor(platform: Platform): null {
-    this.belowFloor.set(platform.slug, (this.belowFloor.get(platform.slug) ?? 0) + 1);
+  private dropBelowFloor(platform: Platform, category: Category): null {
+    const counts = this.belowFloor.get(platform.slug) ?? new Map<string, number>();
+    counts.set(category.slug, (counts.get(category.slug) ?? 0) + 1);
+    this.belowFloor.set(platform.slug, counts);
     return null;
   }
 
@@ -160,7 +163,7 @@ export class ListingProcessor {
       this.tools,
     );
     if (!match && belowFloor) {
-      return this.dropBelowFloor(platform);
+      return this.dropBelowFloor(platform, category);
     }
 
     // Step 10: market outlier. Such a listing is not attached to the product,

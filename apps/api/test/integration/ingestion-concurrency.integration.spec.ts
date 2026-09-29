@@ -134,12 +134,12 @@ describe('ingestion concurrency (integration)', () => {
 
   describe('price floor (step 4b)', () => {
     it('drops a listing under the EGP floor without writing a row, and counts it per store', async () => {
-      processor.takeBelowFloorCount(platforms[0].slug);
+      processor.takeBelowFloor(platforms[0].slug);
       const cheap = listing('cheap', 'Zentrofon Z903 Lite 4GB 64GB', 4999);
       expect(await processor.process(platforms[0], category, cheap, platforms[0].slug)).toBeNull();
       expect(await prisma.sourceListing.count({ where: { externalId: cheap.externalId } })).toBe(0);
-      expect(processor.takeBelowFloorCount(platforms[0].slug)).toBe(1);
-      expect(processor.takeBelowFloorCount(platforms[0].slug)).toBe(0);
+      expect(processor.takeBelowFloor(platforms[0].slug)).toEqual({ total: 1, byCategory: { [category.slug]: 1 } });
+      expect(processor.takeBelowFloor(platforms[0].slug)).toEqual({ total: 0, byCategory: {} });
     });
 
     it('keeps a listing priced exactly at the floor', async () => {

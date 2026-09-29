@@ -35,6 +35,8 @@ export interface IngestionSummary {
    * scrape the same store at once: the processor counts per store, not per job.
    */
   listingsBelowFloor: number;
+  /** The same, per category slug. */
+  listingsBelowFloorByCategory: Record<string, number>;
 }
 
 export interface IngestionReport {
@@ -109,11 +111,14 @@ export class LiveIngestionService {
     }
 
     // Marked even when stores returned nothing, so an empty category moves to
-    // the back of the rotation instead of being retried every run.
-    await this.repository.markCategoriesSwept(
-      categories.filter((category) => category.rolloutWave > 0).map((category) => category.id),
-      new Date(),
-    );
+    // the back of the rotation instead of being retried every run -- but only
+    // when at least one store was actually swept.
+    if (summaries.length > 0) {
+      await this.repository.markCategoriesSwept(
+        categories.filter((category) => category.rolloutWave > 0).map((category) => category.id),
+        new Date(),
+      );
+    }
 
     await this.backfillCrossStore(platforms, touchedProductIds, summaries);
 
@@ -129,6 +134,12 @@ export class LiveIngestionService {
    * The leaves this scheduled sweep covers: wave 0 always, plus the least
    * recently swept of the enabled waves (see selectSweepCategories).
    */
+  private recordBelowFloor(summary: IngestionSummary, platformSlug: string): void {
+    const { total, byCategory } = this.processor.takeBelowFloor(platformSlug);
+    summary.listingsBelowFloor = total;
+    summary.listingsBelowFloorByCategory = byCategory;
+  }
+
   /** Wave 0 always; waves 1..CATEGORY_SWEEP_MAX_WAVE when enabled; negative waves (retired) never. */
   private isWaveLive(category: Pick<Category, 'rolloutWave'>): boolean {
     const wave = category.rolloutWave ?? 0;
@@ -290,10 +301,11 @@ export class LiveIngestionService {
       queriesFailed: 0,
       listingsFailed: 0,
       listingsBelowFloor: 0,
+      listingsBelowFloorByCategory: {},
     };
 
     const seenExternalIds = new Set<string>();
-    this.processor.takeBelowFloorCount(platform.slug);
+    this.processor.takeBelowFloor(platform.slug);
 
     try {
       for (const { category, queries } of categoryQueries) {
@@ -358,11 +370,11 @@ export class LiveIngestionService {
         }
       }
 
-      summary.listingsBelowFloor = this.processor.takeBelowFloorCount(platform.slug);
+      this.recordBelowFloor(summary, platform.slug);
       await this.repository.completeJob(jobId, summary);
       return summary;
     } catch (error) {
-      summary.listingsBelowFloor = this.processor.takeBelowFloorCount(platform.slug);
+      this.recordBelowFloor(summary, platform.slug);
       this.logger.error(`Ingestion failed for platform ${platform.slug}`, error as Error);
       await this.repository.failJob(jobId, error instanceof Error ? error.message : String(error), summary);
       throw error;

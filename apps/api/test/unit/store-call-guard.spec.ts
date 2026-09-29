@@ -126,7 +126,7 @@ describe('LiveIngestionService sweep with a failing query (B-07)', () => {
           matchedExistingCanonicalProduct: true,
         })),
       recordUnpriced: jest.fn(async () => undefined),
-      takeBelowFloorCount: jest.fn(() => 0),
+      takeBelowFloor: jest.fn(() => ({ total: 0, byCategory: {} })),
     } as unknown as ListingProcessor;
     const store = connector('noon', search);
     const service = new LiveIngestionService(
@@ -203,6 +203,16 @@ describe('LiveIngestionService sweep with a failing query (B-07)', () => {
     expect(repository.markCategoriesSwept).toHaveBeenCalledWith(['c3'], expect.any(Date));
   });
 
+  it('does not advance the rotation when no store was swept', async () => {
+    const { service, repository } = setup(async () => [], undefined, { 'retailers.categorySweepMaxWave': 1 });
+    // No active store at all (every one inactive or skipped).
+    (repository.findActivePlatforms as jest.Mock).mockResolvedValue([]);
+
+    await service.runLiveIngestion({ platformSlugs: ['noon'] });
+
+    expect(repository.markCategoriesSwept).not.toHaveBeenCalled();
+  });
+
   it('does not pause a store that simply has nothing for a new-wave category', async () => {
     // Prod, 2026-09-29 00:20: AliExpress returned nothing for five appliance
     // queries in a row and its circuit opened, pausing it for users too.
@@ -219,7 +229,7 @@ describe('LiveIngestionService sweep with a failing query (B-07)', () => {
     const processor = {
       process: jest.fn(async () => null),
       recordUnpriced: jest.fn(async () => undefined),
-      takeBelowFloorCount: jest.fn(() => 0),
+      takeBelowFloor: jest.fn(() => ({ total: 0, byCategory: {} })),
     } as unknown as ListingProcessor;
     let n = 0;
     const store = connector('noon', async (query) => (/fridge|refrigerator/i.test(query) ? [] : [listing(`l${++n}`)]));

@@ -78,6 +78,8 @@ export class IngestionRepository {
         category: { level: { gt: 0 } },
       },
       select: { categoryId: true },
+      // A fixed order, so a broad query resolves the same way every time.
+      orderBy: { id: 'asc' },
       take: 50,
     });
     if (products.length === 0) return null;
