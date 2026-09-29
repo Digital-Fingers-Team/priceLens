@@ -121,4 +121,5 @@ export default registerAs('retailers', () => ({
   elarabyBaseUrl: process.env.ELARABY_BASE_URL ?? 'https://www.elarabygroup.com',
   dream2000Enabled: process.env.DREAM2000_ENABLED !== 'false',
   dream2000BaseUrl: process.env.DREAM2000_BASE_URL ?? 'https://dream2000.com',
+  btechEnabled: process.env.BTECH_ENABLED !== 'false',
 }));

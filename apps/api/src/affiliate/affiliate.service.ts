@@ -95,6 +95,7 @@ export class AffiliateService {
       '2b': this.configService.get<string>('retailers.twoBBaseUrl'),
       elaraby: this.configService.get<string>('retailers.elarabyBaseUrl'),
       dream2000: this.configService.get<string>('retailers.dream2000BaseUrl'),
+      btech: 'https://btech.com',
     };
     return bases[platformSlug];
   }
