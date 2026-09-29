@@ -2,6 +2,7 @@ import { MatchStatus, type PrismaClient } from '@prisma/client';
 import { NormalizerService } from '../normalizer.service';
 import { toMatchingText } from '../text/arabic';
 import { extractMemorySpec } from '../text/specs';
+import { toSlug } from '../../scraping/ingestion/listing-mapping';
 
 /**
  * Finds and splits products whose listings are different RAM/storage
@@ -26,6 +27,11 @@ export interface VariantGroup {
   /** The varying dimensions' values, e.g. { ram: '12GB' }. */
   variant: Partial<Record<Dimension, string>>;
   listingIds: string[];
+  /**
+   * A different product altogether, not a variant (offer audit): the new
+   * product takes its brand and model from its own title, not the original's.
+   */
+  detached?: boolean;
 }
 
 export interface VariantSplitPlan {
@@ -149,7 +155,10 @@ export async function applyVariantSplits(
           where: { id: split.listingIds[0] },
           select: { rawTitle: true, rawImageUrl: true },
         });
-        const baseSlug = `${original.slug}-${slugPart(split.variant)}`;
+        const own = split.detached ? normalizer.extractAttributes(first.rawTitle) : null;
+        const baseSlug = own
+          ? toSlug(first.rawTitle) || `${original.slug}-offer`
+          : `${original.slug}-${slugPart(split.variant)}`;
         let slug = baseSlug;
         for (let n = 2; await tx.canonicalProduct.findUnique({ where: { slug }, select: { id: true } }); n += 1) {
           slug = `${baseSlug}-${n}`;
@@ -161,11 +170,11 @@ export async function applyVariantSplits(
             title: first.rawTitle,
             normalizedTitle: normalizer.normalizeTitle(first.rawTitle).normalized,
             categoryId: original.categoryId,
-            brand: original.brand,
-            model: original.model,
+            brand: own ? own.brand ?? null : original.brand,
+            model: own ? own.model ?? null : original.model,
             tier: original.tier,
             imageUrl: first.rawImageUrl ?? original.imageUrl,
-            attributes: { ...(original.attributes as object), ...split.variant },
+            attributes: own ? {} : { ...(original.attributes as object), ...split.variant },
           },
         });
         await tx.sourceListing.updateMany({
