@@ -230,12 +230,26 @@ export class ReconciliationService {
     maxPairs: number,
     neighborsPerProduct: number,
   ): Promise<CandidatePair[]> {
-    return this.prisma.$queryRaw<CandidatePair[]>`
+    // Only the newest products look for neighbours (every product used to:
+    // 38 minutes on 33k products, and the lock it held froze a migration and
+    // the site behind it, 2026-09-29). New duplicates come from new products;
+    // the brand+model pairs still cover the whole catalogue. The time limit
+    // is a backstop: a slow run skips this source rather than hold the table.
+    const anchors = this.config.get<number>('search.reconciliationTrigramAnchors', 3000);
+    const timeoutMs = this.config.get<number>('search.reconciliationQueryTimeoutMs', 120_000);
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        await tx.$executeRawUnsafe(`SET LOCAL statement_timeout = ${Math.max(1, Math.floor(timeoutMs))}`);
+        return tx.$queryRaw<CandidatePair[]>`
       WITH deduped AS (
         SELECT DISTINCT ON (a_id, b_id) a_id, b_id, similarity FROM (
           SELECT LEAST(a.id, nn.id) AS a_id, GREATEST(a.id, nn.id) AS b_id,
                  nn.sim AS similarity
-          FROM canonical_products a
+          FROM (
+            SELECT id, category_id, normalized_title FROM canonical_products
+            ORDER BY created_at DESC
+            LIMIT ${anchors}
+          ) a
           JOIN LATERAL (
             SELECT b.id, similarity(a.normalized_title, b.normalized_title) AS sim
             FROM canonical_products b
@@ -252,6 +266,11 @@ export class ReconciliationService {
       ORDER BY similarity DESC
       LIMIT ${maxPairs}
     `;
+      }, { timeout: timeoutMs + 10_000 });
+    } catch (err) {
+      this.logger.warn(`Look-alike title search skipped this run: ${(err as Error).message.split('\n').pop()}`);
+      return [];
+    }
   }
 
   /**

@@ -35,15 +35,13 @@ describe('reconciliation with the AI judge (integration)', () => {
   };
   const answer = (a: string, b: string, same: boolean) => judge.answers.set([a, b].sort().join('|'), same);
 
-  const config = {
-    get: (key: string, fallback?: unknown) =>
-      ({
-        'search.reconciliationDryRun': false,
-        'search.reconciliationMaxPairs': 5000,
-        'search.reconciliationSimilarityThreshold': 0.3,
-        'search.reconciliationNeighborsPerProduct': 8,
-      })[key] ?? fallback,
-  } as ConfigService;
+  const settings: Record<string, unknown> = {
+    'search.reconciliationDryRun': false,
+    'search.reconciliationMaxPairs': 5000,
+    'search.reconciliationSimilarityThreshold': 0.3,
+    'search.reconciliationNeighborsPerProduct': 8,
+  };
+  const config = { get: (key: string, fallback?: unknown) => settings[key] ?? fallback } as ConfigService;
 
   const service = () =>
     new ReconciliationService(config, prisma as never, semantic as never, new FuzzyMatcherService(), new NormalizerService());
@@ -135,5 +133,28 @@ describe('reconciliation with the AI judge (integration)', () => {
     const report = await service().reconcile();
     expect(report.merges.some((m) => m.mergeId === b.id)).toBe(false);
     expect(await prisma.canonicalProduct.count({ where: { id: { in: [a.id, b.id] } } })).toBe(2);
+  });
+
+  it('looks for look-alike titles around the newest products only', async () => {
+    // Prod, 2026-09-29: the look-alike search over all 33k products ran 38
+    // minutes and its lock froze a migration and the site behind it. New
+    // duplicates come from new products; brand+model pairs still cover all.
+    judge.available = true;
+    const old = await product(`Infinix budget phone 4GB RAM 64GB edition two ${run}`, 'Infinix', new Date('2020-01-01'));
+    const oldTwin = await product(`Infinix budget phone 4GB RAM 64GB edition two special ${run}`, 'Infinix', new Date('2020-02-01'));
+    answer(old.title, oldTwin.title, true);
+    // The newest product anywhere in the table.
+    await product(`Unrelated kettle ${run}`, 'Kenwood', new Date(Date.now() + 86_400_000));
+
+    settings['search.reconciliationTrigramAnchors'] = 1;
+    try {
+      const report = await service().reconcile();
+      expect(report.merges.some((m) => m.mergeId === oldTwin.id)).toBe(false);
+    } finally {
+      delete settings['search.reconciliationTrigramAnchors'];
+    }
+
+    const report = await service().reconcile();
+    expect(report.merges.find((m) => m.mergeId === oldTwin.id)).toMatchObject({ keepId: old.id });
   });
 });

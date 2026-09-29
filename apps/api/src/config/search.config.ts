@@ -26,6 +26,10 @@ export default registerAs('search', () => ({
   reconciliationScheduleEnabled: (process.env.RECONCILIATION_SCHEDULE_ENABLED ?? 'true') !== 'false',
   reconciliationCron: process.env.RECONCILIATION_CRON ?? '0 * * * *',
   reconciliationDryRun: (process.env.RECONCILIATION_DRY_RUN ?? 'true') !== 'false',
+  // The look-alike title search starts from this many of the newest products,
+  // and gives up after this long (see ReconciliationService.findCandidatePairs).
+  reconciliationTrigramAnchors: Number(process.env.RECONCILIATION_TRIGRAM_ANCHORS ?? '3000'),
+  reconciliationQueryTimeoutMs: Number(process.env.RECONCILIATION_QUERY_TIMEOUT_MS ?? '120000'),
   // Arabic titles for new products (TitleTranslationService), 200 per run.
   titleTranslationCron: process.env.TITLE_TRANSLATION_CRON ?? '*/15 * * * *',
   // Minimum title-trigram similarity (pg_trgm, 0..1) between two canonical

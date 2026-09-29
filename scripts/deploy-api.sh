@@ -67,11 +67,21 @@ fi
 # Migrations run from the NEW image before the old container is removed. If a
 # migration fails the current API keeps serving, rather than the replacement
 # refusing to boot after the old one is already gone.
+#
+# lock_timeout: a migration that alters a table waits for every query using
+# it, and every new query then queues behind the migration -- on 2026-09-29 a
+# 38-minute reconciliation query held the site frozen for 14 minutes this way.
+# On this connection only, a lock not granted within 15 s fails the migration
+# instead; nothing has changed yet, so run the deploy again a bit later.
 log "applying database migrations"
+db_url=$(grep -E '^DATABASE_URL=' .env | head -n 1 | cut -d= -f2- | tr -d '"'"'"'')
+[ -n "$db_url" ] || die "DATABASE_URL not found in .env"
+case "$db_url" in *\?*) sep='&' ;; *) sep='?' ;; esac
 podman run --rm --network pricelens_internal --env-file .env \
+  -e DATABASE_URL="${db_url}${sep}options=-c%20lock_timeout%3D15s" \
   --entrypoint sh -w /repo/apps/api "$IMAGE" \
   -lc 'node /repo/node_modules/.pnpm/prisma@5.22.0/node_modules/prisma/build/index.js migrate deploy' \
-  || die "migration failed -- the running API is untouched"
+  || die "migration failed (or waited over 15 s for a table lock) -- the running API is untouched; retry shortly"
 
 started=$(date +%s)
 
