@@ -6,7 +6,21 @@ import { PrismaService } from '../database/prisma.service';
 
 /** After a failed call, skip the provider this long instead of retrying per pair. */
 const PAUSE_AFTER_FAILURE_MS = 5 * 60 * 1000;
+/** A rate limit (429) clears within a minute on Gemini's per-minute quotas. */
+const PAUSE_AFTER_RATE_LIMIT_MS = 60 * 1000;
+/** Waits before retrying an overloaded (5xx) call; then the provider is paused. */
+const OVERLOADED_RETRY_DELAYS_MS = [1_000, 3_000];
 const CALL_TIMEOUT_MS = 45_000;
+
+/** A provider answered with an HTTP error status. */
+class ProviderHttpError extends Error {
+  constructor(
+    provider: string,
+    readonly status: number,
+  ) {
+    super(`${provider} HTTP ${status}`);
+  }
+}
 
 interface Provider {
   name: 'gemini' | 'openrouter';
@@ -68,19 +82,36 @@ export class SemanticService {
     if (Date.now() < this.pausedUntil) return null;
 
     try {
-      const same = this.parse(await this.provider.ask(this.prompt(titleA, titleB)));
+      const same = this.parse(await this.askWithRetry(this.provider, this.prompt(titleA, titleB)));
       if (same === null) return null;
       await this.prisma.matchJudgement
         .create({ data: { pairKey, titleA, titleB, same, model: `${this.provider.name}:${this.provider.model}` } })
         .catch(() => undefined); // a concurrent caller stored the same pair first
       return same;
     } catch (err) {
-      this.pausedUntil = Date.now() + PAUSE_AFTER_FAILURE_MS;
+      const rateLimited = err instanceof ProviderHttpError && err.status === 429;
+      const pauseMs = rateLimited ? PAUSE_AFTER_RATE_LIMIT_MS : PAUSE_AFTER_FAILURE_MS;
+      this.pausedUntil = Date.now() + pauseMs;
       this.logger.warn(
-        `${this.provider.name} match-judgement call failed, pausing it for ${PAUSE_AFTER_FAILURE_MS / 60_000} min: ` +
-          (err as Error).message,
+        `${this.provider.name} match-judgement call failed, pausing it for ${pauseMs / 1000}s: ` + (err as Error).message,
       );
       return null;
+    }
+  }
+
+  /** Overridable in tests. */
+  sleep: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  /** An overloaded provider (5xx) usually answers a moment later: retry it a couple of times. */
+  private async askWithRetry(provider: Provider, prompt: string): Promise<string | null> {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return await provider.ask(prompt);
+      } catch (err) {
+        const overloaded = err instanceof ProviderHttpError && err.status >= 500;
+        if (!overloaded || attempt >= OVERLOADED_RETRY_DELAYS_MS.length) throw err;
+        await this.sleep(OVERLOADED_RETRY_DELAYS_MS[attempt]);
+      }
     }
   }
 
@@ -114,7 +145,7 @@ export class SemanticService {
       }),
       signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
     });
-    if (!response.ok) throw new Error(`Gemini HTTP ${response.status}`);
+    if (!response.ok) throw new ProviderHttpError('Gemini', response.status);
     const data = (await response.json()) as {
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
     };
@@ -138,7 +169,7 @@ export class SemanticService {
       }),
       signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
     });
-    if (!response.ok) throw new Error(`OpenRouter HTTP ${response.status}`);
+    if (!response.ok) throw new ProviderHttpError('OpenRouter', response.status);
     const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
     return data.choices?.[0]?.message?.content ?? null;
   }
