@@ -12,7 +12,7 @@ export default registerAs('retailers', () => ({
   // least recently swept first. 0 turns the new categories' sweep off.
   // A broad search every store answers; a store that answers it is not
   // blocked, so its empty answers in that sweep don't pause it.
-  storeProbeQuery: process.env.STORE_PROBE_QUERY ?? 'samsung',
+  storeProbeQuery: process.env.STORE_PROBE_QUERY ?? 'samsung,tv',
   categorySweepMaxWave:parseInt(process.env.CATEGORY_SWEEP_MAX_WAVE ?? '0', 10),
   maxCategorySweepsPerRun: parseInt(process.env.MAX_CATEGORY_SWEEPS_PER_RUN ?? '15', 10),
   liveIngestionScheduleEnabled: process.env.LIVE_INGESTION_SCHEDULE_ENABLED !== 'false',

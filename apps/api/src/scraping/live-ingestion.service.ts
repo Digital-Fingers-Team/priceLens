@@ -135,19 +135,28 @@ export class LiveIngestionService {
    * recently swept of the enabled waves (see selectSweepCategories).
    */
   /**
-   * One broad search (STORE_PROBE_QUERY, "samsung" by default: every store
-   * we scrape sells Samsung). True when the store answered with listings. An
-   * empty probe counts as a failure; a paused store rethrows.
+   * Broad searches (STORE_PROBE_QUERY, comma-separated, "samsung,tv" by
+   * default), tried in turn until one answers with listings: true then.
+   * Several words, because some stores only answer product words (Elaraby
+   * finds "tv" but not "samsung"). Only when none answers does the store
+   * count one failure; a paused store rethrows.
    */
   private async probeStore(connector: RetailerConnector): Promise<boolean> {
-    const probe = this.configService.get<string>('retailers.storeProbeQuery', 'samsung');
-    try {
-      const listings = await this.storeCalls.search(connector, probe, 1, { emptyIsFailure: true });
-      return listings.length > 0;
-    } catch (error) {
-      if (error instanceof StoreUnavailableError) throw error;
-      return false;
+    const probes = this.configService
+      .get<string>('retailers.storeProbeQuery', 'samsung,tv')
+      .split(',')
+      .map((word) => word.trim())
+      .filter(Boolean);
+    for (const [index, probe] of probes.entries()) {
+      try {
+        const last = index === probes.length - 1;
+        const listings = await this.storeCalls.search(connector, probe, 1, { emptyIsFailure: last });
+        if (listings.length > 0) return true;
+      } catch (error) {
+        if (error instanceof StoreUnavailableError) throw error;
+      }
     }
+    return false;
   }
 
   private recordBelowFloor(summary: IngestionSummary, platformSlug: string): void {

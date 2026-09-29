@@ -245,6 +245,22 @@ describe('LiveIngestionService sweep with a failing query (B-07)', () => {
     expect(asked).toContain('Refrigerators');
   });
 
+  it('tries each probe word: a store that only answers product words ("tv") is healthy', async () => {
+    // Prod, 2026-09-29 06:00: Elaraby answers "tv" and "refrigerator" but not
+    // a bare brand like "samsung", so a single brand probe paused it again.
+    const guard = new StoreCallGuard(config({ 'retailers.connectorFailureThreshold': 2 }));
+    const { service } = setup(async (query) => (/^tv$|fridge|refrigerator/i.test(query) ? [listing(`l-${query}`)] : []), undefined, {
+      'retailers.categorySweepMaxWave': 1,
+      'retailers.storeProbeQuery': 'samsung,tv',
+    });
+    Object.assign(service, { storeCalls: guard });
+
+    const report = await service.runLiveIngestion({ platformSlugs: ['noon'] });
+
+    expect(guard.isPaused('noon')).toBe(false);
+    expect(report.skippedPlatforms).toEqual([]);
+  });
+
   it('still pauses a store whose probe comes back empty (a silently blocked store)', async () => {
     const guard = new StoreCallGuard(config({ 'retailers.connectorFailureThreshold': 2 }));
     const { service } = setup(async () => []);
