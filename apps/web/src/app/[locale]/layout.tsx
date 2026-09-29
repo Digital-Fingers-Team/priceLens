@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { IBM_Plex_Mono, IBM_Plex_Sans, IBM_Plex_Sans_Arabic } from 'next/font/google';
+import { Suspense } from 'react';
 import { Providers } from '@/components/layout/providers';
+import { PageTracker } from '@/components/analytics/page-tracker';
 import { Navbar } from '@/components/layout/navbar';
 import { Footer } from '@/components/layout/footer';
 import { locales, localeDir } from '@/lib/i18n/config';
@@ -88,6 +90,10 @@ export default async function LocaleLayout({
               {children}
             </main>
             <Footer />
+            {/* useSearchParams: without a boundary it would opt every page out of static rendering. */}
+            <Suspense fallback={null}>
+              <PageTracker />
+            </Suspense>
           </Providers>
         </I18nProvider>
       </body>

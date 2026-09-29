@@ -6,8 +6,14 @@ import type {
   LiveIngestionQueuedResponse,
 } from '@/types/admin.types';
 import type { ApiResponse, PaginatedData } from '@/types/api.types';
+import type { AnalyticsDays, AnalyticsSummary } from '@/types/analytics.types';
 
 export const adminApi = {
+  getAnalyticsSummary: async (days: AnalyticsDays): Promise<AnalyticsSummary> => {
+    const res = await apiClient.get<ApiResponse<AnalyticsSummary>>('/analytics/summary', { params: { days } });
+    return res.data.data;
+  },
+
   getDashboardStats: async (): Promise<DashboardStats> => {
     const res = await apiClient.get<ApiResponse<DashboardStats>>('/admin/dashboard');
     return res.data.data;

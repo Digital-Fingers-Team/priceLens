@@ -89,7 +89,12 @@ export function SearchPageClient({ initial }: { initial: InitialSearch | null })
           {/* Always rendered, so the heading keeps its height when the count
               arrives: on a phone the count wrapped the heading onto a second
               line and pushed the results down (CLS 0.16, audit 08). */}
-          <span className="inline-block min-w-32 text-sm text-muted" aria-hidden={!data || isLoading}>
+          <span
+            className="inline-block min-w-32 text-sm text-muted"
+            aria-hidden={!data || isLoading}
+            // Read by the analytics tracker (components/analytics/page-tracker.tsx).
+            data-search-total={data && !isLoading ? data.total : undefined}
+          >
             {data && !isLoading ? tp(t.search.productCount, data.total) : '\u00a0'}
           </span>
         </h1>

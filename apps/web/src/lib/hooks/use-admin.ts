@@ -3,6 +3,16 @@ import { adminApi } from '@/lib/api/admin.api';
 import { QUERY_KEYS } from '@/config/constants';
 import { useUiStore } from '@/lib/store/ui.store';
 import type { ResolveDecision } from '@/types/admin.types';
+import type { AnalyticsDays } from '@/types/analytics.types';
+
+export function useAnalyticsSummary(days: AnalyticsDays) {
+  return useQuery({
+    queryKey: QUERY_KEYS.analyticsSummary(days),
+    queryFn: () => adminApi.getAnalyticsSummary(days),
+    staleTime: 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+  });
+}
 
 export function useDashboardStats() {
   return useQuery({

@@ -29,6 +29,7 @@ export const QUERY_KEYS = {
   alerts: () => ['alerts'] as const,
   reviewQueue: (page: number) => ['review-queue', page] as const,
   dashboardStats: () => ['dashboard-stats'] as const,
+  analyticsSummary: (days: number) => ['analytics-summary', days] as const,
 } as const;
 
 // Labels are in the dictionary (search.sort.<value>).

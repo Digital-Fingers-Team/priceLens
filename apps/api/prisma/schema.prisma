@@ -1226,3 +1226,29 @@ model ApiUsage {
   @@index([orgId, day])
   @@map("api_usage")
 }
+
+// ─── Site analytics ─────────────────────────────────────────────────────────
+
+/// One page a visitor opened, from the web tracker (owner, 2026-09-29).
+/// Anonymous: a random visitor id kept in the browser; no IP, no account.
+model PageView {
+  id           String   @id
+  visitorId    String   @map("visitor_id") @db.VarChar(36)
+  sessionId    String   @map("session_id") @db.VarChar(36)
+  path         String   @db.VarChar(512)
+  /// home, product, category, search, account or other (analytics/page-path.ts).
+  route        String   @db.VarChar(16)
+  productSlug  String?  @map("product_slug") @db.VarChar(255)
+  categorySlug String?  @map("category_slug") @db.VarChar(255)
+  searchQuery  String?  @map("search_query") @db.VarChar(200)
+  searchTotal  Int?     @map("search_total")
+  locale       String   @db.VarChar(5)
+  referrerHost String?  @map("referrer_host") @db.VarChar(255)
+  device       String   @db.VarChar(8)
+  durationMs   Int?     @map("duration_ms")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([route, createdAt])
+  @@map("page_views")
+}
