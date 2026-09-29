@@ -86,6 +86,8 @@ describe('pickCategoryForQuery against the curated tree', () => {
     ['Professional Wax Heater Temperature Control Adjustable Wax Melting', 'hair-removal'],
     ['KARCHER SE 3 Compact Home Spot Cleaner, 500W Portable Carpet & Upholstery Cleaner', 'vacuum-cleaners'],
     ['Home Cleaning Appliances Multi-functional Electric Floor Cleaner Steam Mop', 'steam-cleaners'],
+    ['Kenwood HG230 Electric Health Grill 1500-1700 W - Local Warranty', 'grills'],
+    ['Sokany SK-08110 800W Grill Maker, Black', 'grills'],
     ['DITONG X3Plus HD Projector Native 1080P Support 4K WIFI6 Android Mini Portable Projector', 'projectors'],
   ])('files "%s" under %s', (title, slug) => {
     expect(pick(title)).toBe(slug);

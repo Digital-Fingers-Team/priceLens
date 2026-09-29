@@ -105,7 +105,7 @@ export const categoryTree: CategoryDefinition[] = [
   leaf('kitchen-appliances', 3, 'blenders', 'Blenders', 'خلاطات', ['blender', 'high speed blender', 'countertop blender', 'خلاط']),
   leaf('kitchen-appliances', 3, 'juicers', 'Juicers', 'عصارات', ['juicer', 'slow juicer', 'cold press juicer', 'citrus juicer', 'عصارة']),
   leaf('kitchen-appliances', 3, 'multicookers', 'Multicookers & Pressure Cookers', 'حلل ضغط كهربائية', ['multicooker', 'electric pressure cooker', 'instant pot', 'rice cooker', 'حلة ضغط كهربائية']),
-  leaf('kitchen-appliances', 4, 'grills', 'Electric Grills', 'شوايات كهربائية', ['electric grill', 'contact grill', 'indoor grill', 'raclette grill', 'شواية كهربائية']),
+  leaf('kitchen-appliances', 4, 'grills', 'Electric Grills', 'شوايات كهربائية', ['electric grill', 'contact grill', 'indoor grill', 'raclette grill', 'grill', 'health grill', 'grill maker', 'شواية كهربائية']),
   leaf('kitchen-appliances', 4, 'snack-makers', 'Waffle, Sandwich & Snack Makers', 'صانعات الوافل والسندوتشات', ['waffle maker', 'waffel maker', 'sandwich maker', 'popcorn maker', 'egg cooker', 'egg boiler', 'donut maker', 'crepe maker', 'yogurt maker', 'صانعة وافل']),
   leaf('kitchen-appliances', 4, 'kettles-toasters', 'Kettles & Toasters', 'غلايات ومحمصات', ['electric kettle', 'toaster', 'breakfast set', 'غلاية', 'محمصة']),
   leaf('kitchen-appliances', 4, 'cookware', 'Cookware Sets', 'أطقم حلل', ['cookware set', 'granite cookware', 'stainless steel cookware', 'pots and pans set', 'طقم حلل']),
