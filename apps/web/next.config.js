@@ -46,6 +46,9 @@ function securityHeaders() {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // The sitemap lists up to 20k products, ~200 API pages; the default 60 s
+  // for a page built at deploy time failed the build (2026-09-29).
+  staticPageGenerationTimeout: 180,
   // The monorepo root. Without it Next 15 guesses from whichever lockfile it
   // finds first, and the server has an unrelated one in the home directory.
   outputFileTracingRoot: path.join(__dirname, '../..'),

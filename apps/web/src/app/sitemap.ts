@@ -14,8 +14,8 @@ const STATIC_ROUTES: Array<{ path: string; priority: number; changeFrequency: 'd
 ];
 
 // Google caps a single sitemap at 50k URLs and 50 MB. Products with a live
-// offer (the browse listing) are ~7k today, x2 languages; a sitemap index is
-// only needed past ~20k products. 100 is the API's page-size ceiling.
+// offer (the browse listing) were ~7k in phase 09 and over 20k by 2026-09-29,
+// x2 languages; past 20k products the rest wait for a sitemap index. 100 is the API's page-size ceiling.
 const PAGE_SIZE = 100;
 const MAX_PRODUCTS = 20000;
 
@@ -50,38 +50,56 @@ async function categoryRoutes(): Promise<MetadataRoute.Sitemap> {
   }
 }
 
+/**
+ * Pages fetched at the same time. One after another, ~200 pages of ~1.5 s
+ * each took over Next's 60-second limit for a static route and failed the
+ * build (2026-09-29).
+ */
+const PAGES_AT_ONCE = 8;
+
+async function productPage(page: number) {
+  try {
+    // An empty query is the catalogue of products with a live offer, the
+    // same call the search page makes with no filters.
+    return (await searchApi.search({ q: '', page, limit: PAGE_SIZE })).hits ?? [];
+  } catch {
+    // A sitemap that lists the static pages beats a 500 that lists nothing:
+    // Google drops the whole file on an error, including the routes that
+    // were fine. An error ends the list like an empty page.
+    return null;
+  }
+}
+
 async function productRoutes(): Promise<MetadataRoute.Sitemap> {
   const urls: MetadataRoute.Sitemap = [];
   let products = 0;
 
-  for (let page = 1; products < MAX_PRODUCTS; page += 1) {
-    let hits;
-    try {
-      // An empty query is the catalogue of products with a live offer, the
-      // same call the search page makes with no filters.
-      const res = await searchApi.search({ q: '', page, limit: PAGE_SIZE });
-      hits = res.hits;
-    } catch {
-      // A sitemap that lists the static pages beats a 500 that lists nothing:
-      // Google drops the whole file on an error, including the routes that
-      // were fine.
-      break;
+  for (let first = 1; products < MAX_PRODUCTS; first += PAGES_AT_ONCE) {
+    const wave = await Promise.all(Array.from({ length: PAGES_AT_ONCE }, (_, i) => productPage(first + i)));
+    let ended = false;
+    for (const hits of wave) {
+      // Pages are taken in order up to the first short, empty or failed one.
+      if (!hits?.length) {
+        ended = true;
+        break;
+      }
+      for (const hit of hits) {
+        if (!hit.slug || products >= MAX_PRODUCTS) continue;
+        products += 1;
+        urls.push(
+          ...bothLanguages(`/products/${hit.slug}`, {
+            lastModified: hit.updatedAt ? new Date(hit.updatedAt) : new Date(),
+            changeFrequency: 'daily',
+            priority: 0.6,
+          }),
+        );
+      }
+      if (hits.length < PAGE_SIZE) {
+        ended = true;
+        break;
+      }
     }
-    if (!hits?.length) break;
-
-    for (const hit of hits) {
-      if (!hit.slug) continue;
-      products += 1;
-      urls.push(
-        ...bothLanguages(`/products/${hit.slug}`, {
-          lastModified: hit.updatedAt ? new Date(hit.updatedAt) : new Date(),
-          changeFrequency: 'daily',
-          priority: 0.6,
-        }),
-      );
-    }
-
-    if (hits.length < PAGE_SIZE) break;
+    if (ended) break;
   }
 
   return urls;
