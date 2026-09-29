@@ -6,13 +6,19 @@ import { RESOLVER_ALIASES } from './category-aliases';
 
 const ARABIC = /[؀-ۿ]/;
 
+/** An English word in the singular: "refrigerators" -> "refrigerator", "watches" -> "watch". */
+function singular(word: string): string {
+  if (word.length <= 3 || !/[a-z]s$/.test(word) || word.endsWith('ss')) return word;
+  return /(ch|sh|x|ss|z)es$/.test(word) ? word.slice(0, -2) : word.slice(0, -1);
+}
+
 /**
  * A phrase as comparable words: lower case, punctuation dropped, Arabic
- * letter variants folded (أ/إ/آ -> ا, ة -> ه, ى -> ي), and each English word
- * singularised ("refrigerators" -> "refrigerator"), so plurals and spelling
- * variants compare equal. Joined with single spaces.
+ * letter variants folded (أ/إ/آ -> ا, ة -> ه, ى -> ي) and the definite
+ * article dropped ("الثلاجة" -> "ثلاجه"), and each English word singularised,
+ * so plurals and spelling variants compare equal. Joined with single spaces.
  */
-function phraseKey(phrase: string): string {
+export function phraseKey(phrase: string): string {
   return phrase
     .toLowerCase()
     .replace(/[أإآ]/g, 'ا')
@@ -20,7 +26,7 @@ function phraseKey(phrase: string): string {
     .replace(/ى/g, 'ي')
     .split(/[^\p{L}\p{N}]+/u)
     .filter(Boolean)
-    .map((word) => (word.length > 3 && /[a-z]s$/.test(word) && !word.endsWith('ss') ? word.slice(0, -1) : word))
+    .map((word) => (word.length > 4 && word.startsWith('ال') ? word.slice(2) : singular(word)))
     .join(' ');
 }
 
@@ -46,7 +52,7 @@ export function buildQueriesForCategory(category: Category): string[] {
 /**
  * The category a free-text search belongs to, or null when none fits.
  *
- * Each category's name, slug words and search terms are matched as whole
+ * Each category's name and search terms are matched as whole
  * words against the query (so "phone" is not found in "headphones"). The
  * category with the longest matching phrase wins -- "baby monitor" beats
  * "monitor" -- then the one with more matching phrases, then the lower
@@ -68,7 +74,9 @@ export function pickCategoryForQuery(
     let longest = 0;
     let hits = 0;
     const wave = category.rolloutWave ?? 0;
-    const phrases = [category.name, category.slug.replace(/-/g, ' '), ...category.searchTerms, ...(aliases[category.slug] ?? [])];
+    // Not the slug: its words are the most generic ("grinders" caught coffee
+    // grinders, "heaters" wax heaters); the name and terms say what belongs.
+    const phrases = [category.name, ...category.searchTerms, ...(aliases[category.slug] ?? [])];
     for (const phrase of phrases) {
       const key = phraseKey(phrase);
       if (key && padded.includes(` ${key} `)) {

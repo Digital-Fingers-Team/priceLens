@@ -67,6 +67,41 @@ describe('pickCategoryForQuery against the curated tree', () => {
     expect(pick('تكييف كاريير')).toBe('air-conditioners');
   });
 
+  it.each([
+    // Titles that sat in the old home-appliances catch-all (prod, 2026-09-29).
+    ['Beko Dish Washer 14 Persons LED Display Half load', 'dishwashers'],
+    ['Philips Dual Basket AirFryer XXL - 2 Basket Drawers', 'air-fryers'],
+    ['Black & Decker 4 Liter Fryer - AF400-B5', 'air-fryers'],
+    ['BOSCH Series 4 Free-Standing Fridge-Freezer with Freezer at Bottom 505 Liters', 'refrigerators'],
+    ['LG Washer 20 Kg And Dryer 11 Kg 1300 Rpm', 'washing-machines'],
+    ['Home International 1000W SS Waffel Maker, Multicolor', 'snack-makers'],
+    ['Waffle Maker 4 in 1, Multi Plate Cooker 800W with Non-Stick Coating', 'snack-makers'],
+    ['Black & Decker Egg Cooker - White, 6 Eggs', 'snack-makers'],
+    ['Popcorn Maker - 1200W Household Electric Popcorn Machine', 'snack-makers'],
+    ['Castle Quickie Food Chopper – 1.5 Liter, 500W', 'food-processors'],
+    ['KENWOOD Food Meat Mincer, Grinder, Kebbe Maker', 'food-processors'],
+    ['STARSEEKER EDGE Titanium Burr Coffee Grinder 48MM', 'coffee-machines'],
+    ['UNIONAIRE 60cm Built-in Gas Oven/Gas Grill, Fan, Stainless Steel', 'built-in-ovens'],
+    ['5-burner stainless steel stove, complete with oven fan, 60*80', 'cookers'],
+    ['Professional Wax Heater Temperature Control Adjustable Wax Melting', 'hair-removal'],
+    ['KARCHER SE 3 Compact Home Spot Cleaner, 500W Portable Carpet & Upholstery Cleaner', 'vacuum-cleaners'],
+    ['Home Cleaning Appliances Multi-functional Electric Floor Cleaner Steam Mop', 'steam-cleaners'],
+    ['DITONG X3Plus HD Projector Native 1080P Support 4K WIFI6 Android Mini Portable Projector', 'projectors'],
+  ])('files "%s" under %s', (title, slug) => {
+    expect(pick(title)).toBe(slug);
+  });
+
+  it('does not file by a generic slug word or a bare "desk"', () => {
+    expect(pick('Electric Salt and Pepper Grinder Set Automatic Battery Pepper Mill')).not.toBe('grinders');
+    expect(pick('6 Pk Magnetic Cord Organizer Holder, Cable Clips, Desk Cable Management')).not.toBe('desks');
+    expect(pick('Digital Ultrasonic Cleaner Bath For Jewelry Parts Glasses')).not.toBe('jewelry');
+  });
+
+  it('matches -es plurals and Arabic words with the definite article', () => {
+    expect(pick('apple watches series 10')).toBe('smart-watches');
+    expect(pick('الثلاجة شارب 16 قدم')).toBe('refrigerators');
+  });
+
   it('returns null when nothing matches', () => {
     expect(pick('xyzzy')).toBeNull();
     expect(pickCategoryForQuery('anything', [])).toBeNull();

@@ -1,6 +1,7 @@
 import { categoryTree } from '../../seed/datasets/categoryTree';
 import { planCategoryUpserts } from '../../seed/categoryTreePlan';
 import { RESOLVER_ALIASES } from '../../src/scraping/ingestion/category-aliases';
+import { phraseKey } from '../../src/scraping/ingestion/search-queries';
 
 const leaves = categoryTree.filter((c) => c.level === 1);
 const ORIGINAL_LEAVES = [
@@ -38,7 +39,8 @@ describe('category tree', () => {
     for (const leaf of leaves) {
       expect([leaf.slug, leaf.searchTerms.length >= 3]).toEqual([leaf.slug, true]);
       for (const term of leaf.searchTerms) {
-        const key = term.trim().toLowerCase();
+        // Compared as the resolver compares them (plural, Arabic variants).
+        const key = phraseKey(term);
         const other = owner.get(key);
         if (other && other !== leaf.slug) clashes.push(`${term}: ${other} / ${leaf.slug}`);
         owner.set(key, leaf.slug);
