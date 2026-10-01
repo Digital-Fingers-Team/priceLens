@@ -131,3 +131,14 @@ export interface LandedCostResponse {
   /** Whether this plan sees the line-by-line breakdown. */
   detail: boolean;
 }
+
+/** A second-hand price range from classifieds (aggregates only). */
+export interface UsedPriceRange {
+  source: string;
+  sampleSize: number;
+  p25: number;
+  median: number;
+  p75: number;
+  capturedAt: string;
+  searchUrl: string | null;
+}

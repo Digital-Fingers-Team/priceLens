@@ -11,6 +11,7 @@ import { useNow } from '@/lib/hooks/use-now';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { useIsWatched, useToggleWatchlist } from '@/lib/hooks/use-watchlist';
 import { AddToBasket } from '@/components/buyer/add-to-basket';
+import { unitPrice } from '@/lib/unit-price';
 import { useUiStore } from '@/lib/store/ui.store';
 import { cheapestOffer } from '@/lib/utils/offers';
 import { storeGoHref } from '@/lib/utils/safe-href';
@@ -34,6 +35,8 @@ export function ProductHeader({ product }: { product: CanonicalProduct }) {
   const openAlertModal = useUiStore((s) => s.openAlertModal);
 
   const { priceStats } = product;
+  // Per kilo / litre for size-labelled products, so pack sizes compare fairly.
+  const perUnit = unitPrice(product.title, priceStats.min);
   const hasRange = priceStats.min != null && priceStats.max != null && priceStats.min !== priceStats.max;
   const listingCount = product._count?.sourceListings ?? product.sourceListings?.length ?? 0;
   const storeCount =
@@ -135,6 +138,11 @@ export function ProductHeader({ product }: { product: CanonicalProduct }) {
               <p className="flex flex-wrap gap-x-4 text-xs text-muted">
                 {priceStats.avg != null && (
                   <span>{tf(t.product.average, { price: fmt.currency(priceStats.avg, priceStats.currency) })}</span>
+                )}
+                {perUnit && (
+                  <span>
+                    {tf(t.used.perUnit, { price: fmt.currency(perUnit.perUnit, priceStats.currency), unit: perUnit.unit === 'kg' ? t.units.kg : t.units.litre })}
+                  </span>
                 )}
                 {lastChecked && <span>{tf(t.product.pricesChecked, { when: fmt.relative(lastChecked, now) })}</span>}
               </p>

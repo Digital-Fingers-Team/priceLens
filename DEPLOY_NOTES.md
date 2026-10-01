@@ -43,3 +43,9 @@ New job: `run-alert-digest`.
 Migration `20261001200000_v2_buyer_differentiators`: tables `installment_plans`, `promos`, `promo_reports`, `user_banks`, `warranty_rules`, `cart_watches`, `cart_watch_items`, `product_reviews`, `review_summaries`. **No data**: the owner enters installment terms, bank / cashback offers, coupons and warranty rules in **/admin/buyer-offers** from the providers' published terms. Until then those sections simply don't show.
 
 New job: `run-cart-watch` (`CART_WATCH_CRON`, hourly at :40).
+
+## Phase 4 — Coverage
+
+Migration `20261001300000_v2_coverage`: enum `StoreKind`, `platforms.kind` (B.TECH, 2B, Elaraby, Dream 2000 → OFFLINE_CHAIN), new platforms **Tradeline** and **Compumarts**, table `used_price_snapshots` (aggregates only).
+
+New job: `run-used-market` (`USED_MARKET_CRON`, 01:15 UTC; `USED_MARKET_BATCH`, 120 products, one OpenSooq request every 3 s). Flag `used_market` turns it and the product-page range off.

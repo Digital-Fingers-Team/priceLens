@@ -5,6 +5,8 @@ export interface PlatformRef {
   name: string;
   logoUrl: string | null;
   baseUrl: string;
+  /** ONLINE, OFFLINE_CHAIN (has branches), USED_MARKET, GROCERY, PHARMACY. Optional for older responses. */
+  kind?: 'ONLINE' | 'OFFLINE_CHAIN' | 'USED_MARKET' | 'GROCERY' | 'PHARMACY';
 }
 
 /**

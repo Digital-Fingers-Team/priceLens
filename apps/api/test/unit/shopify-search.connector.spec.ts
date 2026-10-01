@@ -59,3 +59,12 @@ describe('shopifySuggestUrl', () => {
     expect(url.searchParams.get('resources[limit]')).toBe('10');
   });
 });
+
+describe('shopifySuggestUrl', () => {
+  it('serves a shop on its default locale without a prefix (Tradeline, Compumarts)', () => {
+    expect(shopifySuggestUrl('https://tradelinestores.com', '', 'iphone 15', 5)).toBe(
+      'https://tradelinestores.com/search/suggest.json?q=iphone+15&resources%5Btype%5D=product&resources%5Blimit%5D=5',
+    );
+    expect(shopifySuggestUrl('https://dream2000.com', 'en', 'tv', 50)).toContain('/en/search/suggest.json?q=tv');
+  });
+});

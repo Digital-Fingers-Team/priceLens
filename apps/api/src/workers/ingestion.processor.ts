@@ -33,6 +33,7 @@ import {
   RUN_PRICE_ROLLUP_JOB,
   RUN_ALERT_DIGEST_JOB,
   RUN_CART_WATCH_JOB,
+  RUN_USED_MARKET_JOB,
   ReconciliationJobData,
   StoreCoverageSweepJobData,
   StoreExpansionJobData,
@@ -43,6 +44,7 @@ import { ScrapeSlots } from './scrape-slots';
 import { RenewalRemindersService } from '../billing/renewal-reminders.service';
 import { PriceRollupService } from '../prices/price-rollup.service';
 import { CartWatchService } from '../buyer/cart-watch.service';
+import { UsedMarketService } from '../used-market/used-market.service';
 
 @Processor(INGESTION_QUEUE)
 export class IngestionProcessor {
@@ -63,6 +65,7 @@ export class IngestionProcessor {
     private readonly renewalReminders: RenewalRemindersService,
     private readonly priceRollup: PriceRollupService,
     private readonly cartWatch: CartWatchService,
+    private readonly usedMarket: UsedMarketService,
     @Optional() private readonly titleTranslation?: TitleTranslationService,
   ) {}
 
@@ -149,6 +152,12 @@ export class IngestionProcessor {
   }
 
   /** price_history -> price_daily. Idempotent; re-rolls the last two days. */
+  /** Second-hand price ranges, one classifieds search every few seconds. */
+  @Process(RUN_USED_MARKET_JOB)
+  async handleUsedMarket() {
+    return this.usedMarket.refreshBatch();
+  }
+
   /** Baskets that reached their target total. */
   @Process(RUN_CART_WATCH_JOB)
   async handleCartWatch() {

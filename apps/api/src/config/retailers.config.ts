@@ -72,6 +72,9 @@ export default registerAs('retailers', () => ({
   priceRollupCron: process.env.PRICE_ROLLUP_CRON ?? '35 */6 * * *',
   // Baskets re-priced against their target (CartWatchService).
   cartWatchCron: process.env.CART_WATCH_CRON ?? '40 * * * *',
+  // Second-hand ranges from OpenSooq (UsedMarketService): when, and how many products a night.
+  usedMarketCron: process.env.USED_MARKET_CRON ?? '15 1 * * *',
+  usedMarketBatch: parseInt(process.env.USED_MARKET_BATCH ?? '120', 10),
   storeCoverageSweepBatchSize: parseInt(process.env.STORE_COVERAGE_SWEEP_BATCH_SIZE ?? '100', 10),
   // How long to leave a product alone after the sweep has tried to expand it.
   // Without this, any product that cannot reach the target -- because no other
@@ -125,5 +128,9 @@ export default registerAs('retailers', () => ({
   elarabyBaseUrl: process.env.ELARABY_BASE_URL ?? 'https://www.elarabygroup.com',
   dream2000Enabled: process.env.DREAM2000_ENABLED !== 'false',
   dream2000BaseUrl: process.env.DREAM2000_BASE_URL ?? 'https://dream2000.com',
+  tradelineEnabled: process.env.TRADELINE_ENABLED !== 'false',
+  tradelineBaseUrl: process.env.TRADELINE_BASE_URL ?? 'https://tradelinestores.com',
+  compumartsEnabled: process.env.COMPUMARTS_ENABLED !== 'false',
+  compumartsBaseUrl: process.env.COMPUMARTS_BASE_URL ?? 'https://compumarts.com',
   btechEnabled: process.env.BTECH_ENABLED !== 'false',
 }));

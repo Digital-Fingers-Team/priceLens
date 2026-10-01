@@ -110,4 +110,22 @@ export const storeDefinitions: StoreDefinition[] = [
     priceModifier: 1.0,
     titleStyle: 'clean',
   },
+  {
+    slug: 'tradeline',
+    name: 'Tradeline',
+    baseUrl: 'https://tradelinestores.com',
+    connectorType: ConnectorType.HTTP_API,
+    rateLimit: 60,
+    priceModifier: 1.0,
+    titleStyle: 'clean',
+  },
+  {
+    slug: 'compumarts',
+    name: 'Compumarts',
+    baseUrl: 'https://compumarts.com',
+    connectorType: ConnectorType.HTTP_API,
+    rateLimit: 60,
+    priceModifier: 1.0,
+    titleStyle: 'clean',
+  },
 ];

@@ -961,6 +961,20 @@ describe('Every endpoint (e2e)', () => {
     expectNoProblems();
   });
 
+  it('v2 coverage: used-market range', async () => {
+    const none = await call('GET', '/api/v1/intelligence/products/{productId}/used-price', 200, { params: { productId } });
+    expect(none.body.data.range).toBeNull();
+    await prisma.usedPriceSnapshot.create({
+      data: { canonicalProductId: productId, source: 'opensooq', sampleSize: 12, p25: 20000, median: 22000, p75: 24000 },
+    });
+    // "Checked, too few listings" rows are never shown.
+    await prisma.usedPriceSnapshot.create({ data: { canonicalProductId: productId, source: 'opensooq', sampleSize: 2 } });
+    const some = await call('GET', '/api/v1/intelligence/products/{productId}/used-price', 200, { params: { productId } });
+    expect(some.body.data.range).toMatchObject({ sampleSize: 12, p25: 20000, median: 22000, p75: 24000 });
+    await prisma.usedPriceSnapshot.deleteMany({ where: { canonicalProductId: productId } });
+    expectNoProblems();
+  });
+
   it('calls every registered route', () => {
     interface Layer {
       route?: { path: string; methods: Record<string, boolean> };

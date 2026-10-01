@@ -30,7 +30,8 @@ const TIMEOUT_MS = 30_000;
 
 /** The store's predictive-search URL for `query`. */
 export function shopifySuggestUrl(baseUrl: string, locale: string, query: string, limit: number): string {
-  const url = new URL(`/${locale}/search/suggest.json`, baseUrl);
+  // An empty locale is the shop's default, served without a prefix.
+  const url = new URL(locale ? `/${locale}/search/suggest.json` : '/search/suggest.json', baseUrl);
   url.searchParams.set('q', query);
   url.searchParams.set('resources[type]', 'product');
   url.searchParams.set('resources[limit]', String(Math.max(1, Math.min(limit, SHOPIFY_SUGGEST_MAX))));

@@ -23,6 +23,7 @@ export const OPERATIONAL_FLAGS = {
   LANDED_COST: 'landed_cost',
   WARRANTY_INFO: 'warranty_info',
   SELLER_CAUTION: 'seller_caution',
+  USED_MARKET: 'used_market',
 } as const;
 
 export type OperationalFlag = (typeof OPERATIONAL_FLAGS)[keyof typeof OPERATIONAL_FLAGS];
@@ -102,6 +103,10 @@ export const FLAG_REGISTRY: Record<FlagKey, FlagDefinition> = {
   [OPERATIONAL_FLAGS.SELLER_CAUTION]: {
     defaultOn: true,
     description: 'Neutral "check before buying" note on offers priced far below the market with weak feedback',
+  },
+  [OPERATIONAL_FLAGS.USED_MARKET]: {
+    defaultOn: true,
+    description: 'Second-hand price range from OpenSooq (aggregates only), and its daily sweep',
   },
   [OPERATIONAL_FLAGS.RENEWAL_REMINDERS]: {
     defaultOn: true,

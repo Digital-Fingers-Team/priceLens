@@ -44,6 +44,11 @@ export function OfferRow({ listing, isBest }: { listing: SourceListing; isBest: 
           ) : null}
           <span className="font-medium text-fg">{store}</span>
           {isBest && <Badge variant="brand">{t.product.bestDeal}</Badge>}
+          {listing.platform.kind === 'OFFLINE_CHAIN' && (
+            <Badge variant="outline" title={t.product.hasStoresHint}>
+              {t.product.hasStores}
+            </Badge>
+          )}
         </div>
         <p dir="auto" className="line-clamp-2 text-sm text-muted" title={listing.rawTitle}>
           {listing.rawTitle}

@@ -27,3 +27,13 @@ export function useLandedCost(productId: string | undefined) {
     retry: false,
   });
 }
+
+export function useUsedPrice(productId: string | undefined) {
+  return useQuery({
+    queryKey: ['used-price', productId],
+    queryFn: () => intelligenceApi.getUsedPrice(productId!),
+    enabled: Boolean(productId),
+    staleTime: 60 * 60 * 1000,
+    retry: false,
+  });
+}

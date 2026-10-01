@@ -18,6 +18,7 @@ import {
   RUN_PRICE_ROLLUP_JOB,
   RUN_ALERT_DIGEST_JOB,
   RUN_CART_WATCH_JOB,
+  RUN_USED_MARKET_JOB,
 } from './ingestion.jobs';
 import { retryUntilDone } from '../common/redis-resilience';
 import { JOB_PRIORITY } from './ingestion-queue.service';
@@ -36,6 +37,7 @@ const TITLE_TRANSLATION_JOB_ID = 'scheduled-title-translation';
 const PRICE_ROLLUP_JOB_ID = 'scheduled-price-rollup';
 const ALERT_DIGEST_JOB_ID = 'scheduled-alert-digest';
 const CART_WATCH_JOB_ID = 'scheduled-cart-watch';
+const USED_MARKET_JOB_ID = 'scheduled-used-market';
 
 @Injectable()
 export class IngestionScheduler implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -188,8 +190,16 @@ export class IngestionScheduler implements OnApplicationBootstrap, OnApplication
       { jobId: CART_WATCH_JOB_ID, priority: JOB_PRIORITY.scheduled, repeat: { cron: cartCron } },
     );
 
+    // Night in Cairo: ~120 classifieds searches, a few seconds apart.
+    const usedCron = this.configService.get<string>('retailers.usedMarketCron', '15 1 * * *');
+    await this.queue.add(
+      RUN_USED_MARKET_JOB,
+      {},
+      { jobId: USED_MARKET_JOB_ID, priority: JOB_PRIORITY.scheduled, repeat: { cron: usedCron } },
+    );
+
     this.logger.log(
-      `Scheduled cart watch (${cartCron}), alert digest (${digestCron}), price rollup (${rollupCron}), notification retry (${retryCron}), subscription maintenance (${maintenanceCron}), ` +
+      `Scheduled used market (${usedCron}), cart watch (${cartCron}), alert digest (${digestCron}), price rollup (${rollupCron}), notification retry (${retryCron}), subscription maintenance (${maintenanceCron}), ` +
         `competitor detection (${detectionCron}), MAP sweep (${mapCron}), ` +
         `launch detection (${launchCron}), weekly reports (${reportsCron}) ` +
         `and Arabic titles (${translationCron})`,

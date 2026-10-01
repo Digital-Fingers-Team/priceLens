@@ -21,6 +21,7 @@ import { FeatureFlagsModule } from './feature-flags/feature-flags.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { IntelligenceModule } from './intelligence/intelligence.module';
 import { BuyerModule } from './buyer/buyer.module';
+import { UsedMarketModule } from './used-market/used-market.module';
 import { DealHunterModule } from './deal-hunter/deal-hunter.module';
 import { SellerModule } from './seller/seller.module';
 import { BrandModule } from './brand/brand.module';
@@ -125,6 +126,7 @@ export const ENV_FILES = resolveEnvFiles();
     NotificationsModule,
     IntelligenceModule,
     BuyerModule,
+    UsedMarketModule,
     DealHunterModule,
     SellerModule,
     BrandModule,

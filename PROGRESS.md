@@ -54,8 +54,13 @@ Entitlements service + `@RequiresFeature` guard + `useEntitlements()` hook + `Up
 - [x] Cart watch: baskets with a target total, each item at its cheapest store or all from one store; hourly sweep alerts once when reached, re-arms above (`/cart-watch`, "Add to basket" on the product page)
 - [x] Admin: `/admin/buyer-offers` (installments, offers & coupons, warranty)
 
-## Phase 4 — Coverage expansion
-- [ ] Offline chains (B.TECH and 2B exist; Raya, Select, Tradeline) · [ ] Used market ranges · [ ] Grocery + unit price · [ ] Pharmacy (OTC only)
+## Phase 4 — Coverage expansion (`feat/phase-4-coverage`)
+- [x] Store kinds (`platforms.kind`: ONLINE, OFFLINE_CHAIN, USED_MARKET, GROCERY, PHARMACY). B.TECH, 2B, Elaraby, Dream 2000 marked as chains with branches; offers show "Has stores" with "the in-store price can differ" (we can only read website prices, so there is no separate in-store price to show)
+- [x] New chains: **Tradeline** and **Compumarts** (Shopify search, plain HTTP)
+- [ ] Raya, Select: Raya's storefront loads results client-side (needs a browser connector); Select has no reachable catalogue. Deferred
+- [x] Used market: OpenSooq search pages → title-matched (Arabic/English, variant and accessory guards) asking prices → a 25th–75th percentile range, nightly for up to 120 watched / viewed products. **Aggregates only**: no listing, seller, phone or place is stored. Dubizzle answers a CAPTCHA, so it is not used
+- [x] Unit price (per kg / litre) from size-labelled titles, on the product page
+- [ ] Grocery stores (Breadfast, Talabat Mart) and pharmacies (El Ezaby, Chefaa, Yodawy): app-first or bot-walled; none exposes a catalogue we can read over the web. Deferred until a reachable source exists
 
 ## Phase 5 — New input channels
 - [ ] Image / screenshot search · [ ] Telegram bot · [ ] Advisor

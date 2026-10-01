@@ -17,6 +17,8 @@ const SLUG_BY_CLASS: Record<string, string> = {
   ElarabyConnector: 'elaraby',
   Dream2000Connector: 'dream2000',
   BtechConnector: 'btech',
+  TradelineConnector: 'tradeline',
+  CompumartsConnector: 'compumarts',
 };
 
 /**

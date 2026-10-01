@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MatchStatus, Prisma } from '@prisma/client';
-import type { CanonicalProduct, SourceListing } from '@prisma/client';
+import type { CanonicalProduct, SourceListing, StoreKind } from '@prisma/client';
 import type { CurrentPricesResponse, PriceHistoryResponse } from '@pricelens/contracts';
 import { PrismaService } from '../database/prisma.service';
 import { OfferPolicy, liveOfferWhere, liveOffers, toPrice } from '../prices/offer-rules';
@@ -26,6 +26,7 @@ interface ProductWithRelations extends CanonicalProduct {
       name: string;
       logoUrl: string | null;
       baseUrl: string;
+      kind: StoreKind;
     };
   }>;
 }
@@ -447,6 +448,7 @@ export class ProductsService {
         name: listing.platform.name,
         logoUrl: listing.platform.logoUrl,
         baseUrl: listing.platform.baseUrl,
+        kind: listing.platform.kind,
       },
       externalId: listing.externalId,
       externalUrl: listing.externalUrl,
@@ -496,6 +498,7 @@ export class ProductsService {
         name: listing.platform.name,
         logoUrl: listing.platform.logoUrl,
         baseUrl: listing.platform.baseUrl,
+        kind: listing.platform.kind,
       },
       price,
       currency,
