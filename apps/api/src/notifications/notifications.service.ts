@@ -7,9 +7,12 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { EntitlementsService } from '../billing/entitlements.service';
+import { FEATURES } from '../billing/plan-limits';
+import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
 import { InAppChannel } from './channels/in-app.channel';
 import { EmailChannel } from './channels/email.channel';
 import { TelegramChannel } from './channels/telegram.channel';
+import { WebPushChannel } from './channels/web-push.channel';
 import { NotificationChannelDriver, OutboundNotification } from './channels/notification-channel.interface';
 
 export interface DispatchInput {
@@ -30,6 +33,13 @@ export interface DispatchInput {
    */
   dedupeKey?: string;
   dedupeWindowMinutes?: number;
+  /**
+   * May wait for the daily digest. With the realtime_alerts flag on, an email
+   * for a user whose plan lacks real-time alerts is held (delivery PENDING)
+   * and sent with the day's others by sendDailyDigests(). In-app is always
+   * immediate. Off for anything time-critical (billing, invitations).
+   */
+  digestable?: boolean;
 }
 
 export interface DispatchResult {
@@ -37,6 +47,8 @@ export interface DispatchResult {
   delivered: NotificationChannelType[];
   failed: NotificationChannelType[];
   skipped: NotificationChannelType[];
+  /** Held for the daily digest. */
+  queued?: NotificationChannelType[];
   suppressed?: 'duplicate' | 'rate_limited';
 }
 
@@ -50,14 +62,17 @@ export class NotificationsService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly entitlements: EntitlementsService,
+    private readonly flags: FeatureFlagsService,
     inApp: InAppChannel,
     email: EmailChannel,
     telegram: TelegramChannel,
+    webPush: WebPushChannel,
   ) {
     this.drivers = new Map<NotificationChannelType, NotificationChannelDriver>([
       [inApp.type, inApp],
       [email.type, email],
       [telegram.type, telegram],
+      [webPush.type, webPush],
     ]);
     this.frontendUrl = this.config.get<string>('app.frontendUrl', 'http://localhost:3000').replace(/\/$/, '');
   }
@@ -114,12 +129,24 @@ export class NotificationsService {
     // Sequential rather than parallel: the fan-out is at most three channels,
     // and serialising keeps one slow SMTP connection from being multiplied
     // across every user in an alert sweep.
+    const holdEmail = input.digestable === true && !(await this.isRealtime(input.userId));
+
     for (const target of targets) {
       const driver = this.drivers.get(target.type);
       if (!driver) continue;
 
+      if (holdEmail && target.type === NotificationChannelType.EMAIL) {
+        await this.prisma.notificationDelivery.upsert({
+          where: { notificationId_channelType: { notificationId: notification.id, channelType: target.type } },
+          create: { notificationId: notification.id, channelId: target.channelId, channelType: target.type, status: NotificationStatus.PENDING },
+          update: {},
+        });
+        (result.queued ??= []).push(target.type);
+        continue;
+      }
+
       const outcome = driver.isConfigured()
-        ? await driver.send(target.destination, outbound)
+        ? await driver.send(target.destination, outbound, { pushSubscription: target.pushSubscription })
         : { ok: false, skipped: true, error: `${target.type} is not configured on this deployment` };
 
       const status = outcome.ok
@@ -154,9 +181,11 @@ export class NotificationsService {
           where: { id: target.channelId },
           data: outcome.ok
             ? { lastUsedAt: new Date(), failureCount: 0 }
-            : outcome.skipped
-              ? {}
-              : { failureCount: { increment: 1 } },
+            : outcome.gone
+              ? { isActive: false, failureCount: { increment: 1 } }
+              : outcome.skipped
+                ? {}
+                : { failureCount: { increment: 1 } },
         });
       }
 
@@ -180,14 +209,14 @@ export class NotificationsService {
    */
   private async resolveTargets(
     userId: string,
-  ): Promise<Array<{ type: NotificationChannelType; destination: string; channelId: string | null }>> {
+  ): Promise<Array<{ type: NotificationChannelType; destination: string; channelId: string | null; pushSubscription?: unknown }>> {
     const [channels, { limits }] = await Promise.all([
       this.prisma.notificationChannel.findMany({ where: { userId, isActive: true } }),
       this.entitlements.getEntitlements(userId),
     ]);
 
     const allowed = new Set(limits.notificationChannels);
-    const targets: Array<{ type: NotificationChannelType; destination: string; channelId: string | null }> = [
+    const targets: Array<{ type: NotificationChannelType; destination: string; channelId: string | null; pushSubscription?: unknown }> = [
       { type: NotificationChannelType.IN_APP, destination: userId, channelId: null },
     ];
 
@@ -203,7 +232,12 @@ export class NotificationsService {
         continue;
       }
 
-      targets.push({ type: channel.type, destination: channel.destination, channelId: channel.id });
+      targets.push({
+        type: channel.type,
+        destination: channel.destination,
+        channelId: channel.id,
+        pushSubscription: channel.pushSubscription ?? undefined,
+      });
     }
 
     return targets;
@@ -288,6 +322,71 @@ export class NotificationsService {
   }
 
   /**
+   * Real-time external delivery: everyone while the realtime_alerts flag is
+   * off (the behaviour before it existed), else plans with the feature.
+   */
+  private async isRealtime(userId: string): Promise<boolean> {
+    if (!(await this.flags.isEnabled(FEATURES.REALTIME_ALERTS))) return true;
+    const { limits } = await this.entitlements.getEntitlements(userId);
+    return limits.features.includes(FEATURES.REALTIME_ALERTS);
+  }
+
+  /**
+   * One email per user with every alert held since the last digest. A user's
+   * rows end SENT, FAILED (the retry job resends them one by one) or SKIPPED
+   * (no verified address); none stays PENDING, so nothing is sent twice.
+   * Runs as one Bull job on the worker, never concurrently with itself.
+   */
+  async sendDailyDigests(batchSize = 5000): Promise<{ users: number; alerts: number }> {
+    const held = await this.prisma.notificationDelivery.findMany({
+      where: { status: NotificationStatus.PENDING, channelType: NotificationChannelType.EMAIL },
+      include: { notification: true, channel: true },
+      orderBy: { createdAt: 'asc' },
+      take: batchSize,
+    });
+    if (held.length === 0) return { users: 0, alerts: 0 };
+
+    const byUser = new Map<string, typeof held>();
+    for (const delivery of held) {
+      const list = byUser.get(delivery.notification.userId) ?? [];
+      list.push(delivery);
+      byUser.set(delivery.notification.userId, list);
+    }
+
+    const email = this.drivers.get(NotificationChannelType.EMAIL)!;
+    let users = 0;
+    for (const deliveries of byUser.values()) {
+      const ids = deliveries.map((d) => d.id);
+
+      const channel = deliveries.find((d) => d.channel)?.channel;
+      if (!channel?.destination || !channel.isActive || !channel.verified || !email.isConfigured()) {
+        await this.prisma.notificationDelivery.updateMany({
+          where: { id: { in: ids } },
+          data: { status: NotificationStatus.SKIPPED, error: 'No usable email channel for the digest' },
+        });
+        continue;
+      }
+
+      const lines = deliveries.map((d) => `• ${d.notification.title}\n  ${d.notification.body}${d.notification.url ? `\n  ${d.notification.url}` : ''}`);
+      const outcome = await email.send(channel.destination, {
+        title: `ملخص تنبيهات الأسعار (${deliveries.length})`,
+        body: lines.join('\n\n'),
+        url: `${this.frontendUrl}/notifications`,
+      });
+      await this.prisma.notificationDelivery.updateMany({
+        where: { id: { in: ids } },
+        data: outcome.ok
+          ? { status: NotificationStatus.SENT, sentAt: new Date(), error: null, attempts: { increment: 1 } }
+          : { status: NotificationStatus.FAILED, error: outcome.error ?? 'Digest failed', attempts: { increment: 1 } },
+      });
+      if (outcome.ok) users += 1;
+    }
+
+    this.logger.log(`Daily digest: ${users} email(s) covering ${held.length} alert(s)`);
+    return { users, alerts: held.length };
+  }
+
+  /**
    * Retry deliveries that failed transiently.
    *
    * Idempotent and bounded: only FAILED rows under the attempt cap are picked
@@ -318,11 +417,11 @@ export class NotificationsService {
         continue;
       }
 
-      const outcome = await driver.send(destination, {
-        title: delivery.notification.title,
-        body: delivery.notification.body,
-        url: delivery.notification.url,
-      });
+      const outcome = await driver.send(
+        destination,
+        { title: delivery.notification.title, body: delivery.notification.body, url: delivery.notification.url },
+        { pushSubscription: delivery.channel?.pushSubscription ?? undefined },
+      );
 
       await this.prisma.notificationDelivery.update({
         where: { id: delivery.id },

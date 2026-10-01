@@ -16,6 +16,7 @@ import {
   RUN_WEEKLY_REPORTS_JOB,
   RUN_TITLE_TRANSLATION_JOB,
   RUN_PRICE_ROLLUP_JOB,
+  RUN_ALERT_DIGEST_JOB,
 } from './ingestion.jobs';
 import { retryUntilDone } from '../common/redis-resilience';
 import { JOB_PRIORITY } from './ingestion-queue.service';
@@ -32,6 +33,7 @@ const LAUNCH_DETECTION_JOB_ID = 'scheduled-launch-detection';
 const WEEKLY_REPORTS_JOB_ID = 'scheduled-weekly-reports';
 const TITLE_TRANSLATION_JOB_ID = 'scheduled-title-translation';
 const PRICE_ROLLUP_JOB_ID = 'scheduled-price-rollup';
+const ALERT_DIGEST_JOB_ID = 'scheduled-alert-digest';
 
 @Injectable()
 export class IngestionScheduler implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -167,8 +169,17 @@ export class IngestionScheduler implements OnApplicationBootstrap, OnApplication
       { jobId: PRICE_ROLLUP_JOB_ID, priority: JOB_PRIORITY.scheduled, repeat: { cron: rollupCron } },
     );
 
+    // Morning in Cairo. Sends nothing while realtime_alerts is off (nothing
+    // is held then).
+    const digestCron = this.configService.get<string>('notifications.alertDigestCron', '0 6 * * *');
+    await this.queue.add(
+      RUN_ALERT_DIGEST_JOB,
+      {},
+      { jobId: ALERT_DIGEST_JOB_ID, priority: JOB_PRIORITY.scheduled, repeat: { cron: digestCron } },
+    );
+
     this.logger.log(
-      `Scheduled price rollup (${rollupCron}), notification retry (${retryCron}), subscription maintenance (${maintenanceCron}), ` +
+      `Scheduled alert digest (${digestCron}), price rollup (${rollupCron}), notification retry (${retryCron}), subscription maintenance (${maintenanceCron}), ` +
         `competitor detection (${detectionCron}), MAP sweep (${mapCron}), ` +
         `launch detection (${launchCron}), weekly reports (${reportsCron}) ` +
         `and Arabic titles (${translationCron})`,

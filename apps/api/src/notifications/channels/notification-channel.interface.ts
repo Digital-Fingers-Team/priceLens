@@ -14,6 +14,13 @@ export interface DeliveryResult {
    *  SKIPPED rather than FAILED so it is never retried and never alarms. */
   skipped?: boolean;
   error?: string;
+  /** The destination is permanently dead (an expired browser subscription). */
+  gone?: boolean;
+}
+
+/** Per-channel data a driver may need beyond the destination string. */
+export interface DeliveryContext {
+  pushSubscription?: unknown;
 }
 
 /**
@@ -35,5 +42,5 @@ export interface NotificationChannelDriver {
    * chat id). Implementations must not throw — a transport failure is a
    * DeliveryResult, because one dead channel must not abort the others.
    */
-  send(destination: string, notification: OutboundNotification): Promise<DeliveryResult>;
+  send(destination: string, notification: OutboundNotification, context?: DeliveryContext): Promise<DeliveryResult>;
 }

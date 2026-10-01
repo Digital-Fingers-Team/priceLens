@@ -223,6 +223,8 @@ export class PriceAlertService {
           // sweep somehow evaluates it twice.
           dedupeKey: `alert:${alert.id}:${Math.floor(now.getTime() / (alert.cooldownHours * 3_600_000 || 3_600_000))}`,
           dedupeWindowMinutes: Math.max(alert.cooldownHours * 60, 60),
+          // Free plans get alert emails once a day (realtime_alerts flag).
+          digestable: true,
         });
         if (result.notificationId) notified += 1;
       } catch (error) {

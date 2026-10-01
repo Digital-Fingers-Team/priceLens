@@ -65,6 +65,7 @@ export class AnalyticsService {
       favorites,
       alerts,
       storeClicks,
+      productClicks,
     ] = await Promise.all([
       this.prisma.$queryRaw<Row[]>(Prisma.sql`
         SELECT count(*) AS views, count(DISTINCT "visitor_id") AS visitors,
@@ -131,6 +132,12 @@ export class AnalyticsService {
         SELECT pl."name" AS store, count(*) AS clicks
         FROM "affiliate_clicks" c JOIN "platforms" pl ON pl."id" = c."platform_id"
         WHERE c."clicked_at" >= ${since} GROUP BY 1 ORDER BY clicks DESC LIMIT 10`),
+      // Which products send people to stores: demand data for the seller and
+      // business plans, not just a vanity count.
+      this.prisma.$queryRaw<Row[]>(Prisma.sql`
+        SELECT p."slug", p."title", p."title_ar", count(*) AS count
+        FROM "affiliate_clicks" c JOIN "canonical_products" p ON p."id" = c."canonical_product_id"
+        WHERE c."clicked_at" >= ${since} GROUP BY 1, 2, 3 ORDER BY count DESC LIMIT 10`),
     ]);
 
     const t = traffic[0] ?? {};
@@ -211,7 +218,16 @@ export class AnalyticsService {
           count: num(r.count),
         })),
       },
-      storeClicks: { total: clickTotal, stores: storeClicks.map((r) => ({ store: String(r.store), clicks: num(r.clicks) })) },
+      storeClicks: {
+        total: clickTotal,
+        stores: storeClicks.map((r) => ({ store: String(r.store), clicks: num(r.clicks) })),
+        products: productClicks.map((r) => ({
+          slug: String(r.slug),
+          title: String(r.title),
+          titleAr: (r.title_ar as string | null) ?? null,
+          count: num(r.count),
+        })),
+      },
     };
   }
 

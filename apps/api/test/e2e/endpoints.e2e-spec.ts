@@ -836,6 +836,43 @@ describe('Every endpoint (e2e)', () => {
     expectNoProblems();
   });
 
+  it('v2 buyer pro: landed cost, browser push', async () => {
+    // Landed cost: the e2e product is sold by local stores only, so nothing yet.
+    const before = await call('GET', '/api/v1/intelligence/products/{productId}/landed-cost', 200, { params: { productId } });
+    expect(before.body.data.offers).toEqual([]);
+
+    // Treat Noon as cross-border for a moment: its offer gains a door price.
+    await call('PUT', '/api/v1/admin/landed-cost-rules', 403, { token: free.token, body: { platformId } });
+    await call('PUT', '/api/v1/admin/landed-cost-rules', 400, { token: admin.token, body: { platformId, customsPct: -1 } });
+    const saved = await call('PUT', '/api/v1/admin/landed-cost-rules', 200, {
+      token: admin.token,
+      body: { platformId, customsPct: 10, vatPct: 14, handlingFee: 100 },
+    });
+    const rules = await call('GET', '/api/v1/admin/landed-cost-rules', 200, { token: admin.token });
+    expect(rules.body.data.map((r: { id: string }) => r.id)).toContain(saved.body.data.id);
+
+    const anonymous = await call('GET', '/api/v1/intelligence/products/{productId}/landed-cost', 200, { params: { productId } });
+    const offer = anonymous.body.data.offers[0];
+    // 42999 * 1.10 * 1.14 + 100
+    expect(offer.total).toBeCloseTo(42999 * 1.1 * 1.14 + 100, 0);
+    expect(offer.breakdown).toBeNull();
+    const detailed = await call('GET', '/api/v1/intelligence/products/{productId}/landed-cost', 200, { token: pro.token, params: { productId } });
+    expect(detailed.body.data.offers[0].breakdown).toMatchObject({ handling: 100 });
+
+    await call('DELETE', '/api/v1/admin/landed-cost-rules/{id}', 200, { token: admin.token, params: { id: saved.body.data.id } });
+    await call('DELETE', '/api/v1/admin/landed-cost-rules/{id}', 404, { token: admin.token, params: { id: saved.body.data.id } });
+
+    // Browser push: free plans do not include it; with no VAPID keys it is off.
+    const subscription = { endpoint: 'https://fcm.googleapis.com/fcm/send/e2e', keys: { p256dh: 'p', auth: 'a' } };
+    await call('POST', '/api/v1/notifications/channels/web-push', 403, { token: free.token, body: { subscription } });
+    await call('POST', '/api/v1/notifications/channels/web-push', 400, { token: pro.token, body: { subscription } });
+    await call('POST', '/api/v1/notifications/channels/web-push', 400, { token: pro.token, body: {} });
+    const channels = await call('GET', '/api/v1/notifications/channels', 200, { token: pro.token });
+    expect(channels.body.data.available.WEB_PUSH).toEqual({ configured: false, allowed: true });
+    expect(channels.body.data.webPushPublicKey).toBeNull();
+    expectNoProblems();
+  });
+
   it('calls every registered route', () => {
     interface Layer {
       route?: { path: string; methods: Record<string, boolean> };

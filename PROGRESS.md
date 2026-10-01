@@ -35,13 +35,14 @@ Entitlements service + `@RequiresFeature` guard + `useEntitlements()` hook + `Up
 - [x] Admin: plans editor (`/admin/plans`), feature flags (`/admin/flags`)
 - [x] Price history daily rollup (`price_daily`, Cairo days) + `run-price-rollup` job. Raw pruning deliberately not done: raw rows are written only on change and the verdict reads them.
 
-## Phase 2 — Buyer Pro essentials
-- [ ] `/go/:offerId` click tracking: exists as `/affiliate/go/:listingId` (kept); admin click analytics
-- [ ] Alerts: Free 3 + daily email digest; Pro real-time Telegram / web push; dedupe
-- [ ] History chart: lowest / highest / average, current vs. average
-- [ ] Buy-now-or-wait: add seasonality (White Friday, Ramadan, back-to-school) + confidence
-- [ ] Fake-discount check (exists): verify wording
-- [ ] Landed cost: shipping + customs/VAT table + FX for cross-border stores
+## Phase 2 — Buyer Pro essentials (`feat/phase-2-buyer-pro`)
+- [x] Outbound clicks: `/affiliate/go/:listingId` already logs every click (affiliate kept, owner decision); admin analytics now shows clicks per store **and** the most clicked products
+- [x] Alerts: Free = in-app at once + one daily email digest; Pro = real-time email, Telegram and the new browser push channel (`realtime_alerts` flag). Dedupe/cooldown existed and still applies
+- [x] Browser push (Web Push, our own VAPID keys): `WEB_PUSH` channel, service worker, "turn on in this browser" on /account/notifications; expired subscriptions retire themselves
+- [x] History chart stats: 52-week / all-time low and high, and the verdict card's period low / average / high — already existed
+- [x] Buy-now-or-wait: sale calendar (White Friday, Ramadan, back-to-school) adds a reason and turns "fair" into "wait" within 14 days of a sale; still labelled with a confidence level
+- [x] Discount check: existed; wording made neutral ("not supported by the price history")
+- [x] Landed cost: admin-editable `landed_cost_rules` (per store, optional per category), card on the product page with the assumptions spelled out, breakdown for plans with `landed_cost_detail`, compared with the cheapest local price
 
 ## Phase 3 — Buyer differentiators
 - [ ] Installment comparison · [ ] Card & cashback offers · [ ] Verified coupons · [ ] Warranty info · [ ] Seller trust score · [ ] Arabic review summaries · [ ] Cart watch

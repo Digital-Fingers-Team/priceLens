@@ -128,3 +128,59 @@ export function useSetChannelActive() {
     },
   });
 }
+
+/** VAPID public keys travel base64url-encoded; PushManager wants bytes. */
+function keyBytes(base64url: string): Uint8Array {
+  const padded = (base64url + '='.repeat((4 - (base64url.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(padded);
+  return Uint8Array.from(raw, (char) => char.charCodeAt(0));
+}
+
+export class WebPushUnavailable extends Error {
+  constructor(readonly reason: 'unsupported' | 'blocked') {
+    super(reason);
+  }
+}
+
+/**
+ * Asks for permission, registers the service worker, subscribes this browser
+ * and hands the subscription to the API. Each step can fail for a reason the
+ * user can act on, so those come back as WebPushUnavailable.
+ */
+export function useEnableWebPush() {
+  const queryClient = useQueryClient();
+  const addToast = useUiStore((s) => s.addToast);
+  const { t } = useI18n();
+  const apiError = useApiErrorMessage();
+
+  return useMutation({
+    mutationFn: async (publicKey: string) => {
+      if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+        throw new WebPushUnavailable('unsupported');
+      }
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') throw new WebPushUnavailable('blocked');
+
+      const registration = await navigator.serviceWorker.register('/push-sw.js');
+      await navigator.serviceWorker.ready;
+      const subscription =
+        (await registration.pushManager.getSubscription()) ??
+        (await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: keyBytes(publicKey) as BufferSource,
+        }));
+      return notificationsApi.subscribeWebPush(subscription.toJSON());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: notificationKeys.channels });
+      addToast(t.toast.channelVerified, 'success');
+    },
+    onError: (err: Error) => {
+      if (err instanceof WebPushUnavailable) {
+        addToast(err.reason === 'blocked' ? t.channels.browserBlocked : t.channels.browserUnsupported, 'error');
+        return;
+      }
+      addToast(apiError(err, t.toast.verifyFailed), 'error');
+    },
+  });
+}

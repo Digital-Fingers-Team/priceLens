@@ -31,6 +31,7 @@ import {
   RUN_WEEKLY_REPORTS_JOB,
   RUN_TITLE_TRANSLATION_JOB,
   RUN_PRICE_ROLLUP_JOB,
+  RUN_ALERT_DIGEST_JOB,
   ReconciliationJobData,
   StoreCoverageSweepJobData,
   StoreExpansionJobData,
@@ -145,6 +146,12 @@ export class IngestionProcessor {
   }
 
   /** price_history -> price_daily. Idempotent; re-rolls the last two days. */
+  /** Free plans' alert emails, once a day (realtime_alerts flag). */
+  @Process(RUN_ALERT_DIGEST_JOB)
+  async handleAlertDigest() {
+    return this.notificationsService.sendDailyDigests();
+  }
+
   @Process(RUN_PRICE_ROLLUP_JOB)
   async handlePriceRollup() {
     return this.priceRollup.run();

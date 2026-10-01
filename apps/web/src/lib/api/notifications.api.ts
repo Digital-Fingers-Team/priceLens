@@ -53,6 +53,14 @@ export const notificationsApi = {
     return res.data.data;
   },
 
+  subscribeWebPush: async (subscription: PushSubscriptionJSON) => {
+    const res = await apiClient.post<ApiResponse<{ verified: boolean; destination: string }>>(
+      '/notifications/channels/web-push',
+      { subscription },
+    );
+    return res.data.data;
+  },
+
   removeChannel: async (type: NotificationChannelType): Promise<void> => {
     await apiClient.delete(`/notifications/channels/${type}`);
   },

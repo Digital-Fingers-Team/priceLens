@@ -1,4 +1,4 @@
-import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, IsUUID, Length, Max, Min } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsObject, IsOptional, IsString, IsUUID, Length, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { NotificationChannelType } from '@prisma/client';
 
@@ -47,4 +47,10 @@ export class ListNotificationsQuery {
   @Type(() => Boolean)
   @IsBoolean()
   unreadOnly?: boolean;
+}
+
+/** Shape-checked in NotificationChannelsService (isPushSubscription). */
+export class WebPushSubscribeDto {
+  @IsObject()
+  subscription!: Record<string, unknown>;
 }

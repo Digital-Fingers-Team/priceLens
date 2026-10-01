@@ -2,7 +2,7 @@
 import { Link } from '@/lib/i18n/navigation';
 import { useEffect } from 'react';
 import { usePathname, useRouter } from '@/lib/i18n/navigation';
-import { LayoutDashboard, ClipboardList, BarChart3, Wallet, Tags, ToggleRight } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, BarChart3, Wallet, Tags, ToggleRight, Globe } from 'lucide-react';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { loginHref } from '@/lib/utils/next-path';
 import { cn } from '@/lib/utils/cn';
@@ -13,6 +13,7 @@ const NAV = [
   { href: '/admin/review', label: 'Review Queue', icon: ClipboardList },
   { href: '/admin/payments', label: 'Payments', icon: Wallet },
   { href: '/admin/plans', label: 'Plans', icon: Tags, adminOnly: true },
+  { href: '/admin/landed-cost', label: 'Landed cost', icon: Globe, adminOnly: true },
   { href: '/admin/flags', label: 'Feature flags', icon: ToggleRight, adminOnly: true },
 ];
 

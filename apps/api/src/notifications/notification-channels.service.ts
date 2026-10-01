@@ -6,6 +6,7 @@ import { EntitlementsService } from '../billing/entitlements.service';
 import { UpgradeRequiredException } from '../billing/billing.errors';
 import { EmailChannel } from './channels/email.channel';
 import { TelegramChannel } from './channels/telegram.channel';
+import { WebPushChannel, isPushSubscription } from './channels/web-push.channel';
 
 const VERIFY_TTL_MINUTES = 30;
 
@@ -18,6 +19,7 @@ export class NotificationChannelsService {
     private readonly entitlements: EntitlementsService,
     private readonly email: EmailChannel,
     private readonly telegram: TelegramChannel,
+    private readonly webPush: WebPushChannel,
   ) {}
 
   async list(userId: string) {
@@ -51,7 +53,13 @@ export class NotificationChannelsService {
           configured: this.telegram.isConfigured(),
           allowed: allowed.has(NotificationChannelType.TELEGRAM),
         },
+        [NotificationChannelType.WEB_PUSH]: {
+          configured: this.webPush.isConfigured(),
+          allowed: allowed.has(NotificationChannelType.WEB_PUSH),
+        },
       },
+      // The browser needs it to subscribe; null while web push is off.
+      webPushPublicKey: this.webPush.publicKey,
     };
   }
 
@@ -65,6 +73,9 @@ export class NotificationChannelsService {
   async upsert(userId: string, type: NotificationChannelType, destination: string) {
     if (type === NotificationChannelType.IN_APP) {
       throw new BadRequestException('The in-app inbox is always on and has no destination');
+    }
+    if (type === NotificationChannelType.WEB_PUSH) {
+      throw new BadRequestException('Browser notifications are turned on from the browser itself');
     }
 
     const { limits } = await this.entitlements.getEntitlements(userId);
@@ -244,8 +255,49 @@ export class NotificationChannelsService {
     }
   }
 
+  /**
+   * Saves this browser's push subscription. The subscription is its own
+   * proof: only the browser holding its private keys can receive on it, so
+   * there is no code to confirm and the channel is verified at once. One
+   * browser per user; subscribing another replaces it.
+   */
+  async subscribePush(userId: string, subscription: unknown) {
+    const { limits } = await this.entitlements.getEntitlements(userId);
+    if (!limits.notificationChannels.includes(NotificationChannelType.WEB_PUSH)) {
+      throw new UpgradeRequiredException('Browser notifications are included in the paid plans.');
+    }
+    if (!this.webPush.isConfigured()) {
+      throw new BadRequestException('Browser notifications are not available right now');
+    }
+    if (!isPushSubscription(subscription) || subscription.endpoint.length > 2048) {
+      throw new BadRequestException('That is not a valid browser subscription');
+    }
+
+    const stored = { endpoint: subscription.endpoint, keys: { p256dh: subscription.keys.p256dh, auth: subscription.keys.auth } };
+    const host = new URL(stored.endpoint).host.slice(0, 255);
+    const data = {
+      destination: host,
+      pushSubscription: stored,
+      isActive: true,
+      verified: true,
+      verifiedAt: new Date(),
+      failureCount: 0,
+      verifyToken: null,
+      verifyExpiresAt: null,
+    };
+    await this.prisma.notificationChannel.upsert({
+      where: { userId_type: { userId, type: NotificationChannelType.WEB_PUSH } },
+      create: { userId, type: NotificationChannelType.WEB_PUSH, ...data },
+      update: data,
+    });
+    return { type: NotificationChannelType.WEB_PUSH, verified: true, destination: host };
+  }
+
   private mask(type: NotificationChannelType, destination: string | null): string | null {
     if (!destination) return null;
+
+    // The push service's host (fcm.googleapis.com...) is not personal.
+    if (type === NotificationChannelType.WEB_PUSH) return destination;
 
     if (type === NotificationChannelType.EMAIL) {
       const [local, domain] = destination.split('@');

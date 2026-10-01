@@ -23,4 +23,14 @@ export default registerAs('notifications', () => ({
 
   // Deliveries are retried by a scheduled sweep; give up after this many.
   maxDeliveryAttempts: Number(process.env.NOTIFICATIONS_MAX_ATTEMPTS ?? 4),
+
+  // ─── Web push (VAPID) ─────────────────────────────────────────────────
+  // Our own key pair (npx web-push generate-vapid-keys); no account needed.
+  // The subject is a contact URL or mailto: the push services can reach.
+  webPushPublicKey: process.env.WEB_PUSH_PUBLIC_KEY ?? '',
+  webPushPrivateKey: process.env.WEB_PUSH_PRIVATE_KEY ?? '',
+  webPushSubject: process.env.WEB_PUSH_SUBJECT ?? '',
+
+  // When free plans' held alert emails go out as one digest (UTC).
+  alertDigestCron: process.env.ALERT_DIGEST_CRON ?? '0 6 * * *',
 }));

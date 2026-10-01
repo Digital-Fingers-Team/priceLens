@@ -80,6 +80,7 @@ enum NotificationChannelType {
   IN_APP
   EMAIL
   TELEGRAM
+  WEB_PUSH // browser push (VAPID); one subscribed browser per user
 }
 
 enum NotificationStatus {
@@ -187,6 +188,7 @@ model Category {
   parent   Category?          @relation("CategoryTree", fields: [parentId], references: [id])
   children Category[]         @relation("CategoryTree")
   products CanonicalProduct[]
+  landedCostRules LandedCostRule[]
 
   @@index([parentId])
   @@index([slug])
@@ -214,6 +216,7 @@ model Platform {
   affiliateClicks  AffiliateClick[]
   organizations    Organization[]
   competitorEvents CompetitorEvent[]
+  landedCostRules  LandedCostRule[]
 
   @@map("platforms")
 }
@@ -400,6 +403,36 @@ model PriceDaily {
   @@id([sourceListingId, day])
   @@index([day])
   @@map("price_daily")
+}
+
+/// How a cross-border store's price becomes a price at the buyer's door in
+/// Egypt. Admin-edited (/admin/landed-cost): customs and fees change, and
+/// are never hard-coded. A rule with a category beats the store's default.
+/// Percentages are of the item price plus shipping; VAT is charged on that
+/// plus customs, as Egyptian customs assess it.
+model LandedCostRule {
+  id          String  @id @default(uuid())
+  platformId  String  @map("platform_id")
+  categoryId  String? @map("category_id")
+
+  shippingFlat Decimal @default(0) @map("shipping_flat") @db.Decimal(12, 2) // EGP per order
+  shippingPct  Float   @default(0) @map("shipping_pct")
+  customsPct   Float   @default(0) @map("customs_pct")
+  vatPct       Float   @default(14) @map("vat_pct")
+  handlingFee  Decimal @default(0) @map("handling_fee") @db.Decimal(12, 2) // EGP: clearance, courier fees
+  deliveryDays String? @map("delivery_days") @db.VarChar(32)               // shown as-is, e.g. "10-20"
+  notes        String? @db.VarChar(255)
+  isActive     Boolean @default(true) @map("is_active")
+
+  updatedById String?  @map("updated_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  platform Platform  @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([platformId, categoryId])
+  @@map("landed_cost_rules")
 }
 
 // ─── Reconciliation merges ───────────────────────────────────────────────────
@@ -921,6 +954,10 @@ model NotificationChannel {
   destination String? @db.VarChar(255)
 
   isActive   Boolean   @default(true) @map("is_active")
+  // WEB_PUSH only: the browser's PushSubscription ({ endpoint, keys }). Too
+  // long for `destination`, which then holds the push service's host.
+  pushSubscription Json? @map("push_subscription")
+
   verified   Boolean   @default(false)
   // Short-lived code the user pastes to the Telegram bot / clicks in email.
   verifyToken String?  @map("verify_token") @db.VarChar(64)

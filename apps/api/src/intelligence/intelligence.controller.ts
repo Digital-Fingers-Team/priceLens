@@ -1,15 +1,33 @@
 import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { User } from '@prisma/client';
-import { CurrentUser } from '../common/decorators';
+import { CurrentUser, Public } from '../common/decorators';
 import { FEATURES } from '../billing/plan-limits';
 import { RequiresFeature } from '../billing/requires-feature.decorator';
 import { PriceIntelligenceService } from './price-intelligence.service';
+import { LandedCostService } from './landed-cost.service';
+import { RequiresFlag } from '../feature-flags/requires-flag.decorator';
+import { OPERATIONAL_FLAGS } from '../feature-flags/feature-flags.registry';
 
 @ApiTags('intelligence')
 @Controller('intelligence')
 export class IntelligenceController {
-  constructor(private readonly intelligence: PriceIntelligenceService) {}
+  constructor(
+    private readonly intelligence: PriceIntelligenceService,
+    private readonly landedCost: LandedCostService,
+  ) {}
+
+  /**
+   * Cross-border offers priced at the buyer's door (estimate). Public: every
+   * visitor gets the totals; plans with landed_cost_detail also get the
+   * line-by-line breakdown.
+   */
+  @Public()
+  @RequiresFlag(OPERATIONAL_FLAGS.LANDED_COST)
+  @Get('products/:productId/landed-cost')
+  getLandedCost(@CurrentUser() user: User | undefined, @Param('productId', ParseUUIDPipe) productId: string) {
+    return this.landedCost.forProduct(productId, user?.id ?? null);
+  }
 
   /**
    * The full intelligence panel for a product.

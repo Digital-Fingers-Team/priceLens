@@ -9,6 +9,7 @@ import {
   SetChannelActiveDto,
   UpsertChannelDto,
   VerifyChannelDto,
+  WebPushSubscribeDto,
 } from './dto/notifications.dto';
 
 @ApiTags('notifications')
@@ -65,6 +66,12 @@ export class NotificationsController {
   @Post('channels/active')
   setChannelActive(@CurrentUser() user: User, @Body() dto: SetChannelActiveDto) {
     return this.channels.setActive(user.id, dto.type, dto.isActive);
+  }
+
+  /** This browser's PushManager subscription, from the notifications page. */
+  @Post('channels/web-push')
+  subscribeWebPush(@CurrentUser() user: User, @Body() dto: WebPushSubscribeDto) {
+    return this.channels.subscribePush(user.id, dto.subscription);
   }
 
   @Delete('channels/:type')

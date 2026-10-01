@@ -8,14 +8,20 @@ import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useNotificationChannels, useSetChannelActive, useUpsertChannel, useVerifyChannel } from '@/lib/hooks/use-notifications';
+import {
+  useEnableWebPush,
+  useNotificationChannels,
+  useSetChannelActive,
+  useUpsertChannel,
+  useVerifyChannel,
+} from '@/lib/hooks/use-notifications';
 import { Link } from '@/lib/i18n/navigation';
 import { useI18n } from '@/lib/i18n/provider';
 import type { NotificationChannelType } from '@/types/billing.types';
 import { SignedInGate } from '../signed-in-gate';
 
-const CHANNELS: NotificationChannelType[] = ['IN_APP', 'EMAIL', 'TELEGRAM'];
-const PLACEHOLDER: Record<NotificationChannelType, string> = { IN_APP: '', EMAIL: 'you@example.com', TELEGRAM: '@yourusername' };
+const CHANNELS: NotificationChannelType[] = ['IN_APP', 'EMAIL', 'TELEGRAM', 'WEB_PUSH'];
+const PLACEHOLDER: Record<NotificationChannelType, string> = { IN_APP: '', EMAIL: 'you@example.com', TELEGRAM: '@yourusername', WEB_PUSH: '' };
 
 export default function NotificationSettingsPage() {
   const { t } = useI18n();
@@ -50,6 +56,7 @@ function Settings() {
               type={type}
               channel={data.channels.find((entry) => entry.type === type)}
               availability={data.available[type]}
+              webPushPublicKey={data.webPushPublicKey ?? null}
             />
           ))}
         </div>
@@ -64,10 +71,12 @@ function ChannelCard({
   type,
   channel,
   availability,
+  webPushPublicKey,
 }: {
   type: NotificationChannelType;
   channel: Channels[number] | undefined;
   availability: { configured: boolean; allowed: boolean } | undefined;
+  webPushPublicKey: string | null;
 }) {
   const { t, tf, tp } = useI18n();
   const copy = t.channels.types[type];
@@ -78,6 +87,7 @@ function ChannelCard({
   const { mutate: upsert, isPending: saving } = useUpsertChannel();
   const { mutate: verify, isPending: verifying } = useVerifyChannel();
   const { mutate: setActive } = useSetChannelActive();
+  const enablePush = useEnableWebPush();
 
   const isInApp = type === 'IN_APP';
   const allowed = availability?.allowed ?? false;
@@ -122,7 +132,20 @@ function ChannelCard({
           </p>
         )}
 
-        {!isInApp && allowed && (
+        {type === 'WEB_PUSH' && allowed && configured && webPushPublicKey && (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            {channel?.destination && (
+              <p className="flex-1 text-xs text-muted">
+                {t.channels.currently} <span className="font-mono text-fg" dir="ltr">{channel.destination}</span>
+              </p>
+            )}
+            <Button variant="secondary" className="self-start" loading={enablePush.isPending} onClick={() => enablePush.mutate(webPushPublicKey)}>
+              {t.channels.enableBrowser}
+            </Button>
+          </div>
+        )}
+
+        {!isInApp && type !== 'WEB_PUSH' && allowed && (
           <>
             {channel?.destination && (
               <p className="text-xs text-muted">

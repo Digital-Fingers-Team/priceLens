@@ -15,3 +15,15 @@ export function useProductIntelligence(productId: string | undefined, days = 90)
     retry: 1,
   });
 }
+
+/** Cross-border offers at the door in Egypt; empty for a product sold only locally. */
+export function useLandedCost(productId: string | undefined) {
+  return useQuery({
+    queryKey: ['landed-cost', productId],
+    queryFn: () => intelligenceApi.getLandedCost(productId!),
+    enabled: Boolean(productId),
+    staleTime: 5 * 60 * 1000,
+    // A switched-off flag answers 404: nothing to retry.
+    retry: false,
+  });
+}

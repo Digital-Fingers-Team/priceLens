@@ -20,6 +20,7 @@ export const OPERATIONAL_FLAGS = {
   ORG_INVITES: 'org_invites',
   PRICE_DAILY_ROLLUP: 'price_daily_rollup',
   RENEWAL_REMINDERS: 'renewal_reminders',
+  LANDED_COST: 'landed_cost',
 } as const;
 
 export type OperationalFlag = (typeof OPERATIONAL_FLAGS)[keyof typeof OPERATIONAL_FLAGS];
@@ -30,7 +31,7 @@ export interface FlagDefinition {
   description: string;
 }
 
-/** Plan features that existed before the v2 plan: on, as they are today. */
+/** Plan features that are built: on unless the admin turns them off. */
 const SHIPPED: FeatureKey[] = [
   FEATURES.BUY_VERDICT,
   FEATURES.ADVANCED_DEAL_SCORE,
@@ -50,6 +51,9 @@ const SHIPPED: FeatureKey[] = [
   FEATURES.MARKET_REPORTS,
   FEATURES.API_ACCESS,
   FEATURES.TEAM_SEATS,
+  // v2, phase 2
+  FEATURES.REALTIME_ALERTS,
+  FEATURES.LANDED_COST_DETAIL,
 ];
 
 const featureFlags = Object.fromEntries(
@@ -79,6 +83,10 @@ export const FLAG_REGISTRY: Record<FlagKey, FlagDefinition> = {
   [OPERATIONAL_FLAGS.PRICE_DAILY_ROLLUP]: {
     defaultOn: true,
     description: 'Nightly rollup of price history into one row per listing per day',
+  },
+  [OPERATIONAL_FLAGS.LANDED_COST]: {
+    defaultOn: true,
+    description: 'Cross-border offers priced at the door in Egypt (totals for everyone; the breakdown is landed_cost_detail)',
   },
   [OPERATIONAL_FLAGS.RENEWAL_REMINDERS]: {
     defaultOn: true,

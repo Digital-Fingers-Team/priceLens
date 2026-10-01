@@ -23,6 +23,9 @@ function series(prices: number[], opts: { inStock?: boolean } = {}): DailyPriceP
   }));
 }
 
+/** A date with no sale event within the verdict's horizon (sale-events.ts). */
+const NO_SALE = new Date('2026-06-15T00:00:00Z');
+
 describe('price statistics primitives', () => {
   it('returns null rather than a guess for an empty sample', () => {
     expect(median([])).toBeNull();
@@ -70,7 +73,7 @@ describe('buy/wait verdict', () => {
 
   it('refuses to give a verdict without enough history', () => {
     const points = series([100, 101, 102]);
-    const result = computeBuyVerdict(100, points, computeHistoryStats(points));
+    const result = computeBuyVerdict(100, points, computeHistoryStats(points), NO_SALE);
     expect(result.verdict).toBe('INSUFFICIENT_DATA');
     expect(result.missing?.needDays).toBe(MIN_DAYS_FOR_VERDICT);
     // Critically: no fabricated percentile or confidence.
@@ -79,14 +82,14 @@ describe('buy/wait verdict', () => {
   });
 
   it('refuses a verdict when there is no current price at all', () => {
-    const result = computeBuyVerdict(null, longFlat, computeHistoryStats(longFlat));
+    const result = computeBuyVerdict(null, longFlat, computeHistoryStats(longFlat), NO_SALE);
     expect(result.verdict).toBe('INSUFFICIENT_DATA');
   });
 
   it('says buy when the price is near the bottom of its observed range', () => {
     const prices = Array.from({ length: 40 }, (_, i) => 20_000 + i * 50);
     const points = series(prices);
-    const result = computeBuyVerdict(20_000, points, computeHistoryStats(points));
+    const result = computeBuyVerdict(20_000, points, computeHistoryStats(points), NO_SALE);
     expect(result.verdict).toBe('GOOD_TIME_TO_BUY');
     expect(result.percentile).toBeLessThanOrEqual(25);
     expect(result.reasons.join(' ')).toMatch(/lowest recorded price/i);
@@ -95,7 +98,7 @@ describe('buy/wait verdict', () => {
   it('says wait when the price sits high in its observed range', () => {
     const prices = Array.from({ length: 40 }, (_, i) => 20_000 + i * 50);
     const points = series(prices);
-    const result = computeBuyVerdict(21_950, points, computeHistoryStats(points));
+    const result = computeBuyVerdict(21_950, points, computeHistoryStats(points), NO_SALE);
     expect(result.verdict).toBe('WAIT');
     expect(result.percentile).toBeGreaterThanOrEqual(70);
   });
@@ -109,14 +112,14 @@ describe('buy/wait verdict', () => {
     ];
     prices[89] = 17_999;
     const points = series(prices);
-    const result = computeBuyVerdict(18_499, points, computeHistoryStats(points));
+    const result = computeBuyVerdict(18_499, points, computeHistoryStats(points), NO_SALE);
     expect(result.verdict).toBe('GOOD_TIME_TO_BUY');
     expect(result.vsAverage).toBeGreaterThan(0);
   });
 
   it('downgrades confidence when the price thrashes', () => {
     const jumpy = series(Array.from({ length: 40 }, (_, i) => (i % 2 === 0 ? 10_000 : 20_000)));
-    const result = computeBuyVerdict(10_000, jumpy, computeHistoryStats(jumpy));
+    const result = computeBuyVerdict(10_000, jumpy, computeHistoryStats(jumpy), NO_SALE);
     expect(result.confidence).toBe('LOW');
     expect(result.reasons.join(' ')).toMatch(/moves a lot/i);
   });
@@ -124,19 +127,19 @@ describe('buy/wait verdict', () => {
   it('gives every reason as a code with its numbers, one per sentence (audit 11)', () => {
     const prices = Array.from({ length: 40 }, (_, i) => 20_000 + i * 50);
     const points = series(prices);
-    const wait = computeBuyVerdict(21_950, points, computeHistoryStats(points));
+    const wait = computeBuyVerdict(21_950, points, computeHistoryStats(points), NO_SALE);
     expect(wait.reasonCodes).toHaveLength(wait.reasons.length);
     expect(wait.reasonCodes[0]).toEqual({ code: 'PRICIER_THAN_PCT', params: { pct: expect.any(Number), days: 40 } });
     expect(wait.reasonCodes[1]).toEqual({ code: 'LOW_IN_PERIOD', params: { price: 20_000 } });
 
     const few = series([100, 101, 102]);
-    expect(computeBuyVerdict(100, few, computeHistoryStats(few)).reasonCodes).toEqual([
+    expect(computeBuyVerdict(100, few, computeHistoryStats(few), NO_SALE).reasonCodes).toEqual([
       { code: 'TOO_LITTLE_HISTORY', params: { days: 3, span: 2, needDays: MIN_DAYS_FOR_VERDICT, needSpan: 14 } },
     ]);
   });
 
   it('gives high confidence only with a long, stable history', () => {
-    const result = computeBuyVerdict(20_000, longFlat, computeHistoryStats(longFlat));
+    const result = computeBuyVerdict(20_000, longFlat, computeHistoryStats(longFlat), NO_SALE);
     expect(result.confidence).toBe('MEDIUM');
   });
 });

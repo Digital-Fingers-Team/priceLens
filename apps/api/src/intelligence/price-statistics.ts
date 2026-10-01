@@ -8,6 +8,8 @@
  * afford.
  */
 
+import { SaleEventCode, nearestSale } from './sale-events';
+
 export interface DailyPricePoint {
   /** YYYY-MM-DD */
   date: string;
@@ -265,6 +267,15 @@ export function computeHistoryStats(points: DailyPricePoint[]): HistoryStats | n
  * "we don't know yet" — which is a legitimate, and more trustworthy, answer.
  */
 export const MIN_DAYS_FOR_VERDICT = 10;
+
+/** How far ahead a sale is mentioned, and how close it must be to say "wait". */
+const SALE_HORIZON_DAYS = 21;
+const SALE_WAIT_DAYS = 14;
+const SALE_NAMES: Record<SaleEventCode, string> = {
+  WHITE_FRIDAY: 'White Friday',
+  RAMADAN: 'The Ramadan sales season',
+  BACK_TO_SCHOOL: 'Back-to-school season',
+};
 const MIN_SPAN_DAYS_FOR_VERDICT = 14;
 
 export type VerdictCode = 'GOOD_TIME_TO_BUY' | 'FAIR_PRICE' | 'WAIT' | 'INSUFFICIENT_DATA';
@@ -287,7 +298,13 @@ export type VerdictReasonCode =
   | 'ABOVE_LOW_PCT'
   | 'BELOW_AVERAGE_PCT'
   | 'ABOVE_AVERAGE_PCT'
-  | 'VOLATILE';
+  | 'VOLATILE'
+  | 'SALE_SOON_WHITE_FRIDAY'
+  | 'SALE_SOON_RAMADAN'
+  | 'SALE_SOON_BACK_TO_SCHOOL'
+  | 'SALE_NOW_WHITE_FRIDAY'
+  | 'SALE_NOW_RAMADAN'
+  | 'SALE_NOW_BACK_TO_SCHOOL';
 
 export interface VerdictReason {
   code: VerdictReasonCode;
@@ -323,6 +340,7 @@ export function computeBuyVerdict(
   currentPrice: number | null,
   points: DailyPricePoint[],
   stats: HistoryStats | null,
+  now: Date = new Date(),
 ): BuyVerdict {
   if (currentPrice == null || !stats || points.length === 0) {
     return {
@@ -406,6 +424,21 @@ export function computeBuyVerdict(
     if (aboveLow > 5) {
       say('ABOVE_LOW_PCT', { pct: pct1(aboveLow), price: low }, `${aboveLow.toFixed(1)}% above its recorded low of ${low}.`);
     }
+  }
+
+  // Seasonality (sale-events.ts). A big sale within two weeks turns a merely
+  // fair price into "wait"; a good price stays a good price, and a sale that
+  // is already on is mentioned so the buyer knows why prices may be moving.
+  const sale = nearestSale(now, SALE_HORIZON_DAYS);
+  if (sale && sale.daysAway === 0) {
+    say(`SALE_NOW_${sale.event}`, {}, `${SALE_NAMES[sale.event]} is on now; prices often move during it.`);
+  } else if (sale) {
+    say(
+      `SALE_SOON_${sale.event}`,
+      { days: sale.daysAway },
+      `${SALE_NAMES[sale.event]} starts in about ${sale.daysAway} day(s); prices often drop then.`,
+    );
+    if (verdict === 'FAIR_PRICE' && sale.daysAway <= SALE_WAIT_DAYS) verdict = 'WAIT';
   }
 
   if (vsAverage > 0) {

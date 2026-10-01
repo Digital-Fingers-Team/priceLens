@@ -20,6 +20,7 @@ export const RUN_LAUNCH_DETECTION_JOB = 'run-launch-detection';
 export const RUN_WEEKLY_REPORTS_JOB = 'run-weekly-reports';
 export const RUN_TITLE_TRANSLATION_JOB = 'run-title-translation';
 export const RUN_PRICE_ROLLUP_JOB = 'run-price-rollup';
+export const RUN_ALERT_DIGEST_JOB = 'run-alert-digest';
 
 /** run-live-ingestion: a category sweep over some or all stores. */
 export interface LiveIngestionJobData {

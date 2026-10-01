@@ -36,4 +36,6 @@ export interface ChannelAvailability {
 export interface NotificationChannelsResponse {
   channels: NotificationChannel[];
   available: Record<NotificationChannelType, ChannelAvailability>;
+  /** For PushManager.subscribe(); null while web push is not set up. */
+  webPushPublicKey: string | null;
 }

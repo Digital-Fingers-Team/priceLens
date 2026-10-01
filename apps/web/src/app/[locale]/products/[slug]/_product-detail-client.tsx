@@ -3,6 +3,7 @@ import { productTitle } from '@/lib/product-title';
 import dynamic from 'next/dynamic';
 import { PriceChartSkeleton } from '@/components/charts/price-chart-skeleton';
 import { IntelligencePanel } from '@/components/intelligence/intelligence-panel';
+import { LandedCostCard } from '@/components/intelligence/landed-cost-card';
 import { ListingTableSkeleton } from '@/components/product/listing-table-skeleton';
 import { OfferList } from '@/components/product/offer-list';
 import { ProductHeader } from '@/components/product/product-header';
@@ -108,6 +109,7 @@ export function ProductDetailClient({ slug, initialProduct, fetchedAt }: Product
             <p className="text-sm text-muted">{t.product.offersLede}</p>
           </div>
           <OfferList listings={listings} />
+          <LandedCostCard productId={product.id} />
         </section>
 
         <IntelligencePanel productId={product.id} />

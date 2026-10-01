@@ -333,6 +333,17 @@ function Dashboard({ data }: { data: AnalyticsSummary }) {
             }))}
           />
         </Panel>
+        <Panel title="Most clicked products">
+          <RankList
+            empty="No store clicks in this range."
+            rows={(storeClicks.products ?? []).map((p) => ({
+              key: p.slug,
+              label: <ProductLabel {...p} />,
+              value: p.count,
+              display: formatNumber(p.count),
+            }))}
+          />
+        </Panel>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">

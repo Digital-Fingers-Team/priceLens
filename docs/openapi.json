@@ -2874,6 +2874,31 @@
         ]
       }
     },
+    "/api/v1/notifications/channels/web-push": {
+      "post": {
+        "operationId": "NotificationsController_subscribeWebPush",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebPushSubscribeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "This browser's PushManager subscription, from the notifications page.",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
     "/api/v1/notifications/channels/{type}": {
       "delete": {
         "operationId": "NotificationsController_removeChannel",
@@ -2886,7 +2911,8 @@
               "enum": [
                 "EMAIL",
                 "IN_APP",
-                "TELEGRAM"
+                "TELEGRAM",
+                "WEB_PUSH"
               ],
               "type": "string"
             }
@@ -2899,6 +2925,30 @@
         },
         "tags": [
           "notifications"
+        ]
+      }
+    },
+    "/api/v1/intelligence/products/{productId}/landed-cost": {
+      "get": {
+        "operationId": "IntelligenceController_getLandedCost",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Cross-border offers priced at the buyer's door (estimate). Public: every\nvisitor gets the totals; plans with landed_cost_detail also get the\nline-by-line breakdown.",
+        "tags": [
+          "intelligence"
         ]
       }
     },
@@ -2985,6 +3035,65 @@
         },
         "tags": [
           "intelligence"
+        ]
+      }
+    },
+    "/api/v1/admin/landed-cost-rules": {
+      "get": {
+        "operationId": "LandedCostAdminController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      },
+      "put": {
+        "operationId": "LandedCostAdminController_save",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveLandedCostRuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/landed-cost-rules/{id}": {
+      "delete": {
+        "operationId": "LandedCostAdminController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
         ]
       }
     },
@@ -4013,7 +4122,8 @@
             "enum": [
               "EMAIL",
               "IN_APP",
-              "TELEGRAM"
+              "TELEGRAM",
+              "WEB_PUSH"
             ]
           },
           "destination": {
@@ -4035,7 +4145,8 @@
             "enum": [
               "EMAIL",
               "IN_APP",
-              "TELEGRAM"
+              "TELEGRAM",
+              "WEB_PUSH"
             ]
           },
           "code": {
@@ -4057,7 +4168,8 @@
             "enum": [
               "EMAIL",
               "IN_APP",
-              "TELEGRAM"
+              "TELEGRAM",
+              "WEB_PUSH"
             ]
           },
           "isActive": {
@@ -4067,6 +4179,74 @@
         "required": [
           "type",
           "isActive"
+        ]
+      },
+      "WebPushSubscribeDto": {
+        "type": "object",
+        "properties": {
+          "subscription": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "subscription"
+        ]
+      },
+      "SaveLandedCostRuleDto": {
+        "type": "object",
+        "properties": {
+          "platformId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "categoryId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Omit (or null) for the store's default rule.",
+            "format": "uuid"
+          },
+          "shippingFlat": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000000
+          },
+          "shippingPct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "customsPct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 300
+          },
+          "vatPct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "handlingFee": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000000
+          },
+          "deliveryDays": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 32
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 255
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "platformId"
         ]
       },
       "IssueApiKeyDto": {

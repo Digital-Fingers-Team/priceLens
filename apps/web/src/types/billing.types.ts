@@ -8,7 +8,7 @@ export type SubscriptionStatus =
   | 'INCOMPLETE'
   | 'EXPIRED';
 
-export type NotificationChannelType = 'IN_APP' | 'EMAIL' | 'TELEGRAM';
+export type NotificationChannelType = 'IN_APP' | 'EMAIL' | 'TELEGRAM' | 'WEB_PUSH';
 
 export type AlertType =
   | 'PRICE_TARGET'

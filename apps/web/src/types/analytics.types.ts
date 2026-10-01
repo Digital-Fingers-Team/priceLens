@@ -37,7 +37,11 @@ export interface AnalyticsSummary {
     products: Array<{ slug: string; title: string; titleAr: string | null; count: number; new: number }>;
     alertProducts: Array<{ slug: string; title: string; titleAr: string | null; count: number }>;
   };
-  storeClicks: { total: number; stores: Array<{ store: string; clicks: number }> };
+  storeClicks: {
+    total: number;
+    stores: Array<{ store: string; clicks: number }>;
+    products: Array<{ slug: string; title: string; titleAr: string | null; count: number }>;
+  };
 }
 
 export type AnalyticsDays = 1 | 7 | 30 | 90;

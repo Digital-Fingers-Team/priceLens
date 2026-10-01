@@ -27,7 +27,13 @@ export type VerdictReasonCode =
   | 'ABOVE_LOW_PCT'
   | 'BELOW_AVERAGE_PCT'
   | 'ABOVE_AVERAGE_PCT'
-  | 'VOLATILE';
+  | 'VOLATILE'
+  | 'SALE_SOON_WHITE_FRIDAY'
+  | 'SALE_SOON_RAMADAN'
+  | 'SALE_SOON_BACK_TO_SCHOOL'
+  | 'SALE_NOW_WHITE_FRIDAY'
+  | 'SALE_NOW_RAMADAN'
+  | 'SALE_NOW_BACK_TO_SCHOOL';
 
 export interface VerdictReason {
   code: VerdictReasonCode;
@@ -105,4 +111,23 @@ export interface ProductIntelligence {
   dealScore: DealScore;
   discountCheck: DiscountCheck;
   insufficientData: boolean;
+}
+
+export interface LandedOffer {
+  listingId: string;
+  store: string;
+  storeSlug: string;
+  price: number;
+  total: number;
+  deliveryDays: string | null;
+  assumptions: { customsPct: number; vatPct: number; shipping: 'included' | 'estimated' };
+  breakdown: { price: number; shipping: number; customs: number; vat: number; handling: number; total: number } | null;
+}
+
+export interface LandedCostResponse {
+  currency: string;
+  offers: LandedOffer[];
+  cheapestLocal: { store: string; price: number } | null;
+  /** Whether this plan sees the line-by-line breakdown. */
+  detail: boolean;
 }

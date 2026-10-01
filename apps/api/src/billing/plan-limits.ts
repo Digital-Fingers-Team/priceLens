@@ -91,6 +91,14 @@ export interface PlanLimits {
   seats: number;
 }
 
+/** Real-time channels are what paid plans add over the free inbox + email. */
+const PAID_CHANNELS: NotificationChannelType[] = [
+  NotificationChannelType.IN_APP,
+  NotificationChannelType.EMAIL,
+  NotificationChannelType.TELEGRAM,
+  NotificationChannelType.WEB_PUSH,
+];
+
 /** The free tier's alert types: enough to be genuinely useful as a funnel. */
 const FREE_ALERT_TYPES: AlertType[] = [AlertType.PRICE_TARGET, AlertType.PRICE_DROP_PERCENT];
 
@@ -234,11 +242,7 @@ export const DEFAULT_PLAN_BLUEPRINTS: PlanBlueprint[] = [
       activeAlerts: null,
       priceHistoryDays: null,
       alertTypes: ALL_ALERT_TYPES,
-      notificationChannels: [
-        NotificationChannelType.IN_APP,
-        NotificationChannelType.EMAIL,
-        NotificationChannelType.TELEGRAM,
-      ],
+      notificationChannels: PAID_CHANNELS,
       features: PLUS_FEATURES,
       monitoredSkus: 0,
       apiCallsPerDay: 0,
@@ -261,11 +265,7 @@ export const DEFAULT_PLAN_BLUEPRINTS: PlanBlueprint[] = [
       activeAlerts: null,
       priceHistoryDays: null,
       alertTypes: ALL_ALERT_TYPES,
-      notificationChannels: [
-        NotificationChannelType.IN_APP,
-        NotificationChannelType.EMAIL,
-        NotificationChannelType.TELEGRAM,
-      ],
+      notificationChannels: PAID_CHANNELS,
       features: SELLER_FEATURES,
       monitoredSkus: 500,
       apiCallsPerDay: 0,
@@ -288,11 +288,7 @@ export const DEFAULT_PLAN_BLUEPRINTS: PlanBlueprint[] = [
       activeAlerts: null,
       priceHistoryDays: null,
       alertTypes: ALL_ALERT_TYPES,
-      notificationChannels: [
-        NotificationChannelType.IN_APP,
-        NotificationChannelType.EMAIL,
-        NotificationChannelType.TELEGRAM,
-      ],
+      notificationChannels: PAID_CHANNELS,
       features: SELLER_PLUS_FEATURES,
       monitoredSkus: 2_000,
       apiCallsPerDay: 0,
@@ -316,11 +312,7 @@ export const DEFAULT_PLAN_BLUEPRINTS: PlanBlueprint[] = [
       activeAlerts: null,
       priceHistoryDays: null,
       alertTypes: ALL_ALERT_TYPES,
-      notificationChannels: [
-        NotificationChannelType.IN_APP,
-        NotificationChannelType.EMAIL,
-        NotificationChannelType.TELEGRAM,
-      ],
+      notificationChannels: PAID_CHANNELS,
       features: ENTERPRISE_FEATURES,
       monitoredSkus: null,
       apiCallsPerDay: 50_000,

@@ -3,6 +3,7 @@ import { DatabaseModule } from '../database/database.module';
 import { EmailChannel } from './channels/email.channel';
 import { InAppChannel } from './channels/in-app.channel';
 import { TelegramChannel } from './channels/telegram.channel';
+import { WebPushChannel } from './channels/web-push.channel';
 import { NotificationChannelsService } from './notification-channels.service';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
@@ -16,7 +17,7 @@ import { NotificationsService } from './notifications.service';
 @Module({
   imports: [DatabaseModule],
   controllers: [NotificationsController],
-  providers: [InAppChannel, EmailChannel, TelegramChannel, NotificationsService, NotificationChannelsService],
-  exports: [NotificationsService, NotificationChannelsService, EmailChannel, TelegramChannel],
+  providers: [InAppChannel, EmailChannel, TelegramChannel, WebPushChannel, NotificationsService, NotificationChannelsService],
+  exports: [NotificationsService, NotificationChannelsService, EmailChannel, TelegramChannel, WebPushChannel],
 })
 export class NotificationsModule {}
