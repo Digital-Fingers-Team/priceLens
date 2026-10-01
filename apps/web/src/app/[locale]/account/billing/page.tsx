@@ -11,6 +11,7 @@ import { Link } from '@/lib/i18n/navigation';
 import { useI18n } from '@/lib/i18n/provider';
 import { cn } from '@/lib/utils/cn';
 import { SignedInGate } from '../signed-in-gate';
+import { planWords } from '@/lib/billing/plan-words';
 
 const STATUS_VARIANT: Record<string, BadgeVariant> = {
   ACTIVE: 'success',
@@ -48,8 +49,8 @@ function BillingContent() {
   }
 
   const isPaid = data.tier !== 'FREE';
-  // Wallet / InstaPay plans end on their date unless paid again.
-  const isWallet = data.provider === 'wallet';
+  // Wallet, InstaPay and Paymob plans end on their date unless paid again.
+  const isWallet = ['wallet', 'paymob', 'mock'].includes(data.provider ?? '');
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-10 sm:px-6">
@@ -61,7 +62,7 @@ function BillingContent() {
       <Card>
         <CardHeader className="flex-wrap">
           <div className="flex flex-col gap-1">
-            <h2 className="text-base font-semibold text-fg">{t.pricing.plans[data.tier]?.name ?? data.planName}</h2>
+            <h2 className="text-base font-semibold text-fg">{planWords(t, { key: data.planKey, tier: data.tier, name: data.planName }).name}</h2>
             {data.currentPeriodEnd && (
               <p className="text-xs text-muted">
                 {tf(data.cancelAtPeriodEnd || isWallet ? t.account.accessEnds : t.account.renews, { date: fmt.date(data.currentPeriodEnd) })}
@@ -121,6 +122,9 @@ function BillingContent() {
                 {t.account.renewNow}
               </Link>
             )}
+            <Link href="/account/invoices" className={buttonClassName({ variant: 'secondary' })}>
+              {t.account.invoicesLink}
+            </Link>
             <Link href="/pricing" className={buttonClassName({ variant: isPaid ? 'secondary' : 'primary' })}>
               {isPaid ? t.account.changePlan : t.billing.seePlans}
               <ArrowRight className="flip-rtl h-4 w-4" aria-hidden />

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Logger, Post } from '@nestjs/common';
+import { Body, Controller, Get, Logger, Param, Post, Put } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { User, UserRole } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
@@ -8,7 +8,8 @@ import { ManualPaymentsService } from './manual-payments.service';
 import { PlansService } from './plans.service';
 import { StripeService } from './stripe.service';
 import { SubscriptionsService } from './subscriptions.service';
-import { AdminGrantPlanDto, CancelSubscriptionDto, CreateCheckoutDto } from './dto/billing.dto';
+import { InvoicesService } from './invoices.service';
+import { AdminGrantPlanDto, AdminUpdatePlanDto, CancelSubscriptionDto, CreateCheckoutDto } from './dto/billing.dto';
 import { UpgradeRequiredException } from './billing.errors';
 
 @ApiTags('billing')
@@ -22,6 +23,7 @@ export class BillingController {
     private readonly entitlements: EntitlementsService,
     private readonly stripe: StripeService,
     private readonly manualPayments: ManualPaymentsService,
+    private readonly invoices: InvoicesService,
     private readonly config: ConfigService,
   ) {}
 
@@ -30,14 +32,19 @@ export class BillingController {
   @Get('plans')
   async listPlans() {
     const plans = await this.plans.listPublic();
+    const onlineProviders = await this.invoices.availableProviders(null);
     return {
       // A plan is also purchasable when it can be paid by wallet / InstaPay.
       plans: plans.map((plan) => ({
         ...plan,
-        purchasable: plan.purchasable || this.manualPayments.isSellable({ ...plan, isActive: true }),
+        purchasable:
+          plan.purchasable ||
+          this.manualPayments.isSellable({ ...plan, isActive: true }) ||
+          (onlineProviders.length > 0 && plan.priceMinor > 0 && plan.intervalDays > 0),
       })),
       checkoutEnabled: this.stripe.isConfigured,
       manualPaymentsEnabled: this.manualPayments.isEnabled,
+      onlineProviders,
     };
   }
 
@@ -60,6 +67,7 @@ export class BillingController {
       provider: subscription?.provider ?? null,
       checkoutEnabled: this.stripe.isConfigured,
       manualPaymentsEnabled: this.manualPayments.isEnabled,
+      onlineProviders: await this.invoices.availableProviders(user),
     };
   }
 
@@ -155,6 +163,14 @@ export class BillingController {
   @Roles(UserRole.ADMIN)
   @Get('admin/plans')
   adminListPlans() {
-    return this.plans.listAll();
+    return this.plans.adminList();
+  }
+
+  @Roles(UserRole.ADMIN)
+  @Put('admin/plans/:key')
+  async adminUpdatePlan(@CurrentUser() actor: User, @Param('key') key: string, @Body() dto: AdminUpdatePlanDto) {
+    const plan = await this.plans.adminUpdate(key, dto);
+    this.logger.log(`Admin ${actor.id} edited plan ${key}`);
+    return this.plans.toPublic(plan);
   }
 }

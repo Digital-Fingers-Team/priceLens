@@ -22,6 +22,7 @@ import type { RetailerConnector } from '../../src/scraping/interfaces/retailer-c
 import type { RetailerListing } from '../../src/scraping/interfaces/retailer-listing.interface';
 import { upsertCategories } from '../../seed/generators/generateProducts';
 import { generateStores } from '../../seed/generators/generateStores';
+import { DEFAULT_PLAN_BLUEPRINTS } from '../../src/billing/plan-limits';
 
 /**
  * Every route, called at least once (B-12): the happy path, plus an
@@ -703,6 +704,135 @@ describe('Every endpoint (e2e)', () => {
     });
 
     await call('DELETE', '/api/v1/watchlist/{productId}', 200, { ...victim, params: { productId } });
+    expectNoProblems();
+  });
+
+  it('v2 foundation: flags, online invoices, plan editor, invitations', async () => {
+    // Flags: public snapshot, admin list and toggle.
+    const flags = await call('GET', '/api/v1/flags', 200);
+    expect(flags.body.data).toMatchObject({ deal_hunter: true, mock_checkout: false });
+    await call('GET', '/api/v1/admin/flags', 200, { token: admin.token });
+    await call('GET', '/api/v1/admin/flags', 403, { token: free.token });
+    await call('PUT', '/api/v1/admin/flags/{key}', 403, { token: free.token, params: { key: 'mock_checkout' }, body: { enabled: true } });
+    await call('PUT', '/api/v1/admin/flags/{key}', 404, { token: admin.token, params: { key: 'no_such_flag' }, body: { enabled: true } });
+    await call('PUT', '/api/v1/admin/flags/{key}', 400, { token: admin.token, params: { key: 'mock_checkout' }, body: {} });
+
+    // A switched-off plan feature is a 404 even for a plan that includes it.
+    await call('PUT', '/api/v1/admin/flags/{key}', 200, { token: admin.token, params: { key: 'buy_verdict' }, body: { enabled: false } });
+    const gone = await call('GET', '/api/v1/intelligence/products/{productId}/verdict', 404, { token: pro.token, params: { productId } });
+    expect(gone.body.error?.code).toBe('FEATURE_DISABLED');
+    await call('DELETE', '/api/v1/admin/flags/{key}', 200, { token: admin.token, params: { key: 'buy_verdict' } });
+    await call('GET', '/api/v1/intelligence/products/{productId}/verdict', 200, { token: pro.token, params: { productId } });
+
+    // Plan editor.
+    await call('PUT', '/api/v1/billing/admin/plans/{key}', 403, { token: free.token, params: { key: 'plus_monthly' }, body: { trialDays: 7 } });
+    await call('PUT', '/api/v1/billing/admin/plans/{key}', 404, { token: admin.token, params: { key: 'nope' }, body: { trialDays: 7 } });
+    const edited = await call('PUT', '/api/v1/billing/admin/plans/{key}', 200, {
+      token: admin.token,
+      params: { key: 'plus_monthly' },
+      body: { trialDays: 7, limits: { features: ['deal_hunter', 'not_a_feature'], activeAlerts: null } },
+    });
+    // Unknown feature keys are dropped, never stored.
+    expect(edited.body.data.limits.features).toEqual(['deal_hunter']);
+    const plans = await call('GET', '/api/v1/billing/admin/plans', 200, { token: admin.token });
+    expect(plans.body.data.map((p: { key: string }) => p.key)).toContain('seller_plus_monthly');
+    // Put Plus back the way the rest of the suite expects it.
+    const plusBlueprint = DEFAULT_PLAN_BLUEPRINTS.find((plan) => plan.key === 'plus_monthly')!;
+    await prisma.plan.update({ where: { key: 'plus_monthly' }, data: { limits: plusBlueprint.limits as never, trialDays: plusBlueprint.trialDays } });
+
+    // Online checkout with the test double: off until its flag is on.
+    const before = await call('GET', '/api/v1/billing/providers', 200, { token: free.token });
+    expect(before.body.data.providers).toEqual([]);
+    await call('POST', '/api/v1/billing/invoices/checkout', 404, { token: free.token, body: { planKey: 'plus_monthly', provider: 'mock' } });
+    await call('PUT', '/api/v1/admin/flags/{key}', 200, { token: admin.token, params: { key: 'mock_checkout' }, body: { enabled: true } });
+    const after = await call('GET', '/api/v1/billing/providers', 200, { token: free.token });
+    expect(after.body.data.providers).toEqual(['mock']);
+
+    await call('POST', '/api/v1/billing/invoices/checkout', 400, { token: free.token, body: { planKey: 'plus_monthly', provider: 'bitcoin' } });
+    await call('POST', '/api/v1/billing/invoices/checkout', 403, { token: free.token, body: { planKey: 'enterprise_monthly', provider: 'mock' } });
+    const checkout = await call('POST', '/api/v1/billing/invoices/checkout', 201, {
+      token: free.token,
+      body: { planKey: 'plus_monthly', provider: 'mock' },
+    });
+    const invoiceId = checkout.body.data.invoiceId as string;
+    expect(checkout.body.data.redirectUrl).toContain(`/account/pay/test/${invoiceId}`);
+    const params = { id: invoiceId };
+
+    const pending = await call('GET', '/api/v1/billing/invoices/{id}', 200, { token: free.token, params });
+    expect(pending.body.data).toMatchObject({ status: 'PENDING', amountMinor: 12900, planKey: 'plus_monthly' });
+    await call('GET', '/api/v1/billing/invoices/{id}', 404, { token: pro.token, params });
+    const freeBefore = await call('GET', '/api/v1/billing/me', 200, { token: free.token });
+    expect(freeBefore.body.data.tier).toBe('FREE');
+
+    // Someone else cannot settle it; a decline fails it; paying it grants Plus at once.
+    await call('POST', '/api/v1/billing/invoices/{id}/test-pay', 404, { token: pro.token, params, body: { outcome: 'PAID' } });
+    await call('POST', '/api/v1/billing/invoices/{id}/test-pay', 400, { token: free.token, params, body: { outcome: 'MAYBE' } });
+    const declined = await call('POST', '/api/v1/billing/invoices/{id}/test-pay', 201, { token: free.token, params, body: { outcome: 'FAILED' } });
+    expect(declined.body.data.status).toBe('FAILED');
+    const paid = await call('POST', '/api/v1/billing/invoices/{id}/test-pay', 201, { token: free.token, params, body: { outcome: 'PAID' } });
+    expect(paid.body.data.status).toBe('PAID');
+    const replay = await call('POST', '/api/v1/billing/invoices/{id}/test-pay', 201, { token: free.token, params, body: { outcome: 'PAID' } });
+    expect(replay.body.data.status).toBe('PAID');
+
+    const freeAfter = await call('GET', '/api/v1/billing/me', 200, { token: free.token });
+    expect(freeAfter.body.data).toMatchObject({ tier: 'PLUS', planKey: 'plus_monthly', provider: 'mock', status: 'ACTIVE' });
+    expect(freeAfter.body.data.limits.features).toContain('buy_verdict');
+    // The locked feature is now available.
+    await call('GET', '/api/v1/intelligence/products/{productId}/verdict', 200, { token: free.token, params: { productId } });
+
+    const list = await call('GET', '/api/v1/billing/invoices', 200, { token: free.token });
+    expect(list.body.data.invoices[0]).toMatchObject({ id: invoiceId, kind: 'online', status: 'PAID' });
+
+    // Cancelling keeps the plan to the end of the period.
+    const cancelled = await call('POST', '/api/v1/billing/cancel', 201, { token: free.token, body: { immediately: false } });
+    expect(cancelled.body.data.cancelAtPeriodEnd).toBe(true);
+    await call('POST', '/api/v1/billing/cancel', 201, { token: free.token, body: { immediately: true } });
+    await call('DELETE', '/api/v1/admin/flags/{key}', 200, { token: admin.token, params: { key: 'mock_checkout' } });
+    await call('DELETE', '/api/v1/admin/flags/{key}', 403, { token: free.token, params: { key: 'mock_checkout' } });
+
+    // Paymob's callback is HMAC-signed; an unsigned one is refused.
+    await call('POST', '/api/v1/billing/webhook/paymob', 400, { body: { type: 'TRANSACTION', obj: { id: 1 } } });
+
+    // Invitations: the enterprise user's workspace invites the free user by email.
+    // One workspace per owner: reuse the one the seller test created.
+    const owned = await call('GET', '/api/v1/seller/workspaces', 200, { token: pro.token });
+    const shop = owned.body.data.find((w: { role: string; name: string }) => w.role === 'OWNER');
+    const orgParams = { orgId: shop.id as string };
+    await call('POST', '/api/v1/seller/workspaces/{orgId}/invites', 400, { token: pro.token, params: orgParams, body: { email: 'not-an-email', role: 'MEMBER' } });
+    await call('POST', '/api/v1/seller/workspaces/{orgId}/invites', 404, { token: free.token, params: orgParams, body: { email: free.email, role: 'MEMBER' } });
+    const created = await call('POST', '/api/v1/seller/workspaces/{orgId}/invites', 201, {
+      token: pro.token,
+      params: orgParams,
+      body: { email: free.email, role: 'MEMBER' },
+    });
+    const token = String(created.body.data.link).split('/invite/')[1];
+    expect(token).toBeTruthy();
+    const open = await call('GET', '/api/v1/seller/workspaces/{orgId}/invites', 200, { token: pro.token, params: orgParams });
+    expect(open.body.data.map((i: { email: string }) => i.email)).toEqual([free.email.toLowerCase()]);
+
+    const preview = await call('GET', '/api/v1/invites/{token}', 200, { params: { token } });
+    expect(preview.body.data).toMatchObject({ workspace: shop.name, role: 'MEMBER' });
+    await call('POST', '/api/v1/invites/{token}/accept', 403, { token: pro.token, params: { token } });
+    const joined = await call('POST', '/api/v1/invites/{token}/accept', 201, { token: free.token, params: { token } });
+    expect(joined.body.data).toEqual({ orgId: orgParams.orgId, role: 'MEMBER' });
+    await call('POST', '/api/v1/invites/{token}/accept', 404, { token: free.token, params: { token } });
+    await call('GET', '/api/v1/invites/{token}', 404, { params: { token: 'not-a-token' } });
+
+    const second = await call('POST', '/api/v1/seller/workspaces/{orgId}/invites', 201, {
+      token: pro.token,
+      params: orgParams,
+      body: { email: 'someone-new@example.com', role: 'ADMIN' },
+    });
+    await call('DELETE', '/api/v1/seller/workspaces/{orgId}/invites/{inviteId}', 200, {
+      token: pro.token,
+      params: { ...orgParams, inviteId: second.body.data.id },
+    });
+    await call('DELETE', '/api/v1/seller/workspaces/{orgId}/invites/{inviteId}', 404, {
+      token: pro.token,
+      params: { ...orgParams, inviteId: second.body.data.id },
+    });
+    // Leave the free user as they were: in no workspace.
+    await prisma.organizationMember.deleteMany({ where: { orgId: orgParams.orgId, userId: free.id } });
     expectNoProblems();
   });
 

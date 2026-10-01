@@ -1,5 +1,6 @@
 import { BullModule } from '@nestjs/bull';
 import { Module } from '@nestjs/common';
+import { PricesModule } from '../prices/prices.module';
 import { ConfigService } from '@nestjs/config';
 import { AffiliateModule } from '../affiliate/affiliate.module';
 import { AFFILIATE_CONVERSION_QUEUE } from '../affiliate/affiliate.constants';
@@ -30,6 +31,7 @@ import { WorkerMemoryGuard } from './worker-memory-guard';
     SellerModule,
     BrandModule,
     AffiliateModule,
+    PricesModule,
   ],
   providers: [
     IngestionProcessor,

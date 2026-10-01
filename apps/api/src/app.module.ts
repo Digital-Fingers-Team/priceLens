@@ -17,6 +17,7 @@ import { PricesModule } from './prices/prices.module';
 import { WorkersModule } from './workers/workers.module';
 import { AffiliateModule } from './affiliate/affiliate.module';
 import { BillingModule } from './billing/billing.module';
+import { FeatureFlagsModule } from './feature-flags/feature-flags.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { IntelligenceModule } from './intelligence/intelligence.module';
 import { DealHunterModule } from './deal-hunter/deal-hunter.module';
@@ -104,6 +105,7 @@ export const ENV_FILES = resolveEnvFiles();
 
     // ─── Feature Modules ────────────────────────────────────────────────────
     DatabaseModule,
+    FeatureFlagsModule,
     AuthModule,
     ProductsModule,
     CategoriesModule,

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Plus, Search } from 'lucide-react';
 import { PositionBadge } from '@/components/seller/position-badge';
+import { TeamPanel } from '@/components/seller/team-panel';
 import { Button } from '@/components/ui/button';
 import { buttonClassName } from '@/components/ui/button-styles';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
@@ -210,6 +211,8 @@ export default function WorkspaceDashboard() {
           </Button>
         </CardBody>
       </Card>
+
+      <TeamPanel orgId={orgId} />
     </div>
   );
 }

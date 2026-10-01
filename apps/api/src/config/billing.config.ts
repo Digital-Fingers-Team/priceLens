@@ -26,4 +26,20 @@ export default registerAs('billing', () => ({
   // Where a new payment is announced (the owner's own chat, not a user's).
   ownerTelegramBotToken: process.env.BILLING_OWNER_TELEGRAM_BOT_TOKEN ?? '',
   ownerTelegramChatId: process.env.BILLING_OWNER_TELEGRAM_CHAT_ID ?? '',
+
+  // ─── Paymob (cards, mobile wallets, Fawry) ─────────────────────────────
+  // All four needed; with any missing Paymob is not offered at checkout.
+  paymobBaseUrl: process.env.PAYMOB_BASE_URL ?? 'https://accept.paymob.com',
+  paymobSecretKey: process.env.PAYMOB_SECRET_KEY ?? '',
+  paymobPublicKey: process.env.PAYMOB_PUBLIC_KEY ?? '',
+  paymobHmacSecret: process.env.PAYMOB_HMAC_SECRET ?? '',
+  // Comma-separated integration ids from the Paymob dashboard (one per
+  // payment method: card, wallet, Fawry...).
+  paymobIntegrationIds: (process.env.PAYMOB_INTEGRATION_IDS ?? '')
+    .split(',')
+    .map((id) => Number(id.trim()))
+    .filter((id) => Number.isInteger(id) && id > 0),
+
+  // Days before a non-renewing plan ends that the reminder goes out.
+  renewalReminderDays: Number(process.env.BILLING_RENEWAL_REMINDER_DAYS ?? 3),
 }));

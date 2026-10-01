@@ -7,7 +7,7 @@ import { useAuthStore } from '@/lib/store/auth.store';
 import { useUiStore } from '@/lib/store/ui.store';
 import { useI18n } from '@/lib/i18n/provider';
 import { useApiErrorMessage } from '@/lib/hooks/use-api-error';
-import type { CompetitorEventType, OrgType, SellerProductRow } from '@/types/seller.types';
+import type { CompetitorEventType, OrgRole, OrgType, SellerProductRow } from '@/types/seller.types';
 
 const sellerKeys = {
   workspaces: ['seller', 'workspaces'] as const,
@@ -16,6 +16,8 @@ const sellerKeys = {
   product: (orgId: string, productId: string) => ['seller', orgId, 'product', productId] as const,
   events: (orgId: string, unreadOnly: boolean) => ['seller', orgId, 'events', unreadOnly] as const,
   rules: (orgId: string) => ['seller', orgId, 'rules'] as const,
+  members: (orgId: string) => ['seller', orgId, 'members'] as const,
+  invites: (orgId: string) => ['seller', orgId, 'invites'] as const,
 };
 
 export function useWorkspaces() {
@@ -155,5 +157,64 @@ export function useUpsertAlertRule(orgId: string) {
     }) => sellerApi.upsertRule(orgId, input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: sellerKeys.rules(orgId) }),
     onError: (err: AxiosError) => addToast(apiError(err, t.toast.ruleSaveFailed), 'error'),
+  });
+}
+
+// ─── Team: members and invitations ────────────────────────────────────────
+
+export function useWorkspaceMembers(orgId: string) {
+  return useQuery({ queryKey: sellerKeys.members(orgId), queryFn: () => sellerApi.members(orgId) });
+}
+
+/** Only admins can see invitations; a member's 403 just means "no list". */
+export function useWorkspaceInvites(orgId: string, enabled: boolean) {
+  return useQuery({ queryKey: sellerKeys.invites(orgId), queryFn: () => sellerApi.invites(orgId), enabled });
+}
+
+export function useInviteMember(orgId: string) {
+  const queryClient = useQueryClient();
+  const addToast = useUiStore((s) => s.addToast);
+  const apiError = useApiErrorMessage();
+  return useMutation({
+    mutationFn: (input: { email: string; role: OrgRole }) => sellerApi.invite(orgId, input.email, input.role),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: sellerKeys.invites(orgId) }),
+    onError: (error: AxiosError) => addToast(apiError(error), 'error'),
+  });
+}
+
+export function useRevokeInvite(orgId: string) {
+  const queryClient = useQueryClient();
+  const addToast = useUiStore((s) => s.addToast);
+  const apiError = useApiErrorMessage();
+  return useMutation({
+    mutationFn: (inviteId: string) => sellerApi.revokeInvite(orgId, inviteId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: sellerKeys.invites(orgId) }),
+    onError: (error: AxiosError) => addToast(apiError(error), 'error'),
+  });
+}
+
+export function useRemoveMember(orgId: string) {
+  const queryClient = useQueryClient();
+  const addToast = useUiStore((s) => s.addToast);
+  const apiError = useApiErrorMessage();
+  return useMutation({
+    mutationFn: (memberId: string) => sellerApi.removeMember(orgId, memberId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: sellerKeys.members(orgId) }),
+    onError: (error: AxiosError) => addToast(apiError(error), 'error'),
+  });
+}
+
+export function useInvitePreview(token: string) {
+  return useQuery({ queryKey: ['invite', token], queryFn: () => sellerApi.previewInvite(token), retry: false });
+}
+
+export function useAcceptInvite() {
+  const queryClient = useQueryClient();
+  const apiError = useApiErrorMessage();
+  const addToast = useUiStore((s) => s.addToast);
+  return useMutation({
+    mutationFn: (token: string) => sellerApi.acceptInvite(token),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: sellerKeys.workspaces }),
+    onError: (error: AxiosError) => addToast(apiError(error), 'error'),
   });
 }

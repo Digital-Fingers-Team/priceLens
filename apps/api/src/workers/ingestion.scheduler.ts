@@ -15,6 +15,7 @@ import {
   RUN_LAUNCH_DETECTION_JOB,
   RUN_WEEKLY_REPORTS_JOB,
   RUN_TITLE_TRANSLATION_JOB,
+  RUN_PRICE_ROLLUP_JOB,
 } from './ingestion.jobs';
 import { retryUntilDone } from '../common/redis-resilience';
 import { JOB_PRIORITY } from './ingestion-queue.service';
@@ -30,6 +31,7 @@ const MAP_SWEEP_JOB_ID = 'scheduled-map-sweep';
 const LAUNCH_DETECTION_JOB_ID = 'scheduled-launch-detection';
 const WEEKLY_REPORTS_JOB_ID = 'scheduled-weekly-reports';
 const TITLE_TRANSLATION_JOB_ID = 'scheduled-title-translation';
+const PRICE_ROLLUP_JOB_ID = 'scheduled-price-rollup';
 
 @Injectable()
 export class IngestionScheduler implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -156,8 +158,17 @@ export class IngestionScheduler implements OnApplicationBootstrap, OnApplication
       { jobId: TITLE_TRANSLATION_JOB_ID, priority: JOB_PRIORITY.scheduled, repeat: { cron: translationCron } },
     );
 
+    // price_history -> price_daily (PriceRollupService). Cheap: it re-rolls
+    // two days per run.
+    const rollupCron = this.configService.get<string>('retailers.priceRollupCron', '35 */6 * * *');
+    await this.queue.add(
+      RUN_PRICE_ROLLUP_JOB,
+      {},
+      { jobId: PRICE_ROLLUP_JOB_ID, priority: JOB_PRIORITY.scheduled, repeat: { cron: rollupCron } },
+    );
+
     this.logger.log(
-      `Scheduled notification retry (${retryCron}), subscription maintenance (${maintenanceCron}), ` +
+      `Scheduled price rollup (${rollupCron}), notification retry (${retryCron}), subscription maintenance (${maintenanceCron}), ` +
         `competitor detection (${detectionCron}), MAP sweep (${mapCron}), ` +
         `launch detection (${launchCron}), weekly reports (${reportsCron}) ` +
         `and Arabic titles (${translationCron})`,

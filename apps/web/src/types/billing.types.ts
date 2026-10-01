@@ -62,12 +62,68 @@ export interface Entitlements {
   provider: string | null;
   checkoutEnabled: boolean;
   manualPaymentsEnabled: boolean;
+  /** Online gateways this user can pay with now ("paymob", "mock"). */
+  onlineProviders: OnlineProvider[];
 }
 
 export interface PlansResponse {
   plans: Plan[];
   checkoutEnabled: boolean;
   manualPaymentsEnabled: boolean;
+  onlineProviders: OnlineProvider[];
+}
+
+export type OnlineProvider = 'paymob' | 'mock';
+export type InvoiceStatus = 'PENDING' | 'PAID' | 'FAILED' | 'CANCELED' | 'REFUNDED';
+
+/** One row of /account/invoices: an online invoice or a wallet/InstaPay order. */
+export interface InvoiceRow {
+  id: string;
+  kind: 'online' | 'manual';
+  provider: string;
+  planKey: string;
+  planName: string;
+  amountMinor: number;
+  currency: string;
+  status: InvoiceStatus;
+  createdAt: string;
+  paidAt: string | null;
+  reference: string | null;
+}
+
+export interface InvoiceDetail {
+  id: string;
+  provider: string;
+  planKey: string;
+  planName: string;
+  amountMinor: number;
+  currency: string;
+  status: InvoiceStatus;
+  failureReason: string | null;
+  paidAt: string | null;
+  createdAt: string;
+}
+
+/** /billing/admin/plans: a plan with its admin-only fields. */
+export interface AdminPlan extends Plan {
+  isActive: boolean;
+  isPublic: boolean;
+  sortOrder: number;
+  stripePriceId: string | null;
+  updatedAt: string;
+}
+
+export type AdminPlanPatch = Partial<
+  Pick<AdminPlan, 'name' | 'description' | 'priceMinor' | 'intervalDays' | 'trialDays' | 'sortOrder' | 'isActive' | 'isPublic' | 'limits'>
+>;
+
+export interface FlagState {
+  key: string;
+  enabled: boolean;
+  source: 'database' | 'environment' | 'default';
+  description: string;
+  defaultOn: boolean;
+  updatedAt: string | null;
 }
 
 export type ManualPaymentStatus = 'AWAITING_PAYMENT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED';

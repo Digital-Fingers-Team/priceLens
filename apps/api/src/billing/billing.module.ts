@@ -8,6 +8,12 @@ import { PlansService } from './plans.service';
 import { StripeService } from './stripe.service';
 import { StripeWebhookController } from './stripe-webhook.controller';
 import { SubscriptionsService } from './subscriptions.service';
+import { InvoicesController } from './invoices.controller';
+import { InvoicesService } from './invoices.service';
+import { RenewalRemindersService } from './renewal-reminders.service';
+import { PaymobProvider } from './payments/paymob.provider';
+import { MockPaymentProvider } from './payments/mock.provider';
+import { PAYMENT_PROVIDERS, PaymentProvider } from './payments/payment-provider';
 
 /**
  * @Global because entitlements are consulted from watchlist, prices,
@@ -18,8 +24,25 @@ import { SubscriptionsService } from './subscriptions.service';
 @Global()
 @Module({
   imports: [DatabaseModule],
-  controllers: [BillingController, ManualPaymentsController, StripeWebhookController],
-  providers: [PlansService, SubscriptionsService, EntitlementsService, StripeService, ManualPaymentsService],
-  exports: [PlansService, SubscriptionsService, EntitlementsService, StripeService],
+  controllers: [BillingController, ManualPaymentsController, StripeWebhookController, InvoicesController],
+  providers: [
+    PlansService,
+    SubscriptionsService,
+    EntitlementsService,
+    StripeService,
+    ManualPaymentsService,
+    InvoicesService,
+    RenewalRemindersService,
+    PaymobProvider,
+    MockPaymentProvider,
+    // Every one-payment-per-period gateway. Adding one is a new class here
+    // and a flag in feature-flags.registry.ts.
+    {
+      provide: PAYMENT_PROVIDERS,
+      useFactory: (...providers: PaymentProvider[]) => providers,
+      inject: [PaymobProvider, MockPaymentProvider],
+    },
+  ],
+  exports: [PlansService, SubscriptionsService, EntitlementsService, StripeService, InvoicesService, RenewalRemindersService],
 })
 export class BillingModule {}

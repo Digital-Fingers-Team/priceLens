@@ -30,12 +30,16 @@ import {
   RUN_SUBSCRIPTION_MAINTENANCE_JOB,
   RUN_WEEKLY_REPORTS_JOB,
   RUN_TITLE_TRANSLATION_JOB,
+  RUN_PRICE_ROLLUP_JOB,
   ReconciliationJobData,
   StoreCoverageSweepJobData,
   StoreExpansionJobData,
 } from './ingestion.jobs';
 import { JOB_PRIORITY } from './ingestion-queue.service';
 import { ScrapeSlots } from './scrape-slots';
+
+import { RenewalRemindersService } from '../billing/renewal-reminders.service';
+import { PriceRollupService } from '../prices/price-rollup.service';
 
 @Processor(INGESTION_QUEUE)
 export class IngestionProcessor {
@@ -53,6 +57,8 @@ export class IngestionProcessor {
     private readonly launchDetectionService: LaunchDetectionService,
     private readonly marketReportsService: MarketReportsService,
     private readonly scrapeSlots: ScrapeSlots,
+    private readonly renewalReminders: RenewalRemindersService,
+    private readonly priceRollup: PriceRollupService,
     @Optional() private readonly titleTranslation?: TitleTranslationService,
   ) {}
 
@@ -134,7 +140,14 @@ export class IngestionProcessor {
   @Process(RUN_SUBSCRIPTION_MAINTENANCE_JOB)
   async handleSubscriptionMaintenance() {
     const expired = await this.subscriptionsService.expireLapsedSubscriptions();
-    return { expired };
+    const reminded = await this.renewalReminders.sendDue();
+    return { expired, reminded };
+  }
+
+  /** price_history -> price_daily. Idempotent; re-rolls the last two days. */
+  @Process(RUN_PRICE_ROLLUP_JOB)
+  async handlePriceRollup() {
+    return this.priceRollup.run();
   }
 
   @Process(RUN_PRICE_ALERTS_JOB)

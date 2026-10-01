@@ -81,6 +81,43 @@ export class PlansService implements OnModuleInit {
     return plans.map((plan) => this.toPublic(plan));
   }
 
+  /** Everything the admin plan editor shows, inactive and hidden plans included. */
+  async adminList() {
+    const plans = await this.prisma.plan.findMany({ orderBy: { sortOrder: 'asc' } });
+    return plans.map((plan) => ({
+      ...this.toPublic(plan),
+      isActive: plan.isActive,
+      isPublic: plan.isPublic,
+      sortOrder: plan.sortOrder,
+      stripePriceId: plan.stripePriceId,
+      updatedAt: plan.updatedAt.toISOString(),
+    }));
+  }
+
+  /**
+   * Admin edit. Limits go through parsePlanLimits, so a malformed edit can
+   * only ever make a plan *less* generous (unknown keys and bad values fall
+   * back to the free tier), never hand out the paid product by accident.
+   * Running subscriptions see the change within the entitlements cache TTL.
+   */
+  async adminUpdate(key: string, patch: AdminPlanPatch): Promise<Plan> {
+    await this.findByKey(key);
+    const data: Prisma.PlanUpdateInput = {};
+    if (patch.name !== undefined) data.name = patch.name;
+    if (patch.description !== undefined) data.description = patch.description;
+    if (patch.priceMinor !== undefined) data.priceMinor = patch.priceMinor;
+    if (patch.intervalDays !== undefined) data.intervalDays = patch.intervalDays;
+    if (patch.trialDays !== undefined) data.trialDays = patch.trialDays;
+    if (patch.sortOrder !== undefined) data.sortOrder = patch.sortOrder;
+    if (patch.isActive !== undefined) data.isActive = patch.isActive;
+    if (patch.isPublic !== undefined) data.isPublic = patch.isPublic;
+    if (patch.limits !== undefined) data.limits = parsePlanLimits(patch.limits) as unknown as Prisma.InputJsonValue;
+
+    const plan = await this.prisma.plan.update({ where: { key }, data });
+    this.logger.log(`Plan ${key} edited: ${Object.keys(data).join(', ')}`);
+    return plan;
+  }
+
   async findByKey(key: string): Promise<Plan> {
     const plan = await this.prisma.plan.findUnique({ where: { key } });
     if (!plan) throw new NotFoundException(`Plan "${key}" not found`);
@@ -116,4 +153,16 @@ export class PlansService implements OnModuleInit {
       limits: parsePlanLimits(plan.limits),
     };
   }
+}
+
+export interface AdminPlanPatch {
+  name?: string;
+  description?: string | null;
+  priceMinor?: number;
+  intervalDays?: number;
+  trialDays?: number;
+  sortOrder?: number;
+  isActive?: boolean;
+  isPublic?: boolean;
+  limits?: unknown;
 }

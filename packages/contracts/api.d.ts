@@ -23,6 +23,7 @@ export type ApiErrorCode =
   // Domain
   | 'UPGRADE_REQUIRED'
   | 'QUOTA_EXCEEDED'
+  | 'FEATURE_DISABLED'
   | 'CORS_ORIGIN_NOT_ALLOWED'
   | 'CSRF_TOKEN_INVALID'
   // Database (Prisma)

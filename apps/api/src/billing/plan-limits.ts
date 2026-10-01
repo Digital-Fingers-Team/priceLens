@@ -22,12 +22,36 @@ export const FEATURES = {
   EXTENDED_HISTORY: 'extended_history',
   AD_FREE: 'ad_free',
 
+  // ── Buyer Pro (v2 plan, phases 2-5) ───────────────────────────────────
+  /** Alerts delivered the moment a price moves, over Telegram / web push. */
+  REALTIME_ALERTS: 'realtime_alerts',
+  /** Landed cost broken down: shipping, customs, VAT, FX. */
+  LANDED_COST_DETAIL: 'landed_cost_detail',
+  INSTALLMENT_COMPARISON: 'installment_comparison',
+  CARD_OFFERS: 'card_offers',
+  VERIFIED_COUPONS: 'verified_coupons',
+  REVIEW_SUMMARIES: 'review_summaries',
+  CART_WATCH: 'cart_watch',
+  IMAGE_SEARCH: 'image_search',
+  ADVISOR: 'advisor',
+
   // ── B2B (stages 3-5) ──────────────────────────────────────────────────
   SELLER_WORKSPACE: 'seller_workspace',
   COMPETITOR_MONITORING: 'competitor_monitoring',
   COMPETITOR_ALERTS: 'competitor_alerts',
   MARGIN_PRICING: 'margin_pricing',
   MARKET_POSITIONING: 'market_positioning',
+  PROFIT_CALCULATOR: 'profit_calculator',
+  BEST_PLATFORM: 'best_platform',
+  REPRICER_SUGGEST: 'repricer_suggest',
+  RANK_TRACKING: 'rank_tracking',
+
+  // ── Seller Plus (v2 plan, phases 6-7) ─────────────────────────────────
+  /** Applies repricer suggestions through an official seller API. */
+  REPRICER_AUTO: 'repricer_auto',
+  IMPORT_FINDER: 'import_finder',
+  TREND_RADAR: 'trend_radar',
+  FX_TRACKING: 'fx_tracking',
 
   // ── Enterprise (stages 7-14) ──────────────────────────────────────────
   MAP_MONITORING: 'map_monitoring',
@@ -36,6 +60,7 @@ export const FEATURES = {
   MARKET_REPORTS: 'market_reports',
   API_ACCESS: 'api_access',
   TEAM_SEATS: 'team_seats',
+  PROCUREMENT_QUOTES: 'procurement_quotes',
 } as const;
 
 export type FeatureKey = (typeof FEATURES)[keyof typeof FEATURES];
@@ -87,6 +112,15 @@ const PLUS_FEATURES: FeatureKey[] = [
   FEATURES.DEAL_HUNTER,
   FEATURES.EXTENDED_HISTORY,
   FEATURES.AD_FREE,
+  FEATURES.REALTIME_ALERTS,
+  FEATURES.LANDED_COST_DETAIL,
+  FEATURES.INSTALLMENT_COMPARISON,
+  FEATURES.CARD_OFFERS,
+  FEATURES.VERIFIED_COUPONS,
+  FEATURES.REVIEW_SUMMARIES,
+  FEATURES.CART_WATCH,
+  FEATURES.IMAGE_SEARCH,
+  FEATURES.ADVISOR,
 ];
 
 const SELLER_FEATURES: FeatureKey[] = [
@@ -96,16 +130,29 @@ const SELLER_FEATURES: FeatureKey[] = [
   FEATURES.COMPETITOR_ALERTS,
   FEATURES.MARGIN_PRICING,
   FEATURES.MARKET_POSITIONING,
+  FEATURES.PROFIT_CALCULATOR,
+  FEATURES.BEST_PLATFORM,
+  FEATURES.REPRICER_SUGGEST,
+  FEATURES.RANK_TRACKING,
+];
+
+const SELLER_PLUS_FEATURES: FeatureKey[] = [
+  ...SELLER_FEATURES,
+  FEATURES.REPRICER_AUTO,
+  FEATURES.IMPORT_FINDER,
+  FEATURES.TREND_RADAR,
+  FEATURES.FX_TRACKING,
 ];
 
 const ENTERPRISE_FEATURES: FeatureKey[] = [
-  ...SELLER_FEATURES,
+  ...SELLER_PLUS_FEATURES,
   FEATURES.MAP_MONITORING,
   FEATURES.DISTRIBUTION_MONITORING,
   FEATURES.LAUNCH_DETECTION,
   FEATURES.MARKET_REPORTS,
   FEATURES.API_ACCESS,
   FEATURES.TEAM_SEATS,
+  FEATURES.PROCUREMENT_QUOTES,
 ];
 
 /**
@@ -148,6 +195,14 @@ export interface PlanBlueprint {
   isPublic: boolean;
   limits: PlanLimits;
 }
+
+/** Exported for the data migration test: what each tier's plan row must hold. */
+export const PLAN_FEATURE_SETS = {
+  plus: PLUS_FEATURES,
+  seller: SELLER_FEATURES,
+  sellerPlus: SELLER_PLUS_FEATURES,
+  enterprise: ENTERPRISE_FEATURES,
+} as const;
 
 export const DEFAULT_PLAN_BLUEPRINTS: PlanBlueprint[] = [
   {
@@ -218,6 +273,33 @@ export const DEFAULT_PLAN_BLUEPRINTS: PlanBlueprint[] = [
     },
   },
   {
+    key: 'seller_plus_monthly',
+    tier: PlanTier.SELLER,
+    name: 'Seller Plus',
+    description: 'For serious sellers: more SKUs, auto-repricing where a platform allows it, import opportunities and trend radar.',
+    priceMinor: 249_900, // 2,499.00 EGP — placeholder, set from the admin panel
+    currency: 'EGP',
+    intervalDays: 30,
+    sortOrder: 3,
+    trialDays: 0,
+    isPublic: true,
+    limits: {
+      trackedProducts: null,
+      activeAlerts: null,
+      priceHistoryDays: null,
+      alertTypes: ALL_ALERT_TYPES,
+      notificationChannels: [
+        NotificationChannelType.IN_APP,
+        NotificationChannelType.EMAIL,
+        NotificationChannelType.TELEGRAM,
+      ],
+      features: SELLER_PLUS_FEATURES,
+      monitoredSkus: 2_000,
+      apiCallsPerDay: 0,
+      seats: 5,
+    },
+  },
+  {
     key: 'enterprise_monthly',
     tier: PlanTier.ENTERPRISE,
     name: 'Enterprise',
@@ -225,7 +307,7 @@ export const DEFAULT_PLAN_BLUEPRINTS: PlanBlueprint[] = [
     priceMinor: 1_500_000, // 15,000.00 EGP — contract pricing; a starting point
     currency: 'EGP',
     intervalDays: 30,
-    sortOrder: 3,
+    sortOrder: 4,
     trialDays: 0,
     // Enterprise is sold, not self-served: it is not offered through Checkout.
     isPublic: false,

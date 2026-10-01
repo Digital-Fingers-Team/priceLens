@@ -138,6 +138,7 @@ model User {
   notificationChannels NotificationChannel[]
   notifications        Notification[]
   orgMemberships       OrganizationMember[]
+  invoices             Invoice[]
 
   @@index([email])
   @@index([username])
@@ -381,6 +382,24 @@ model PriceHistory {
   @@index([sourceListingId, recordedAt, priceUsd], map: "price_history_listing_recorded_price_idx")
   @@index([recordedAt], map: "price_history_recorded_at_brin_idx", type: Brin)
   @@map("price_history")
+}
+
+/// One row per listing per day: the daily rollup of price_history, kept
+/// forever so long charts stay cheap even if raw rows are ever pruned.
+/// Written by the nightly rollup job. Keyed by listing only: merges move
+/// listings between products, so the product is read through source_listings.
+model PriceDaily {
+  sourceListingId String   @map("source_listing_id")
+  day             DateTime @db.Date
+  minPrice        Decimal  @map("min_price") @db.Decimal(12, 2)
+  maxPrice        Decimal  @map("max_price") @db.Decimal(12, 2)
+  avgPrice        Decimal  @map("avg_price") @db.Decimal(12, 2)
+  closePrice      Decimal  @map("close_price") @db.Decimal(12, 2)
+  inStock         Boolean  @map("in_stock")
+
+  @@id([sourceListingId, day])
+  @@index([day])
+  @@map("price_daily")
 }
 
 // ─── Reconciliation merges ───────────────────────────────────────────────────
@@ -723,6 +742,7 @@ model Plan {
 
   subscriptions  Subscription[]
   manualPayments ManualPayment[]
+  invoices       Invoice[]
 
   @@index([tier, isActive])
   @@map("plans")
@@ -753,6 +773,10 @@ model Subscription {
   // how an enterprise deal gets a custom product cap without inventing a Plan
   // row per customer.
   limitOverrides Json @default("{}") @map("limit_overrides")
+
+  // A plan paid once per period (wallet, Paymob) does not renew by itself;
+  // the maintenance job reminds the user once before it ends.
+  renewalReminderSentAt DateTime? @map("renewal_reminder_sent_at")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -825,6 +849,62 @@ model ManualPayment {
   @@index([userId, status])
   @@index([status, submittedAt])
   @@map("manual_payments")
+}
+
+enum InvoiceStatus {
+  PENDING // checkout started, no money yet
+  PAID
+  FAILED
+  CANCELED
+  REFUNDED
+}
+
+/// One payment attempt through an online PaymentProvider (Paymob, Stripe,
+/// the dev mock). Wallet/InstaPay transfers stay in manual_payments; the
+/// invoices page shows both.
+model Invoice {
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  planId String @map("plan_id")
+
+  provider    String  @db.VarChar(32)
+  // The provider's id for this payment (Paymob order id, Stripe invoice id).
+  // Null until the provider has answered.
+  providerRef String? @map("provider_ref") @db.VarChar(128)
+
+  amountMinor Int           @map("amount_minor")
+  currency    String        @db.VarChar(3)
+  status      InvoiceStatus @default(PENDING)
+  // Length of the period this payment buys, copied from the plan at checkout
+  // so a later plan edit cannot change what was paid for.
+  periodDays  Int           @map("period_days")
+
+  paidAt        DateTime? @map("paid_at")
+  failureReason String?   @map("failure_reason") @db.VarChar(255)
+  metadata      Json      @default("{}")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan Plan @relation(fields: [planId], references: [id])
+
+  @@unique([provider, providerRef])
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@map("invoices")
+}
+
+/// A feature switch the admin can flip without a deploy. FEATURE_<KEY> in the
+/// environment is the default until a row exists; a row always wins.
+model FeatureFlag {
+  key         String   @id @db.VarChar(64)
+  enabled     Boolean
+  description String?  @db.VarChar(255)
+  updatedById String?  @map("updated_by_id")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("feature_flags")
 }
 
 // ─── Notifications ───────────────────────────────────────────────────────────
@@ -956,6 +1036,7 @@ model Organization {
   discoveries ProductDiscovery[]
   reports     MarketReport[]
   apiKeys     ApiKey[]
+  invites     OrganizationInvite[]
 
   @@index([platformId])
   @@map("organizations")
@@ -975,6 +1056,28 @@ model OrganizationMember {
   @@unique([orgId, userId])
   @@index([userId])
   @@map("organization_members")
+}
+
+/// An invitation to a workspace for someone who may not have an account yet.
+/// Only the SHA-256 of the token is stored; the emailed link carries the token.
+model OrganizationInvite {
+  id          String    @id @default(uuid())
+  orgId       String    @map("org_id")
+  email       String    @db.VarChar(255)
+  role        OrgRole   @default(MEMBER)
+  tokenHash   String    @unique @map("token_hash") @db.VarChar(64)
+  invitedById String    @map("invited_by_id")
+  expiresAt   DateTime  @map("expires_at")
+  acceptedAt  DateTime? @map("accepted_at")
+  acceptedBy  String?   @map("accepted_by")
+  revokedAt   DateTime? @map("revoked_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([email])
+  @@map("organization_invites")
 }
 
 // A product the seller actually sells, mapped onto our canonical catalogue.

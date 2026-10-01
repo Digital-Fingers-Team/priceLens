@@ -14,6 +14,7 @@ import { useAuthStore } from '@/lib/store/auth.store';
 import { cn } from '@/lib/utils/cn';
 import { loginHref } from '@/lib/utils/next-path';
 import type { Plan } from '@/types/billing.types';
+import { planWords } from '@/lib/billing/plan-words';
 
 type Fmt = ReturnType<typeof useI18n>;
 
@@ -77,7 +78,7 @@ export default function PricingPage() {
               const isCurrent = billing?.planKey === plan.key;
               const featured = plan.tier === 'PLUS';
               // Worded by the dictionary per tier; the API's English for anything else.
-              const words = t.pricing.plans[plan.tier] ?? { name: plan.name, description: plan.description };
+              const words = planWords(t, plan);
               return (
                 <div
                   key={plan.id}
@@ -144,8 +145,8 @@ export default function PricingPage() {
                             router.push(loginHref('/pricing'));
                             return;
                           }
-                          // No card checkout: pay by wallet / InstaPay instead.
-                          if (!data.checkoutEnabled && data.manualPaymentsEnabled) {
+                          // No Stripe: pay online (Paymob) or by wallet / InstaPay on the pay page.
+                          if (!data.checkoutEnabled && (data.manualPaymentsEnabled || data.onlineProviders?.length)) {
                             router.push(`/account/pay/${plan.key}`);
                             return;
                           }
@@ -160,7 +161,7 @@ export default function PricingPage() {
               );
             })}
           </div>
-          {!data.checkoutEnabled && !data.manualPaymentsEnabled && <p className="text-center text-xs text-muted">{t.pricing.checkoutDisabled}</p>}
+          {!data.checkoutEnabled && !data.manualPaymentsEnabled && !data.onlineProviders?.length && <p className="text-center text-xs text-muted">{t.pricing.checkoutDisabled}</p>}
         </>
       )}
     </div>

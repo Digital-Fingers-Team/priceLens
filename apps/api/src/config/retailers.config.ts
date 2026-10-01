@@ -68,6 +68,8 @@ export default registerAs('retailers', () => ({
   launchDetectionCron: process.env.LAUNCH_DETECTION_CRON ?? '20 */6 * * *',
   // Monday morning, covering the week that just ended.
   weeklyReportsCron: process.env.WEEKLY_REPORTS_CRON ?? '0 6 * * 1',
+  // price_history -> price_daily rollup (PriceRollupService).
+  priceRollupCron: process.env.PRICE_ROLLUP_CRON ?? '35 */6 * * *',
   storeCoverageSweepBatchSize: parseInt(process.env.STORE_COVERAGE_SWEEP_BATCH_SIZE ?? '100', 10),
   // How long to leave a product alone after the sweep has tried to expand it.
   // Without this, any product that cannot reach the target -- because no other

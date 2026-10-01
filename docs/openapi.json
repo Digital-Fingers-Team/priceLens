@@ -1,6 +1,120 @@
 {
   "openapi": "3.0.0",
   "paths": {
+    "/api/v1/flags": {
+      "get": {
+        "operationId": "FeatureFlagsController_snapshot",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Effective flags for the web app. Public: a switched-off feature is hidden\nfor signed-out visitors too. Says nothing a visitor could not learn by\nclicking around.",
+        "tags": [
+          "feature-flags"
+        ]
+      }
+    },
+    "/api/v1/admin/flags": {
+      "get": {
+        "operationId": "FeatureFlagsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "feature-flags"
+        ]
+      }
+    },
+    "/api/v1/admin/flags/{key}": {
+      "put": {
+        "operationId": "FeatureFlagsController_set",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetFeatureFlagDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "feature-flags"
+        ]
+      },
+      "delete": {
+        "operationId": "FeatureFlagsController_reset",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "feature-flags"
+        ]
+      }
+    },
     "/api/v1/auth/register": {
       "post": {
         "operationId": "AuthController_register",
@@ -1170,9 +1284,9 @@
             "schema": {
               "type": "string",
               "enum": [
-                "UNDERCUT",
                 "PRICE_INCREASE",
                 "PRICE_DROP",
+                "UNDERCUT",
                 "OUT_OF_STOCK",
                 "BACK_IN_STOCK",
                 "NEW_ENTRANT",
@@ -1360,6 +1474,138 @@
         ],
         "responses": {
           "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      }
+    },
+    "/api/v1/seller/workspaces/{orgId}/invites": {
+      "get": {
+        "operationId": "InvitesController_list",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      },
+      "post": {
+        "operationId": "InvitesController_create",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInviteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      }
+    },
+    "/api/v1/seller/workspaces/{orgId}/invites/{inviteId}": {
+      "delete": {
+        "operationId": "InvitesController_revoke",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "inviteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      }
+    },
+    "/api/v1/invites/{token}": {
+      "get": {
+        "operationId": "InvitesController_preview",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "The invite page, before sign-in: which workspace, for which email.",
+        "tags": [
+          "seller"
+        ]
+      }
+    },
+    "/api/v1/invites/{token}/accept": {
+      "post": {
+        "operationId": "InvitesController_accept",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
             "description": ""
           }
         },
@@ -2104,14 +2350,44 @@
         "parameters": [],
         "responses": {
           "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/billing/admin/plans/{key}": {
+      "put": {
+        "operationId": "BillingController_adminUpdatePlan",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminUpdatePlanDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object"
-                  }
+                  "type": "object"
                 }
               }
             }
@@ -2229,9 +2505,9 @@
               "type": "string",
               "enum": [
                 "REJECTED",
+                "CANCELLED",
                 "AWAITING_PAYMENT",
                 "SUBMITTED",
-                "CANCELLED",
                 "APPROVED"
               ]
             }
@@ -2298,6 +2574,123 @@
             "description": ""
           }
         },
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/billing/providers": {
+      "get": {
+        "operationId": "InvoicesController_providers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Online gateways this user can pay with right now.",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/billing/invoices/checkout": {
+      "post": {
+        "operationId": "InvoicesController_checkout",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartInvoiceCheckoutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/billing/invoices": {
+      "get": {
+        "operationId": "InvoicesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/billing/invoices/{id}": {
+      "get": {
+        "operationId": "InvoicesController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/billing/invoices/{id}/test-pay": {
+      "post": {
+        "operationId": "InvoicesController_testPay",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestPayDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The test double's \"Pay\" / \"Decline\" buttons. The event is signed and then\nparsed back through the provider, so this exercises the same verify +\nsettle path a real gateway callback takes.",
         "tags": [
           "billing"
         ]
@@ -3012,6 +3405,17 @@
       }
     },
     "schemas": {
+      "SetFeatureFlagDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ]
+      },
       "RegisterDto": {
         "type": "object",
         "properties": {
@@ -3234,8 +3638,8 @@
             "type": "string",
             "enum": [
               "ADMIN",
-              "MEMBER",
-              "OWNER"
+              "OWNER",
+              "MEMBER"
             ]
           }
         },
@@ -3309,9 +3713,9 @@
           "type": {
             "type": "string",
             "enum": [
-              "UNDERCUT",
               "PRICE_INCREASE",
               "PRICE_DROP",
+              "UNDERCUT",
               "OUT_OF_STOCK",
               "BACK_IN_STOCK",
               "NEW_ENTRANT",
@@ -3341,6 +3745,28 @@
         },
         "required": [
           "type"
+        ]
+      },
+      "CreateInviteDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 255,
+            "format": "email"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "OWNER",
+              "MEMBER"
+            ]
+          }
+        },
+        "required": [
+          "email",
+          "role"
         ]
       },
       "UpsertBrandWatchDto": {
@@ -3452,6 +3878,47 @@
           "planKey"
         ]
       },
+      "AdminUpdatePlanDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "priceMinor": {
+            "type": "number",
+            "description": "Piastres. 12900 = 129.00 EGP.",
+            "minimum": 0
+          },
+          "intervalDays": {
+            "type": "number",
+            "minimum": 0
+          },
+          "trialDays": {
+            "type": "number",
+            "minimum": 0
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "isPublic": {
+            "type": "boolean"
+          },
+          "limits": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A PlanLimits object; validated by parsePlanLimits."
+          }
+        }
+      },
       "StartManualPaymentDto": {
         "type": "object",
         "properties": {
@@ -3501,6 +3968,42 @@
             "maxLength": 255
           }
         }
+      },
+      "StartInvoiceCheckoutDto": {
+        "type": "object",
+        "properties": {
+          "planKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "paymob",
+              "mock"
+            ]
+          }
+        },
+        "required": [
+          "planKey",
+          "provider"
+        ]
+      },
+      "TestPayDto": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "PAID",
+              "FAILED"
+            ]
+          }
+        },
+        "required": [
+          "outcome"
+        ]
       },
       "UpsertChannelDto": {
         "type": "object",

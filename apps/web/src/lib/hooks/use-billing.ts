@@ -7,13 +7,18 @@ import { useAuthStore } from '@/lib/store/auth.store';
 import { useUiStore } from '@/lib/store/ui.store';
 import { useI18n } from '@/lib/i18n/provider';
 import { useApiErrorMessage } from '@/lib/hooks/use-api-error';
-import type { Entitlements, ManualPaymentMethod, ManualPaymentStatus } from '@/types/billing.types';
+import type { AdminPlanPatch, Entitlements, ManualPaymentMethod, ManualPaymentStatus, OnlineProvider } from '@/types/billing.types';
 
 const billingKeys = {
   plans: ['billing', 'plans'] as const,
   me: ['billing', 'me'] as const,
   payments: ['billing', 'payments'] as const,
   adminPayments: (status?: ManualPaymentStatus) => ['billing', 'admin-payments', status ?? 'all'] as const,
+  invoices: ['billing', 'invoices'] as const,
+  invoice: (id: string) => ['billing', 'invoice', id] as const,
+  adminPlans: ['billing', 'admin-plans'] as const,
+  flags: ['flags'] as const,
+  adminFlags: ['admin', 'flags'] as const,
 };
 
 export function usePlans() {
@@ -209,5 +214,118 @@ export function useReviewPayment() {
       addToast(`${payment.code} ${input.decision === 'approve' ? 'approved' : 'rejected'}`, 'success');
     },
     onError: (err: AxiosError) => addToast(apiError(err, 'Could not update the payment'), 'error'),
+  });
+}
+
+// ─── Online invoices (Paymob, test double) ──────────────────────────────
+
+export function useOnlineCheckout() {
+  const addToast = useUiStore((s) => s.addToast);
+  const { t } = useI18n();
+  const apiError = useApiErrorMessage();
+  return useMutation({
+    mutationFn: (input: { planKey: string; provider: OnlineProvider }) =>
+      billingApi.startOnlineCheckout(input.planKey, input.provider),
+    onSuccess: (data) => {
+      // Full navigation: Paymob's page is off-origin.
+      window.location.href = data.redirectUrl;
+    },
+    onError: (err: AxiosError) => addToast(apiError(err, t.toast.checkoutFailed), 'error'),
+  });
+}
+
+export function useInvoices() {
+  const isAuthenticated = useAuthStore((s) => Boolean(s.user));
+  return useQuery({ queryKey: billingKeys.invoices, queryFn: () => billingApi.invoices(), enabled: isAuthenticated });
+}
+
+/** Polls a pending invoice: the gateway's callback, not the redirect, settles it. */
+export function useInvoice(id: string | null) {
+  return useQuery({
+    queryKey: billingKeys.invoice(id ?? ''),
+    queryFn: () => billingApi.invoice(id!),
+    enabled: Boolean(id),
+    refetchInterval: (query) => (query.state.data?.status === 'PENDING' ? 3000 : false),
+  });
+}
+
+export function useTestPay() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; outcome: 'PAID' | 'FAILED' }) => billingApi.testPay(input.id, input.outcome),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: billingKeys.me });
+      queryClient.invalidateQueries({ queryKey: ['billing', 'invoice'] });
+      queryClient.invalidateQueries({ queryKey: billingKeys.invoices });
+    },
+  });
+}
+
+// ─── Feature flags ──────────────────────────────────────────────────────
+
+/**
+ * Which features exist right now. A switched-off feature is hidden; a
+ * switched-on one the plan lacks is shown locked with an upgrade prompt.
+ * While loading, everything reads as off, so nothing flashes in and out.
+ */
+export function useFlags() {
+  const { data, isLoading } = useQuery({
+    queryKey: billingKeys.flags,
+    queryFn: () => billingApi.flags(),
+    staleTime: 60 * 1000,
+  });
+  return { isOn: (key: string) => Boolean(data?.[key]), isLoading };
+}
+
+/**
+ * One feature's state for the UI: 'hidden' (switched off), 'locked' (on, not
+ * in the plan) or 'available'. The server enforces the same rule.
+ */
+export function useEntitlement(feature: string): 'hidden' | 'locked' | 'available' | 'loading' {
+  const flags = useFlags();
+  const { hasFeature, isLoading } = useEntitlements();
+  if (flags.isLoading) return 'loading';
+  if (!flags.isOn(feature)) return 'hidden';
+  if (isLoading) return 'loading';
+  return hasFeature(feature) ? 'available' : 'locked';
+}
+
+// ─── Admin: plans and flags ─────────────────────────────────────────────
+
+export function useAdminPlans() {
+  return useQuery({ queryKey: billingKeys.adminPlans, queryFn: () => billingApi.adminPlans() });
+}
+
+export function useUpdatePlan() {
+  const queryClient = useQueryClient();
+  const addToast = useUiStore((s) => s.addToast);
+  const apiError = useApiErrorMessage();
+  return useMutation({
+    mutationFn: (input: { key: string; patch: AdminPlanPatch }) => billingApi.updatePlan(input.key, input.patch),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: billingKeys.adminPlans });
+      queryClient.invalidateQueries({ queryKey: billingKeys.plans });
+      addToast('Plan saved', 'success');
+    },
+    onError: (err: AxiosError) => addToast(apiError(err), 'error'),
+  });
+}
+
+export function useAdminFlags() {
+  return useQuery({ queryKey: billingKeys.adminFlags, queryFn: () => billingApi.adminFlags() });
+}
+
+export function useSetFlag() {
+  const queryClient = useQueryClient();
+  const addToast = useUiStore((s) => s.addToast);
+  const apiError = useApiErrorMessage();
+  return useMutation({
+    mutationFn: (input: { key: string; enabled: boolean | null }) =>
+      input.enabled === null ? billingApi.resetFlag(input.key) : billingApi.setFlag(input.key, input.enabled),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: billingKeys.adminFlags });
+      queryClient.invalidateQueries({ queryKey: billingKeys.flags });
+    },
+    onError: (err: AxiosError) => addToast(apiError(err), 'error'),
   });
 }

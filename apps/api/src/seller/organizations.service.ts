@@ -152,29 +152,17 @@ export class OrganizationsService {
       throw new BadRequestException('A workspace has exactly one owner; transfer ownership instead');
     }
 
-    const owner = await this.prisma.organizationMember.findFirst({
-      where: { orgId, role: OrgRole.OWNER },
-      select: { userId: true },
-    });
-    const { limits } = await this.entitlements.getEntitlements(owner?.userId ?? actorId);
-
-    const seatsUsed = await this.prisma.organizationMember.count({ where: { orgId } });
-    if (seatsUsed >= limits.seats) {
-      throw new UpgradeRequiredException(
-        `Your plan includes ${limits.seats} seat(s) and all are in use.`,
-        { limit: limits.seats, current: seatsUsed },
-      );
-    }
+    await this.assertSeatAvailable(orgId, actorId);
 
     const user = await this.prisma.user.findUnique({
       where: { email: email.toLowerCase().trim() },
       select: { id: true },
     });
     if (!user) {
-      // Deliberately explicit: an invite flow for non-users is not built yet,
-      // and silently doing nothing would be worse than saying so.
+      // People without an account are invited by link (InvitesService);
+      // this endpoint only adds existing users.
       throw new BadRequestException(
-        'That person does not have a PriceLens account yet. Ask them to sign up first.',
+        'That person does not have a PriceLens account yet. Send them an invitation link instead.',
       );
     }
 
@@ -196,6 +184,39 @@ export class OrganizationsService {
 
     await this.entitlements.invalidate(user.id);
     return { id: member.id, role: member.role };
+  }
+
+  /**
+   * Seat count comes from the owner's plan, and an open invitation holds a
+   * seat: otherwise inviting ten people on a three-seat plan would succeed
+   * and fail later, one acceptance at a time.
+   */
+  async assertSeatAvailable(orgId: string, actorId: string, options: { ignoreInviteId?: string } = {}): Promise<void> {
+    const owner = await this.prisma.organizationMember.findFirst({
+      where: { orgId, role: OrgRole.OWNER },
+      select: { userId: true },
+    });
+    const { limits } = await this.entitlements.getEntitlements(owner?.userId ?? actorId);
+
+    const [members, openInvites] = await Promise.all([
+      this.prisma.organizationMember.count({ where: { orgId } }),
+      this.prisma.organizationInvite.count({
+        where: {
+          orgId,
+          acceptedAt: null,
+          revokedAt: null,
+          expiresAt: { gt: new Date() },
+          ...(options.ignoreInviteId ? { id: { not: options.ignoreInviteId } } : {}),
+        },
+      }),
+    ]);
+    const seatsUsed = members + openInvites;
+    if (seatsUsed >= limits.seats) {
+      throw new UpgradeRequiredException(
+        `Your plan includes ${limits.seats} seat(s) and all are in use.`,
+        { limit: limits.seats, current: seatsUsed },
+      );
+    }
   }
 
   async removeMember(orgId: string, actorId: string, memberId: string) {

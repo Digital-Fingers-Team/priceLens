@@ -97,6 +97,8 @@ export class SubscriptionsService {
             trialEndsAt: options.trialEndsAt ?? previous.trialEndsAt,
             providerCustomerId: options.providerCustomerId ?? previous.providerCustomerId,
             providerSubscriptionId: options.providerSubscriptionId ?? previous.providerSubscriptionId,
+            // A new period earns a new "your plan ends soon" reminder.
+            renewalReminderSentAt: null,
             ...(options.limitOverrides !== undefined ? { limitOverrides: options.limitOverrides } : {}),
           },
         });

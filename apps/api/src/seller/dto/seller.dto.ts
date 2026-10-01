@@ -1,5 +1,6 @@
 import {
   IsBoolean,
+  IsEmail,
   IsEnum,
   IsInt,
   IsNumber,
@@ -9,6 +10,7 @@ import {
   Length,
   Max,
   Min,
+  MaxLength,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CompetitorEventType, OrgRole, OrgType } from '@prisma/client';
@@ -25,6 +27,15 @@ export class CreateOrganizationDto {
   @IsOptional()
   @IsUUID()
   platformId?: string;
+}
+
+export class CreateInviteDto {
+  @IsEmail()
+  @MaxLength(255)
+  email!: string;
+
+  @IsEnum(OrgRole)
+  role!: OrgRole;
 }
 
 export class AddMemberDto {

@@ -5,17 +5,20 @@ import { CompetitorEventsService } from './competitor-events.service';
 import { OrganizationsService } from './organizations.service';
 import { SellerController } from './seller.controller';
 import { SellerProductsService } from './seller-products.service';
+import { InvitesService } from './invites.service';
+import { InvitesController } from './invites.controller';
 
 @Module({
   // No IntelligenceModule: this module only uses the pure helpers in
   // price-statistics.ts, which are plain functions rather than providers.
   imports: [DatabaseModule],
-  controllers: [SellerController],
+  controllers: [SellerController, InvitesController],
   providers: [
     OrganizationsService,
     SellerProductsService,
     CompetitorEventsService,
     CompetitorDetectionService,
+    InvitesService,
   ],
   exports: [CompetitorDetectionService, OrganizationsService],
 })

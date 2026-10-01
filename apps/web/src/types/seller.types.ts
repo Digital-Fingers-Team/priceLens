@@ -127,3 +127,35 @@ export interface MatchSuggestion {
   slug: string;
   confidence: number;
 }
+
+export interface WorkspaceMember {
+  id: string;
+  role: OrgRole;
+  joinedAt: string;
+  user: { id: string; email: string; username: string; displayName: string | null };
+}
+
+export interface WorkspaceInvite {
+  id: string;
+  email: string;
+  role: OrgRole;
+  expiresAt: string;
+  createdAt: string;
+}
+
+/** The answer to creating an invitation: the link is shown so it can be shared by hand. */
+export interface CreatedInvite {
+  id: string;
+  email: string;
+  role: OrgRole;
+  expiresAt: string;
+  link: string;
+  emailed: boolean;
+}
+
+export interface InvitePreview {
+  workspace: string;
+  role: OrgRole;
+  email: string;
+  expiresAt: string;
+}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Check, CheckCircle2, Clock, Copy, ExternalLink, Landmark, Smartphone, XCircle } from 'lucide-react';
+import { Check, CheckCircle2, Clock, Copy, CreditCard, ExternalLink, Landmark, Smartphone, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { buttonClassName } from '@/components/ui/button-styles';
@@ -10,13 +10,22 @@ import { Card, CardBody } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState, ErrorState } from '@/components/ui/state';
-import { useCancelPayment, useMyPayments, useStartPayment, useSubmitPayment } from '@/lib/hooks/use-billing';
+import {
+  useCancelPayment,
+  useMyBilling,
+  useMyPayments,
+  useOnlineCheckout,
+  usePlans,
+  useStartPayment,
+  useSubmitPayment,
+} from '@/lib/hooks/use-billing';
 import { useApiErrorMessage } from '@/lib/hooks/use-api-error';
 import { Link, useRouter } from '@/lib/i18n/navigation';
 import { useI18n } from '@/lib/i18n/provider';
 import { cn } from '@/lib/utils/cn';
-import type { ManualPayment, ManualPaymentMethod, PaymentDestinations } from '@/types/billing.types';
+import type { ManualPayment, ManualPaymentMethod, OnlineProvider, PaymentDestinations } from '@/types/billing.types';
 import { SignedInGate } from '../../signed-in-gate';
+import { planWords } from '@/lib/billing/plan-words';
 
 /**
  * Wallet / InstaPay checkout: send the money, then enter the transfer number.
@@ -33,6 +42,87 @@ export default function PayPage() {
 }
 
 function PayContent({ planKey }: { planKey: string }) {
+  const { t } = useI18n();
+  const { data: billing, isLoading } = useMyBilling();
+
+  if (isLoading || !billing) {
+    return (
+      <Shell>
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-72 w-full" />
+      </Shell>
+    );
+  }
+
+  const online = billing.onlineProviders ?? [];
+  if (!billing.manualPaymentsEnabled) {
+    return (
+      <Shell>
+        {online.length > 0 ? (
+          <OnlinePay planKey={planKey} providers={online} />
+        ) : (
+          <ErrorState
+            title={t.pricing.checkoutDisabled}
+            action={
+              <Link href="/pricing" className={buttonClassName({ variant: 'secondary' })}>
+                {t.billing.seePlans}
+              </Link>
+            }
+          />
+        )}
+      </Shell>
+    );
+  }
+  return <ManualPayContent planKey={planKey} online={online} />;
+}
+
+/** Card / wallet / Fawry through Paymob, or the test double when it is switched on. */
+function OnlinePay({ planKey, providers }: { planKey: string; providers: OnlineProvider[] }) {
+  const { t, tf, fmt } = useI18n();
+  const { data: plans } = usePlans();
+  const checkout = useOnlineCheckout();
+  const plan = plans?.plans.find((p) => p.key === planKey);
+
+  return (
+    <Card>
+      <CardBody className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          {plan && (
+            <p className="text-sm text-muted">
+              {tf(t.pay.amount, { amount: fmt.number(plan.price), currency: plan.currency, days: plan.intervalDays })}
+            </p>
+          )}
+          <h2 className="flex items-center gap-2 text-base font-semibold text-fg">
+            <CreditCard className="h-4 w-4 text-brand" aria-hidden />
+            {t.pay.onlineTitle}
+          </h2>
+          <p className="text-sm text-muted">{t.pay.onlineLede}</p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          {providers.includes('paymob') && (
+            <Button
+              loading={checkout.isPending && checkout.variables?.provider === 'paymob'}
+              onClick={() => checkout.mutate({ planKey, provider: 'paymob' })}
+            >
+              {t.pay.payPaymob}
+            </Button>
+          )}
+          {providers.includes('mock') && (
+            <Button
+              variant="secondary"
+              loading={checkout.isPending && checkout.variables?.provider === 'mock'}
+              onClick={() => checkout.mutate({ planKey, provider: 'mock' })}
+            >
+              {t.pay.payTest}
+            </Button>
+          )}
+        </div>
+      </CardBody>
+    </Card>
+  );
+}
+
+function ManualPayContent({ planKey, online }: { planKey: string; online: OnlineProvider[] }) {
   const { t } = useI18n();
   const apiError = useApiErrorMessage();
   const start = useStartPayment();
@@ -75,6 +165,12 @@ function PayContent({ planKey }: { planKey: string }) {
   return (
     <Shell>
       <Header payment={payment} />
+      {payment.status === 'AWAITING_PAYMENT' && online.length > 0 && (
+        <>
+          <OnlinePay planKey={planKey} providers={online} />
+          <p className="text-sm text-muted">{t.pay.orManual}</p>
+        </>
+      )}
       {payment.status === 'AWAITING_PAYMENT' && destinations && <PayForm payment={payment} destinations={destinations} />}
       {payment.status === 'SUBMITTED' && <Waiting payment={payment} />}
       {payment.status === 'APPROVED' && (
@@ -114,7 +210,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 
 function Header({ payment }: { payment: ManualPayment }) {
   const { t, tf, fmt } = useI18n();
-  const planName = t.pricing.plans[payment.tier]?.name ?? payment.planName;
+  const planName = planWords(t, { key: payment.planKey, tier: payment.tier, name: payment.planName }).name;
   return (
     <header className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center justify-between gap-2">

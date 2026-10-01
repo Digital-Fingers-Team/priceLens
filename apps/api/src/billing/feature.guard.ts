@@ -4,10 +4,18 @@ import { EntitlementsService } from './entitlements.service';
 import { FeatureKey } from './plan-limits';
 import { REQUIRES_FEATURE_KEY } from './requires-feature.decorator';
 import { UpgradeRequiredException } from './billing.errors';
+import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
+import { FlagKey } from '../feature-flags/feature-flags.registry';
+import { REQUIRES_FLAG_KEY } from '../feature-flags/requires-flag.decorator';
+import { FeatureDisabledException } from '../feature-flags/feature-flags.errors';
 
 /**
- * Enforces @RequiresFeature. Registered as a global APP_GUARD so the gate is
- * declarative and lives next to the route it protects.
+ * Enforces @RequiresFeature and @RequiresFlag. Registered as a global
+ * APP_GUARD so the gate is declarative and lives next to the route it protects.
+ *
+ * Order of checks: a switched-off flag is a 404 for everyone (the feature does
+ * not exist right now), before any sign-in or plan question. Then a plan
+ * feature needs a signed-in user whose plan includes it.
  *
  * Runs after JwtAuthGuard, so `request.user` is populated for any route that
  * is not @Public.
@@ -17,15 +25,21 @@ export class FeatureGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly entitlements: EntitlementsService,
+    private readonly flags: FeatureFlagsService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const required = this.reflector.getAllAndOverride<FeatureKey[]>(REQUIRES_FEATURE_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const targets = [context.getHandler(), context.getClass()];
+    const required = this.reflector.getAllAndOverride<FeatureKey[]>(REQUIRES_FEATURE_KEY, targets) ?? [];
+    const switches = this.reflector.getAllAndOverride<FlagKey[]>(REQUIRES_FLAG_KEY, targets) ?? [];
 
-    if (!required || required.length === 0) return true;
+    if (required.length === 0 && switches.length === 0) return true;
+
+    for (const flag of [...switches, ...required]) {
+      if (!(await this.flags.isEnabled(flag))) throw new FeatureDisabledException(flag);
+    }
+
+    if (required.length === 0) return true;
 
     const request = context.switchToHttp().getRequest();
     const user = request.user;

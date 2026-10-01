@@ -2,6 +2,10 @@ import { apiClient } from './client';
 import type { ApiResponse } from '@/types/api.types';
 import type {
   CompetitorEvent,
+  CreatedInvite,
+  InvitePreview,
+  WorkspaceInvite,
+  WorkspaceMember,
   CompetitorEventType,
   MatchSuggestion,
   OrgRole,
@@ -118,6 +122,42 @@ export const sellerApi = {
       email,
       role,
     });
+    return res.data.data;
+  },
+
+  members: async (orgId: string) => {
+    const res = await apiClient.get<ApiResponse<WorkspaceMember[]>>(`${base(orgId)}/members`);
+    return res.data.data;
+  },
+
+  removeMember: async (orgId: string, memberId: string) => {
+    await apiClient.delete(`${base(orgId)}/members/${memberId}`);
+  },
+
+  invites: async (orgId: string) => {
+    const res = await apiClient.get<ApiResponse<WorkspaceInvite[]>>(`${base(orgId)}/invites`);
+    return res.data.data;
+  },
+
+  invite: async (orgId: string, email: string, role: OrgRole) => {
+    const res = await apiClient.post<ApiResponse<CreatedInvite>>(`${base(orgId)}/invites`, { email, role });
+    return res.data.data;
+  },
+
+  revokeInvite: async (orgId: string, inviteId: string) => {
+    await apiClient.delete(`${base(orgId)}/invites/${inviteId}`);
+  },
+
+  previewInvite: async (token: string) => {
+    const res = await apiClient.get<ApiResponse<InvitePreview>>(`/invites/${encodeURIComponent(token)}`);
+    return res.data.data;
+  },
+
+  acceptInvite: async (token: string) => {
+    const res = await apiClient.post<ApiResponse<{ orgId: string; role: OrgRole }>>(
+      `/invites/${encodeURIComponent(token)}/accept`,
+      {},
+    );
     return res.data.data;
   },
 };

@@ -2,6 +2,12 @@ import { apiClient } from './client';
 import type { ApiResponse } from '@/types/api.types';
 import type {
   AdminManualPayment,
+  AdminPlan,
+  AdminPlanPatch,
+  FlagState,
+  InvoiceDetail,
+  InvoiceRow,
+  OnlineProvider,
   Entitlements,
   ManualPayment,
   ManualPaymentMethod,
@@ -83,6 +89,66 @@ export const billingApi = {
 
   rejectPayment: async (id: string, reason?: string) => {
     const res = await apiClient.post<ApiResponse<ManualPayment>>(`/billing/payments/admin/${id}/reject`, { reason });
+    return res.data.data;
+  },
+
+  // ─── Online invoices (Paymob, test double) ────────────────────────────
+
+  startOnlineCheckout: async (planKey: string, provider: OnlineProvider) => {
+    const res = await apiClient.post<ApiResponse<{ invoiceId: string; redirectUrl: string }>>(
+      '/billing/invoices/checkout',
+      { planKey, provider },
+    );
+    return res.data.data;
+  },
+
+  invoices: async () => {
+    const res = await apiClient.get<ApiResponse<{ invoices: InvoiceRow[] }>>('/billing/invoices');
+    return res.data.data;
+  },
+
+  invoice: async (id: string) => {
+    const res = await apiClient.get<ApiResponse<InvoiceDetail>>(`/billing/invoices/${id}`);
+    return res.data.data;
+  },
+
+  testPay: async (id: string, outcome: 'PAID' | 'FAILED') => {
+    const res = await apiClient.post<ApiResponse<{ invoiceId: string | null; status: string }>>(
+      `/billing/invoices/${id}/test-pay`,
+      { outcome },
+    );
+    return res.data.data;
+  },
+
+  // ─── Admin: plans and flags ───────────────────────────────────────────
+
+  adminPlans: async () => {
+    const res = await apiClient.get<ApiResponse<AdminPlan[]>>('/billing/admin/plans');
+    return res.data.data;
+  },
+
+  updatePlan: async (key: string, patch: AdminPlanPatch) => {
+    const res = await apiClient.put<ApiResponse<AdminPlan>>(`/billing/admin/plans/${key}`, patch);
+    return res.data.data;
+  },
+
+  flags: async () => {
+    const res = await apiClient.get<ApiResponse<Record<string, boolean>>>('/flags');
+    return res.data.data;
+  },
+
+  adminFlags: async () => {
+    const res = await apiClient.get<ApiResponse<FlagState[]>>('/admin/flags');
+    return res.data.data;
+  },
+
+  setFlag: async (key: string, enabled: boolean) => {
+    const res = await apiClient.put<ApiResponse<FlagState>>(`/admin/flags/${key}`, { enabled });
+    return res.data.data;
+  },
+
+  resetFlag: async (key: string) => {
+    const res = await apiClient.delete<ApiResponse<FlagState>>(`/admin/flags/${key}`);
     return res.data.data;
   },
 };

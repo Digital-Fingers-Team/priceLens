@@ -2,7 +2,7 @@
 import { Link } from '@/lib/i18n/navigation';
 import { useEffect } from 'react';
 import { usePathname, useRouter } from '@/lib/i18n/navigation';
-import { LayoutDashboard, ClipboardList, BarChart3, Wallet } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, BarChart3, Wallet, Tags, ToggleRight } from 'lucide-react';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { loginHref } from '@/lib/utils/next-path';
 import { cn } from '@/lib/utils/cn';
@@ -12,6 +12,8 @@ const NAV = [
   { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/admin/review', label: 'Review Queue', icon: ClipboardList },
   { href: '/admin/payments', label: 'Payments', icon: Wallet },
+  { href: '/admin/plans', label: 'Plans', icon: Tags, adminOnly: true },
+  { href: '/admin/flags', label: 'Feature flags', icon: ToggleRight, adminOnly: true },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -42,7 +44,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <p className="label-mono text-muted px-3 mb-3">
             Admin Panel
           </p>
-          {NAV.map(({ href, label, icon: Icon, exact }) => {
+          {NAV.filter((item) => !('adminOnly' in item) || user?.role === 'ADMIN').map(({ href, label, icon: Icon, exact }) => {
             const active = exact ? pathname === href : pathname.startsWith(href);
             return (
               <Link
