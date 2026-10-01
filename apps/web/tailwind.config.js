@@ -44,13 +44,14 @@ module.exports = {
       medium: '500',
       semibold: '600',
     },
-    // Sharp by default; `full` is kept for the pill moments (search field,
-    // status dots, avatars).
+    // Softly rounded (owner, 2026-10-01: "not sharp corners, normal ones").
+    // Components only use these names, so the whole UI follows this scale;
+    // `full` is kept for the pill moments (search field, status dots, avatars).
     borderRadius: {
       none: '0',
-      sm: '2px',
-      DEFAULT: '4px',
-      md: '6px',
+      sm: '6px',
+      DEFAULT: '8px',
+      md: '12px',
       full: '9999px',
     },
     // Three elevation levels: raised (sticky bars), overlay (menus,
