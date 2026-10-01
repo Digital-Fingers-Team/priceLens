@@ -10,6 +10,7 @@ import { useI18n } from '@/lib/i18n/provider';
 import { useNow } from '@/lib/hooks/use-now';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { useIsWatched, useToggleWatchlist } from '@/lib/hooks/use-watchlist';
+import { AddToBasket } from '@/components/buyer/add-to-basket';
 import { useUiStore } from '@/lib/store/ui.store';
 import { cheapestOffer } from '@/lib/utils/offers';
 import { storeGoHref } from '@/lib/utils/safe-href';
@@ -171,6 +172,7 @@ export function ProductHeader({ product }: { product: CanonicalProduct }) {
               <Button variant="outline" size="lg" leftIcon={<Bell className="h-4 w-4" aria-hidden />} onClick={() => openAlertModal(product.id)}>
                 {t.product.setAlert}
               </Button>
+              <AddToBasket productId={product.id} price={product.priceStats?.min ?? null} />
             </>
           ) : (
             <Button

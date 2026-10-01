@@ -44,8 +44,15 @@ Entitlements service + `@RequiresFeature` guard + `useEntitlements()` hook + `Up
 - [x] Discount check: existed; wording made neutral ("not supported by the price history")
 - [x] Landed cost: admin-editable `landed_cost_rules` (per store, optional per category), card on the product page with the assumptions spelled out, breakdown for plans with `landed_cost_detail`, compared with the cheapest local price
 
-## Phase 3 — Buyer differentiators
-- [ ] Installment comparison · [ ] Card & cashback offers · [ ] Verified coupons · [ ] Warranty info · [ ] Seller trust score · [ ] Arabic review summaries · [ ] Cart watch
+## Phase 3 — Buyer differentiators (`feat/phase-3-buyer-differentiators`)
+- [x] Installment comparison: admin-entered plans (valU, sympl, Aman, Souhoola, bank cards) priced against the cheapest eligible store: monthly, total, extra %, down payment; "check final terms" note. No terms seeded: nothing invented
+- [x] Card & cashback offers: per bank / store, filtered and ranked by the buyer's saved banks (`/account/banks`, names only, never card numbers)
+- [x] Verified coupons: shown only when admin-verified ≤30 days or reported working ≤14 days; "worked / didn't" votes (one per buyer) push broken codes out
+- [x] Warranty: admin rules per store + brand; shown per offer, with a note when the cheapest offer's warranty is weaker
+- [x] Seller caution: neutral note when an offer is far below the market and its feedback is weak **or unknown** (stores don't give us sellers or reviews; worded as "we can't see", never as a verdict)
+- [ ] Arabic review summaries: **moved to phase 5**. No connector collects review text (all stores are browser-scraped, ratings are not even captured), so it needs a per-product review crawl; built there with the LLM provider. Tables (`product_reviews`, `review_summaries`) are in place
+- [x] Cart watch: baskets with a target total, each item at its cheapest store or all from one store; hourly sweep alerts once when reached, re-arms above (`/cart-watch`, "Add to basket" on the product page)
+- [x] Admin: `/admin/buyer-offers` (installments, offers & coupons, warranty)
 
 ## Phase 4 — Coverage expansion
 - [ ] Offline chains (B.TECH and 2B exist; Raya, Select, Tradeline) · [ ] Used market ranges · [ ] Grocery + unit price · [ ] Pharmacy (OTC only)

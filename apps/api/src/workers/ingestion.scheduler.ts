@@ -17,6 +17,7 @@ import {
   RUN_TITLE_TRANSLATION_JOB,
   RUN_PRICE_ROLLUP_JOB,
   RUN_ALERT_DIGEST_JOB,
+  RUN_CART_WATCH_JOB,
 } from './ingestion.jobs';
 import { retryUntilDone } from '../common/redis-resilience';
 import { JOB_PRIORITY } from './ingestion-queue.service';
@@ -34,6 +35,7 @@ const WEEKLY_REPORTS_JOB_ID = 'scheduled-weekly-reports';
 const TITLE_TRANSLATION_JOB_ID = 'scheduled-title-translation';
 const PRICE_ROLLUP_JOB_ID = 'scheduled-price-rollup';
 const ALERT_DIGEST_JOB_ID = 'scheduled-alert-digest';
+const CART_WATCH_JOB_ID = 'scheduled-cart-watch';
 
 @Injectable()
 export class IngestionScheduler implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -178,8 +180,16 @@ export class IngestionScheduler implements OnApplicationBootstrap, OnApplication
       { jobId: ALERT_DIGEST_JOB_ID, priority: JOB_PRIORITY.scheduled, repeat: { cron: digestCron } },
     );
 
+    // Right after the price-alert sweep's slot, on the same prices.
+    const cartCron = this.configService.get<string>('retailers.cartWatchCron', '40 * * * *');
+    await this.queue.add(
+      RUN_CART_WATCH_JOB,
+      {},
+      { jobId: CART_WATCH_JOB_ID, priority: JOB_PRIORITY.scheduled, repeat: { cron: cartCron } },
+    );
+
     this.logger.log(
-      `Scheduled alert digest (${digestCron}), price rollup (${rollupCron}), notification retry (${retryCron}), subscription maintenance (${maintenanceCron}), ` +
+      `Scheduled cart watch (${cartCron}), alert digest (${digestCron}), price rollup (${rollupCron}), notification retry (${retryCron}), subscription maintenance (${maintenanceCron}), ` +
         `competitor detection (${detectionCron}), MAP sweep (${mapCron}), ` +
         `launch detection (${launchCron}), weekly reports (${reportsCron}) ` +
         `and Arabic titles (${translationCron})`,

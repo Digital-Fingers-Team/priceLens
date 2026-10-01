@@ -37,3 +37,9 @@ Migration `20261001100000_v2_buyer_pro`:
 Behaviour change to know about: with `realtime_alerts` on (default), alert **emails** for Free users are held and sent once a day (`ALERT_DIGEST_CRON`, 06:00 UTC); their in-app inbox is still immediate. Turn the flag off in /admin/flags to go back to instant email for everyone. Until SMTP is configured, emails are skipped either way.
 
 New job: `run-alert-digest`.
+
+## Phase 3 — Buyer differentiators
+
+Migration `20261001200000_v2_buyer_differentiators`: tables `installment_plans`, `promos`, `promo_reports`, `user_banks`, `warranty_rules`, `cart_watches`, `cart_watch_items`, `product_reviews`, `review_summaries`. **No data**: the owner enters installment terms, bank / cashback offers, coupons and warranty rules in **/admin/buyer-offers** from the providers' published terms. Until then those sections simply don't show.
+
+New job: `run-cart-watch` (`CART_WATCH_CRON`, hourly at :40).

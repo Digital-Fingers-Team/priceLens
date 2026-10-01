@@ -21,6 +21,8 @@ export const OPERATIONAL_FLAGS = {
   PRICE_DAILY_ROLLUP: 'price_daily_rollup',
   RENEWAL_REMINDERS: 'renewal_reminders',
   LANDED_COST: 'landed_cost',
+  WARRANTY_INFO: 'warranty_info',
+  SELLER_CAUTION: 'seller_caution',
 } as const;
 
 export type OperationalFlag = (typeof OPERATIONAL_FLAGS)[keyof typeof OPERATIONAL_FLAGS];
@@ -54,6 +56,11 @@ const SHIPPED: FeatureKey[] = [
   // v2, phase 2
   FEATURES.REALTIME_ALERTS,
   FEATURES.LANDED_COST_DETAIL,
+  // v2, phase 3
+  FEATURES.INSTALLMENT_COMPARISON,
+  FEATURES.CARD_OFFERS,
+  FEATURES.VERIFIED_COUPONS,
+  FEATURES.CART_WATCH,
 ];
 
 const featureFlags = Object.fromEntries(
@@ -87,6 +94,14 @@ export const FLAG_REGISTRY: Record<FlagKey, FlagDefinition> = {
   [OPERATIONAL_FLAGS.LANDED_COST]: {
     defaultOn: true,
     description: 'Cross-border offers priced at the door in Egypt (totals for everyone; the breakdown is landed_cost_detail)',
+  },
+  [OPERATIONAL_FLAGS.WARRANTY_INFO]: {
+    defaultOn: true,
+    description: 'Warranty per offer on the product page, from the warranty rules in the admin',
+  },
+  [OPERATIONAL_FLAGS.SELLER_CAUTION]: {
+    defaultOn: true,
+    description: 'Neutral "check before buying" note on offers priced far below the market with weak feedback',
   },
   [OPERATIONAL_FLAGS.RENEWAL_REMINDERS]: {
     defaultOn: true,

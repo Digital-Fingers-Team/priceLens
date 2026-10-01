@@ -1284,9 +1284,9 @@
             "schema": {
               "type": "string",
               "enum": [
+                "UNDERCUT",
                 "PRICE_INCREASE",
                 "PRICE_DROP",
-                "UNDERCUT",
                 "OUT_OF_STOCK",
                 "BACK_IN_STOCK",
                 "NEW_ENTRANT",
@@ -2227,6 +2227,450 @@
         ]
       }
     },
+    "/api/v1/buyer/products/{productId}/extras": {
+      "get": {
+        "operationId": "BuyerController_extrasFor",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Installments, card offers, coupons, warranty and caution for a product.\nPublic: warranty and caution are for everyone; the Pro sections come\nback locked (with a count) for anyone whose plan lacks them.",
+        "tags": [
+          "buyer"
+        ]
+      }
+    },
+    "/api/v1/buyer/banks": {
+      "get": {
+        "operationId": "BuyerController_banks",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "buyer"
+        ]
+      },
+      "put": {
+        "operationId": "BuyerController_setBanks",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetBanksDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "buyer"
+        ]
+      }
+    },
+    "/api/v1/buyer/coupons/{id}/report": {
+      "post": {
+        "operationId": "BuyerController_report",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportCouponDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "buyer"
+        ]
+      }
+    },
+    "/api/v1/buyer/carts": {
+      "get": {
+        "operationId": "BuyerController_listCarts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "buyer"
+        ]
+      },
+      "post": {
+        "operationId": "BuyerController_createCart",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCartWatchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "buyer"
+        ]
+      }
+    },
+    "/api/v1/buyer/carts/{id}": {
+      "patch": {
+        "operationId": "BuyerController_updateCart",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCartWatchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "buyer"
+        ]
+      },
+      "delete": {
+        "operationId": "BuyerController_deleteCart",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Not gated: someone who downgraded can still clear their baskets out.",
+        "tags": [
+          "buyer"
+        ]
+      }
+    },
+    "/api/v1/admin/installment-plans": {
+      "get": {
+        "operationId": "BuyerAdminController_installments",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      },
+      "post": {
+        "operationId": "BuyerAdminController_createInstallment",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveInstallmentPlanDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/installment-plans/{id}": {
+      "patch": {
+        "operationId": "BuyerAdminController_updateInstallment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveInstallmentPlanDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      },
+      "delete": {
+        "operationId": "BuyerAdminController_deleteInstallment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/promos": {
+      "get": {
+        "operationId": "BuyerAdminController_promos",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      },
+      "post": {
+        "operationId": "BuyerAdminController_createPromo",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavePromoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/promos/{id}": {
+      "patch": {
+        "operationId": "BuyerAdminController_updatePromo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavePromoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      },
+      "delete": {
+        "operationId": "BuyerAdminController_deletePromo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/warranty-rules": {
+      "get": {
+        "operationId": "BuyerAdminController_warranty",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      },
+      "put": {
+        "operationId": "BuyerAdminController_saveWarranty",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveWarrantyRuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/warranty-rules/{id}": {
+      "delete": {
+        "operationId": "BuyerAdminController_deleteWarranty",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/v1/billing/plans": {
       "get": {
         "operationId": "BillingController_listPlans",
@@ -2505,9 +2949,9 @@
               "type": "string",
               "enum": [
                 "REJECTED",
-                "CANCELLED",
                 "AWAITING_PAYMENT",
                 "SUBMITTED",
+                "CANCELLED",
                 "APPROVED"
               ]
             }
@@ -3747,8 +4191,8 @@
             "type": "string",
             "enum": [
               "ADMIN",
-              "OWNER",
-              "MEMBER"
+              "MEMBER",
+              "OWNER"
             ]
           }
         },
@@ -3822,9 +4266,9 @@
           "type": {
             "type": "string",
             "enum": [
+              "UNDERCUT",
               "PRICE_INCREASE",
               "PRICE_DROP",
-              "UNDERCUT",
               "OUT_OF_STOCK",
               "BACK_IN_STOCK",
               "NEW_ENTRANT",
@@ -3868,8 +4312,8 @@
             "type": "string",
             "enum": [
               "ADMIN",
-              "OWNER",
-              "MEMBER"
+              "MEMBER",
+              "OWNER"
             ]
           }
         },
@@ -3940,6 +4384,299 @@
         "required": [
           "providerKey",
           "affiliateId"
+        ]
+      },
+      "SetBanksDto": {
+        "type": "object",
+        "properties": {
+          "banks": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 64
+            }
+          }
+        },
+        "required": [
+          "banks"
+        ]
+      },
+      "ReportCouponDto": {
+        "type": "object",
+        "properties": {
+          "worked": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "worked"
+        ]
+      },
+      "CartItemDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "qty": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 99
+          }
+        },
+        "required": [
+          "productId"
+        ]
+      },
+      "CreateCartWatchDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "targetTotal": {
+            "type": "number",
+            "minimum": 1
+          },
+          "acrossStores": {
+            "type": "boolean"
+          },
+          "items": {
+            "maxItems": 30,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CartItemDto"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "targetTotal",
+          "items"
+        ]
+      },
+      "UpdateCartWatchDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "targetTotal": {
+            "type": "number",
+            "minimum": 1
+          },
+          "acrossStores": {
+            "type": "boolean"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "items": {
+            "maxItems": 30,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CartItemDto"
+            }
+          }
+        }
+      },
+      "SaveInstallmentPlanDto": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "BNPL",
+              "BANK_CARD"
+            ]
+          },
+          "months": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 120
+          },
+          "markupPct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 300
+          },
+          "adminFeePct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "adminFeeFlat": {
+            "type": "number",
+            "minimum": 0
+          },
+          "downPaymentPct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "minAmount": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0
+          },
+          "maxAmount": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0
+          },
+          "platformIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "validUntil": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceUrl": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 512,
+            "format": "uri"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 255
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SavePromoDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "enum": [
+              "CARD",
+              "COUPON",
+              "CASHBACK"
+            ],
+            "type": "string"
+          },
+          "platformId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "bankName": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 64
+          },
+          "code": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 64
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "titleAr": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 160
+          },
+          "valueType": {
+            "enum": [
+              "PERCENT",
+              "AMOUNT"
+            ],
+            "type": "string"
+          },
+          "value": {
+            "type": "number",
+            "minimum": 0
+          },
+          "maxDiscount": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0
+          },
+          "minSpend": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0
+          },
+          "validFrom": {
+            "type": "string",
+            "nullable": true
+          },
+          "validUntil": {
+            "type": "string",
+            "nullable": true
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "sourceUrl": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 512,
+            "format": "uri"
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SaveWarrantyRuleDto": {
+        "type": "object",
+        "properties": {
+          "platformId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "brand": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 64
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "SELLER",
+              "LOCAL_AGENT",
+              "INTERNATIONAL",
+              "NONE"
+            ]
+          },
+          "months": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 120
+          },
+          "agentName": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 128
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 255
+          }
+        },
+        "required": [
+          "platformId",
+          "type"
         ]
       },
       "CreateCheckoutDto": {

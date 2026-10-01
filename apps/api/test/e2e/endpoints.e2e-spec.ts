@@ -873,6 +873,94 @@ describe('Every endpoint (e2e)', () => {
     expectNoProblems();
   });
 
+  it('v2 buyer differentiators: installments, offers, coupons, warranty, baskets', async () => {
+    const extrasPath = '/api/v1/buyer/products/{productId}/extras';
+    const empty = await call('GET', extrasPath, 200, { params: { productId } });
+    expect(empty.body.data.installments).toMatchObject({ count: 0 });
+
+    // Admin enters a 0% plan, a bank-card offer, a coupon and a warranty rule.
+    const plan = await call('POST', '/api/v1/admin/installment-plans', 201, {
+      token: admin.token,
+      body: { provider: 'valU', months: 6, markupPct: 0 },
+    });
+    await call('POST', '/api/v1/admin/installment-plans', 403, { token: free.token, body: { provider: 'x', months: 6 } });
+    await call('POST', '/api/v1/admin/installment-plans', 400, { token: admin.token, body: { provider: 'x', months: 0 } });
+    await call('GET', '/api/v1/admin/installment-plans', 200, { token: admin.token });
+    await call('PATCH', '/api/v1/admin/installment-plans/{id}', 200, { token: admin.token, params: { id: plan.body.data.id }, body: { notes: 'e2e' } });
+
+    const card = await call('POST', '/api/v1/admin/promos', 201, {
+      token: admin.token,
+      body: { type: 'CARD', bankName: 'CIB', title: '10% with CIB', valueType: 'PERCENT', value: 10, maxDiscount: 1000 },
+    });
+    await call('POST', '/api/v1/admin/promos', 400, { token: admin.token, body: { type: 'COUPON', title: 'no code', valueType: 'AMOUNT', value: 50 } });
+    const coupon = await call('POST', '/api/v1/admin/promos', 201, {
+      token: admin.token,
+      body: { type: 'COUPON', code: 'save50', title: '50 off', valueType: 'AMOUNT', value: 50, verified: true },
+    });
+    expect(coupon.body.data.code).toBe('SAVE50');
+    await call('GET', '/api/v1/admin/promos', 200, { token: admin.token });
+    await call('PATCH', '/api/v1/admin/promos/{id}', 200, { token: admin.token, params: { id: card.body.data.id }, body: { minSpend: 1 } });
+
+    const rule = await call('PUT', '/api/v1/admin/warranty-rules', 200, {
+      token: admin.token,
+      body: { platformId, type: 'LOCAL_AGENT', months: 24, agentName: 'Agent' },
+    });
+    await call('GET', '/api/v1/admin/warranty-rules', 200, { token: admin.token });
+
+    // A free visitor sees the Pro sections locked, with counts; warranty for everyone.
+    const locked = await call('GET', extrasPath, 200, { params: { productId } });
+    expect(locked.body.data.installments).toEqual({ access: 'locked', count: 1, items: [] });
+    expect(locked.body.data.cardOffers).toMatchObject({ access: 'locked', count: 1 });
+    expect(locked.body.data.warranty.offers.find((o: { warranty: unknown }) => o.warranty)).toBeTruthy();
+
+    // The enterprise user (all features) sees them, and their bank first.
+    await call('PUT', '/api/v1/buyer/banks', 400, { token: pro.token, body: { banks: 'CIB' } });
+    await call('PUT', '/api/v1/buyer/banks', 200, { token: pro.token, body: { banks: ['CIB', ' CIB '] } });
+    const banks = await call('GET', '/api/v1/buyer/banks', 200, { token: pro.token });
+    expect(banks.body.data).toEqual({ mine: ['CIB'], known: ['CIB'] });
+    const open = await call('GET', extrasPath, 200, { token: pro.token, params: { productId } });
+    const best = open.body.data.installments.items[0];
+    expect(best).toMatchObject({ provider: 'valU', months: 6, extraPct: 0 });
+    expect(best.monthly).toBeCloseTo(best.price / 6, 1);
+    expect(open.body.data.cardOffers.items[0]).toMatchObject({ bankName: 'CIB', mine: true });
+    expect(open.body.data.cardOffers.items[0].saving).toBe(1000);
+    expect(open.body.data.coupons.items[0]).toMatchObject({ code: 'SAVE50', saving: 50 });
+
+    // Coupon reports: one vote each, changeable.
+    const report = { params: { id: coupon.body.data.id } };
+    await call('POST', '/api/v1/buyer/coupons/{id}/report', 201, { token: pro.token, ...report, body: { worked: false } });
+    await call('POST', '/api/v1/buyer/coupons/{id}/report', 201, { token: pro.token, ...report, body: { worked: true } });
+    await call('POST', '/api/v1/buyer/coupons/{id}/report', 404, { token: pro.token, params: { id: card.body.data.id }, body: { worked: true } });
+    const counted = await prisma.promo.findUniqueOrThrow({ where: { id: coupon.body.data.id } });
+    expect([counted.workedCount, counted.failedCount]).toEqual([1, 0]);
+
+    // Baskets: Pro only; the target is reached, so the sweep notifies once.
+    await call('GET', '/api/v1/buyer/carts', 403, { token: free.token });
+    await call('POST', '/api/v1/buyer/carts', 400, { token: pro.token, body: { name: 'x', targetTotal: 10, items: [] } });
+    const cart = await call('POST', '/api/v1/buyer/carts', 201, {
+      token: pro.token,
+      body: { name: 'Phone', targetTotal: 999_999, items: [{ productId, qty: 1 }] },
+    });
+    expect(cart.body.data).toMatchObject({ reached: true, items: [{ qty: 1 }] });
+    const carts = await call('GET', '/api/v1/buyer/carts', 200, { token: pro.token });
+    expect(carts.body.data).toHaveLength(1);
+    const cartParams = { params: { id: cart.body.data.id } };
+    await call('PATCH', '/api/v1/buyer/carts/{id}', 200, { token: pro.token, ...cartParams, body: { acrossStores: false } });
+    // The plan gate answers before ownership is even checked.
+    await call('PATCH', '/api/v1/buyer/carts/{id}', 403, { token: free.token, ...cartParams, body: { name: 'mine now' } });
+    await call('DELETE', '/api/v1/buyer/carts/{id}', 404, { token: free.token, ...cartParams });
+    await call('DELETE', '/api/v1/buyer/carts/{id}', 200, { token: pro.token, ...cartParams });
+
+    // Clean up so later runs start from nothing.
+    await call('DELETE', '/api/v1/admin/installment-plans/{id}', 200, { token: admin.token, params: { id: plan.body.data.id } });
+    await call('DELETE', '/api/v1/admin/promos/{id}', 200, { token: admin.token, params: { id: card.body.data.id } });
+    await call('DELETE', '/api/v1/admin/promos/{id}', 200, { token: admin.token, params: { id: coupon.body.data.id } });
+    await call('DELETE', '/api/v1/admin/warranty-rules/{id}', 200, { token: admin.token, params: { id: rule.body.data.id } });
+    await call('DELETE', '/api/v1/admin/warranty-rules/{id}', 404, { token: admin.token, params: { id: rule.body.data.id } });
+    await call('PUT', '/api/v1/buyer/banks', 200, { token: pro.token, body: { banks: [] } });
+    expectNoProblems();
+  });
+
   it('calls every registered route', () => {
     interface Layer {
       route?: { path: string; methods: Record<string, boolean> };

@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { Heart, User, LogOut, Shield, Menu, X, Sparkles, Building2, Bell, Tag } from 'lucide-react';
+import { Heart, User, LogOut, Shield, Menu, X, Sparkles, Building2, Bell, Tag, ShoppingBasket } from 'lucide-react';
 import { LensMark, Wordmark } from '@/components/brand/logo';
 import { NotificationBell } from '@/components/notifications/notification-bell';
 import { Button, IconButton } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { useAuthStore } from '@/lib/store/auth.store';
 import { useLogout } from '@/lib/hooks/use-auth';
 import { Link, usePathname, useRouter } from '@/lib/i18n/navigation';
 import { useI18n } from '@/lib/i18n/provider';
+import { useFlags } from '@/lib/hooks/use-billing';
 import { LocaleSwitch } from './locale-switch';
 import { ThemeToggle } from './theme-toggle';
 
@@ -35,8 +36,10 @@ export function Navbar() {
     close();
   }
 
+  const flags = useFlags();
   const memberLinks = [
     { href: '/watchlist', label: t.nav.watchlist, Icon: Heart },
+    ...(flags.isOn('cart_watch') ? [{ href: '/cart-watch', label: t.nav.baskets, Icon: ShoppingBasket }] : []),
     { href: '/deal-hunter', label: t.nav.dealHunter, Icon: Sparkles },
     { href: '/seller', label: t.nav.seller, Icon: Building2 },
   ];

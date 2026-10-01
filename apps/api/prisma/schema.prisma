@@ -140,6 +140,9 @@ model User {
   notifications        Notification[]
   orgMemberships       OrganizationMember[]
   invoices             Invoice[]
+  promoReports         PromoReport[]
+  banks                UserBank[]
+  cartWatches          CartWatch[]
 
   @@index([email])
   @@index([username])
@@ -217,6 +220,8 @@ model Platform {
   organizations    Organization[]
   competitorEvents CompetitorEvent[]
   landedCostRules  LandedCostRule[]
+  promos           Promo[]
+  warrantyRules    WarrantyRule[]
 
   @@map("platforms")
 }
@@ -271,6 +276,8 @@ model CanonicalProduct {
   priceHistory     PriceHistory[]
   watchlistItems   WatchlistItem[]
   priceAlerts      PriceAlert[]
+  cartWatchItems   CartWatchItem[]
+  reviewSummary    ReviewSummary?
   reviewQueues     ReviewQueue[]
   affiliateClicks  AffiliateClick[]
   sellerProducts   SellerProduct[]
@@ -352,6 +359,7 @@ model SourceListing {
   matchDecisions   MatchDecision[]
   reviewQueues     ReviewQueue[]
   affiliateClicks  AffiliateClick[]
+  reviews          ProductReview[]
 
   @@unique([platformId, externalId])
   @@index([canonicalProductId])
@@ -1447,4 +1455,209 @@ model PageView {
   @@index([createdAt])
   @@index([route, createdAt])
   @@map("page_views")
+}
+
+// ─── v2 phase 3: buyer differentiators ──────────────────────────────────────
+
+/// An installment offer (valU, sympl, Aman, Souhoola, a bank's card plan),
+/// entered by the admin from the provider's published terms. `markupPct` is
+/// the total extra over the financed amount for the whole tenor, which is how
+/// Egyptian providers quote; the buyer sees monthly, total and the extra %.
+model InstallmentPlan {
+  id             String    @id @default(uuid())
+  provider       String    @db.VarChar(64)
+  /// BNPL (valU, sympl...) or BANK_CARD (a bank's card installments).
+  kind           String    @default("BNPL") @db.VarChar(16)
+  months         Int
+  markupPct      Float     @default(0) @map("markup_pct")
+  adminFeePct    Float     @default(0) @map("admin_fee_pct")
+  adminFeeFlat   Decimal   @default(0) @map("admin_fee_flat") @db.Decimal(12, 2)
+  downPaymentPct Float     @default(0) @map("down_payment_pct")
+  minAmount      Decimal?  @map("min_amount") @db.Decimal(12, 2)
+  maxAmount      Decimal?  @map("max_amount") @db.Decimal(12, 2)
+  /// Stores it works at; empty = every store.
+  platformIds    String[]  @map("platform_ids")
+  validUntil     DateTime? @map("valid_until")
+  sourceUrl      String?   @map("source_url") @db.VarChar(512)
+  notes          String?   @db.VarChar(255)
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@index([isActive])
+  @@map("installment_plans")
+}
+
+enum PromoType {
+  CARD     // "pay with <bank> card at <store> and save X"
+  CASHBACK
+  COUPON
+}
+
+enum PromoValueType {
+  PERCENT
+  AMOUNT
+}
+
+/// A bank-card offer, a cashback offer or a coupon code. Admin-entered.
+/// Coupons are ranked by verification and by what buyers report.
+model Promo {
+  id             String         @id @default(uuid())
+  type           PromoType
+  /// null = every store.
+  platformId     String?        @map("platform_id")
+  bankName       String?        @map("bank_name") @db.VarChar(64)
+  code           String?        @db.VarChar(64)
+  title          String         @db.VarChar(160)
+  titleAr        String?        @map("title_ar") @db.VarChar(160)
+  valueType      PromoValueType @map("value_type")
+  value          Float
+  maxDiscount    Decimal?       @map("max_discount") @db.Decimal(12, 2)
+  minSpend       Decimal?       @map("min_spend") @db.Decimal(12, 2)
+  validFrom      DateTime?      @map("valid_from")
+  validUntil     DateTime?      @map("valid_until")
+  verified       Boolean        @default(false)
+  lastVerifiedAt DateTime?      @map("last_verified_at")
+  workedCount    Int            @default(0) @map("worked_count")
+  failedCount    Int            @default(0) @map("failed_count")
+  sourceUrl      String?        @map("source_url") @db.VarChar(512)
+  isActive       Boolean        @default(true) @map("is_active")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  platform Platform?     @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  reports  PromoReport[]
+
+  @@index([type, isActive])
+  @@index([platformId])
+  @@map("promos")
+}
+
+/// One buyer's "this code worked / didn't work". One vote per buyer.
+model PromoReport {
+  id        String   @id @default(uuid())
+  promoId   String   @map("promo_id")
+  userId    String   @map("user_id")
+  worked    Boolean
+  createdAt DateTime @default(now()) @map("created_at")
+
+  promo Promo @relation(fields: [promoId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([promoId, userId])
+  @@map("promo_reports")
+}
+
+/// The banks a buyer has cards with, to filter card offers. A bank's NAME
+/// only: card numbers are never asked for or stored.
+model UserBank {
+  userId    String   @map("user_id")
+  bankName  String   @map("bank_name") @db.VarChar(64)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, bankName])
+  @@map("user_banks")
+}
+
+enum WarrantyType {
+  LOCAL_AGENT   // the brand's official Egyptian agent
+  INTERNATIONAL
+  SELLER        // the seller's own guarantee
+  NONE
+}
+
+/// What warranty a store gives on a brand (admin-entered). A rule with a
+/// brand beats the store's default (brand = null).
+model WarrantyRule {
+  id         String       @id @default(uuid())
+  platformId String       @map("platform_id")
+  /// Lower-case brand, or null for the store's default.
+  brand      String?      @db.VarChar(64)
+  type       WarrantyType
+  months     Int          @default(0)
+  agentName  String?      @map("agent_name") @db.VarChar(128)
+  notes      String?      @db.VarChar(255)
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
+
+  platform Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+
+  @@unique([platformId, brand])
+  @@map("warranty_rules")
+}
+
+/// A basket the buyer wants at a total: tell them when it gets there.
+model CartWatch {
+  id             String    @id @default(uuid())
+  userId         String    @map("user_id")
+  name           String    @db.VarChar(80)
+  targetTotal    Decimal   @map("target_total") @db.Decimal(12, 2)
+  /// true: each item at its cheapest store; false: all from one store.
+  acrossStores   Boolean   @default(true) @map("across_stores")
+  lastTotal      Decimal?  @map("last_total") @db.Decimal(12, 2)
+  lastCheckedAt  DateTime? @map("last_checked_at")
+  lastNotifiedAt DateTime? @map("last_notified_at")
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  user  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items CartWatchItem[]
+
+  @@index([userId])
+  @@index([isActive, lastCheckedAt])
+  @@map("cart_watches")
+}
+
+model CartWatchItem {
+  id                 String @id @default(uuid())
+  cartId             String @map("cart_id")
+  canonicalProductId String @map("canonical_product_id")
+  qty                Int    @default(1)
+
+  cart             CartWatch        @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  canonicalProduct CanonicalProduct @relation(fields: [canonicalProductId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, canonicalProductId])
+  @@map("cart_watch_items")
+}
+
+/// A buyer review as the store shows it, for the review summary.
+model ProductReview {
+  id              String    @id @default(uuid())
+  sourceListingId String    @map("source_listing_id")
+  externalId      String    @map("external_id") @db.VarChar(128)
+  rating          Float?
+  title           String?   @db.VarChar(255)
+  body            String    @db.Text
+  reviewedAt      DateTime? @map("reviewed_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  sourceListing SourceListing @relation(fields: [sourceListingId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceListingId, externalId])
+  @@map("product_reviews")
+}
+
+/// Pros, cons and common issues distilled from a product's reviews by the
+/// LLM, in Arabic and English. Regenerated when the reviews change enough.
+model ReviewSummary {
+  canonicalProductId String   @id @map("canonical_product_id")
+  pros               Json     @default("[]")
+  cons               Json     @default("[]")
+  issues             Json     @default("[]")
+  prosAr             Json     @default("[]") @map("pros_ar")
+  consAr             Json     @default("[]") @map("cons_ar")
+  issuesAr           Json     @default("[]") @map("issues_ar")
+  sampleSize         Int      @map("sample_size")
+  /// Hash of the review ids summarised, to tell when a new summary is due.
+  reviewsHash        String   @map("reviews_hash") @db.VarChar(64)
+  model              String   @db.VarChar(64)
+  generatedAt        DateTime @default(now()) @map("generated_at")
+
+  canonicalProduct CanonicalProduct @relation(fields: [canonicalProductId], references: [id], onDelete: Cascade)
+
+  @@map("review_summaries")
 }
