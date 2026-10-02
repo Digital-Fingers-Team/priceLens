@@ -21,6 +21,9 @@ import {
   RUN_USED_MARKET_JOB,
   RUN_SELLER_REPRICER_JOB,
   RUN_RANK_TRACKING_JOB,
+  RUN_FX_REFRESH_JOB,
+  RUN_IMPORT_FINDER_JOB,
+  RUN_TREND_RADAR_JOB,
 } from './ingestion.jobs';
 import { retryUntilDone } from '../common/redis-resilience';
 import { JOB_PRIORITY } from './ingestion-queue.service';
@@ -42,6 +45,9 @@ const CART_WATCH_JOB_ID = 'scheduled-cart-watch';
 const USED_MARKET_JOB_ID = 'scheduled-used-market';
 const SELLER_REPRICER_JOB_ID = 'scheduled-seller-repricer';
 const RANK_TRACKING_JOB_ID = 'scheduled-rank-tracking';
+const FX_REFRESH_JOB_ID = 'scheduled-fx-refresh';
+const IMPORT_FINDER_JOB_ID = 'scheduled-import-finder';
+const TREND_RADAR_JOB_ID = 'scheduled-trend-radar';
 
 @Injectable()
 export class IngestionScheduler implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -218,8 +224,20 @@ export class IngestionScheduler implements OnApplicationBootstrap, OnApplication
       { jobId: RANK_TRACKING_JOB_ID, priority: JOB_PRIORITY.scheduled, repeat: { cron: rankCron } },
     );
 
+    // Importer tools: FX rates twice a day, opportunities nightly, the radar weekly.
+    const fxCron = this.configService.get<string>('retailers.fxRefreshCron', '20 7,13 * * *');
+    await this.queue.add(RUN_FX_REFRESH_JOB, {}, { jobId: FX_REFRESH_JOB_ID, priority: JOB_PRIORITY.scheduled, repeat: { cron: fxCron } });
+    const importCron = this.configService.get<string>('retailers.importFinderCron', '10 4 * * *');
+    await this.queue.add(
+      RUN_IMPORT_FINDER_JOB,
+      {},
+      { jobId: IMPORT_FINDER_JOB_ID, priority: JOB_PRIORITY.scheduled, repeat: { cron: importCron } },
+    );
+    const radarCron = this.configService.get<string>('retailers.trendRadarCron', '40 4 * * 6');
+    await this.queue.add(RUN_TREND_RADAR_JOB, {}, { jobId: TREND_RADAR_JOB_ID, priority: JOB_PRIORITY.scheduled, repeat: { cron: radarCron } });
+
     this.logger.log(
-      `Scheduled repricer (${repricerCron}), rank tracking (${rankCron}), used market (${usedCron}), cart watch (${cartCron}), alert digest (${digestCron}), price rollup (${rollupCron}), notification retry (${retryCron}), subscription maintenance (${maintenanceCron}), ` +
+      `Scheduled FX (${fxCron}), import finder (${importCron}), trend radar (${radarCron}), repricer (${repricerCron}), rank tracking (${rankCron}), used market (${usedCron}), cart watch (${cartCron}), alert digest (${digestCron}), price rollup (${rollupCron}), notification retry (${retryCron}), subscription maintenance (${maintenanceCron}), ` +
         `competitor detection (${detectionCron}), MAP sweep (${mapCron}), ` +
         `launch detection (${launchCron}), weekly reports (${reportsCron}) ` +
         `and Arabic titles (${translationCron})`,

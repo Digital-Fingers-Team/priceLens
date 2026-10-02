@@ -78,6 +78,12 @@ export default registerAs('retailers', () => ({
   // Seller tools: repricer suggestions (hourly) and search-rank checks (daily).
   sellerRepricerCron: process.env.SELLER_REPRICER_CRON ?? '50 * * * *',
   rankTrackingCron: process.env.RANK_TRACKING_CRON ?? '30 2 * * *',
+  // Importer tools: FX rates (CBE publishes during the Cairo working day),
+  // the import-opportunity rebuild (after the nightly rollup) and the weekly
+  // trend radar (Saturday, once the Saturday-to-Friday week is complete).
+  fxRefreshCron: process.env.FX_REFRESH_CRON ?? '20 7,13 * * *',
+  importFinderCron: process.env.IMPORT_FINDER_CRON ?? '10 4 * * *',
+  trendRadarCron: process.env.TREND_RADAR_CRON ?? '40 4 * * 6',
   storeCoverageSweepBatchSize: parseInt(process.env.STORE_COVERAGE_SWEEP_BATCH_SIZE ?? '100', 10),
   // How long to leave a product alone after the sweep has tried to expand it.
   // Without this, any product that cannot reach the target -- because no other

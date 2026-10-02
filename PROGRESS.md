@@ -79,8 +79,12 @@ Entitlements service + `@RequiresFeature` guard + `useEntitlements()` hook + `Up
 - [ ] Repricer auto mode (Seller Plus): no official seller API is connected for any store, so it is unavailable everywhere and says so. Never via scraping or stored credentials
 - [x] Search rank tracking: keyword + store, checked daily in the store's own search (first 48 results), 60-day history
 - [x] Admin: `/admin/fee-tables`. **No fees are seeded**: the owner enters them from each store's published seller fee schedule
-## Phase 7 — Importers & traders
-- [ ] Import-opportunity finder · [ ] FX tracking (CBE + market) · [ ] Trend radar
+## Phase 7 — Importers & traders (`feat/phase-7-importers`)
+- [x] FX tracking: `FxRateProvider` interface; CBE official buy/sell (its public rates page, no key) and the market reference (`FX_RATES_API_URL`, the rate ingestion converts at), one row per source, currency and day in `fx_rates` (USD, EUR, GBP, CNY, SAR, AED); refreshed twice a day. Today's rates are public; history and impact are Seller Plus
+- [x] FX impact: for watchlist and workspace products sold by a cross-border store, landed cost now, a month ago, and at −10 % … +20 % on the dollar, margin against the cheapest local price, and the dollar rate at which importing stops paying
+- [x] Import-opportunity finder: nightly rebuild of `import_opportunities` from current prices (no scraping). Cross-border = a store with a landed-cost rule (AliExpress, Alibaba). Margin vs the median of local stores' lowest; demand = local stores, interest (views, clicks, watchlist adds, alerts), reviews, 30-day local price stability. Margins ≥ 60 % are capped in the ranking and flagged "check it is the same item"
+- [x] Trend radar: weekly (Saturday–Friday, Cairo) `trend_signals` for categories and products: new listings / stores, interest, median week-on-week move of the lowest price. New listings include stores we just started covering; the page says so
+- [x] `/importers` page (three tabs, Arabic + English), navbar link; admin endpoints to run each job now
 
 ## Phase 8 — Business
 - [ ] MAP (exists: add UI) · [ ] Unauthorized sellers (distribution exists: add UI) · [ ] Reports (exist: add PDF/CSV + UI) · [ ] Public API (exists: add key UI + docs page) · [ ] Procurement quotes

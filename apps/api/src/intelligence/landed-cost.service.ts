@@ -174,7 +174,7 @@ export function pickRule(rules: LandedCostRule[], platformId: string, categoryId
   );
 }
 
-function ruleValues(rule: LandedCostRule) {
+export function ruleValues(rule: LandedCostRule) {
   return {
     shippingFlat: Number(rule.shippingFlat),
     shippingPct: rule.shippingPct,

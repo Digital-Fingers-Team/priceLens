@@ -62,3 +62,11 @@ Migration `20261001400000_v2_seller_tools` (additive): enums `RepricerStrategy`,
 **To do: enter platform fees in /admin/fee-tables** (Noon, Jumia, Amazon.eg …) from each store's seller fee schedule. Until then the profit calculator and best-platform finder say there are no fee tables.
 
 New jobs: `run-seller-repricer` (`SELLER_REPRICER_CRON`, hourly at :50; also connects links saved before we had crawled them) and `run-rank-tracking` (`RANK_TRACKING_CRON`, 02:30 UTC; one store search per distinct keyword, 2 s apart). The repricer only suggests; auto mode is unavailable (no official seller API connected).
+
+## Phase 7 — Importers & traders
+
+Migration `20261002100000_v2_importers` (additive): enums `FxSource`, `TrendScope`; new tables `fx_rates`, `import_opportunities`, `trend_signals`. No data.
+
+New jobs: `run-fx-refresh` (`FX_REFRESH_CRON`, 07:20 and 13:20 UTC), `run-import-finder` (`IMPORT_FINDER_CRON`, 04:10 UTC) and `run-trend-radar` (`TREND_RADAR_CRON`, Saturday 04:40 UTC). Each is skipped when its plan feature flag (`fx_tracking`, `import_finder`, `trend_radar`) is off. No keys needed: the CBE page (`CBE_RATES_URL`) is public; it rejects requests without a browser user agent, so a layout change or block shows up as a failed CBE refresh in the worker log while the market rate keeps being stored.
+
+Rate history starts on deploy day: "a month ago" stays empty for 30 days. Import opportunities only exist for stores with a landed-cost rule (/admin/landed-cost-rules). Run once after deploy: `POST /admin/trade/fx/refresh`, `/admin/trade/import-opportunities/rebuild`, `/admin/trade/trend-radar/build`.

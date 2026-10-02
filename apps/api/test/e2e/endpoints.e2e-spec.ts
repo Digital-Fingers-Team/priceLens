@@ -24,6 +24,7 @@ import { upsertCategories } from '../../seed/generators/generateProducts';
 import { generateStores } from '../../seed/generators/generateStores';
 import { DEFAULT_PLAN_BLUEPRINTS } from '../../src/billing/plan-limits';
 import { RankTrackingService } from '../../src/seller-tools/rank-tracking.service';
+import { CbeFxProvider, MarketFxProvider } from '../../src/trade/fx-rate.providers';
 
 /**
  * Every route, called at least once (B-12): the happy path, plus an
@@ -995,6 +996,71 @@ describe('Every endpoint (e2e)', () => {
       body: { update_id: 1 },
     });
     await call('POST', '/api/v1/admin/telegram/webhook', 403, { token: free.token });
+    expectNoProblems();
+  });
+
+  it('v2 importer tools: FX tracking, import finder, trend radar', async () => {
+    const auth = { token: pro.token };
+    const today = new Date().toISOString().slice(0, 10);
+
+    // FX: both sources stored; one failing source does not stop the other.
+    const cbe = jest.spyOn(app.get(CbeFxProvider), 'fetchRates').mockResolvedValue([
+      { currency: 'USD', buy: 50.9, sell: 51.1, mid: 51, rateDate: today },
+    ]);
+    const market = jest.spyOn(app.get(MarketFxProvider), 'fetchRates').mockRejectedValue(new Error('offline'));
+    await call('POST', '/api/v1/admin/trade/fx/refresh', 403, { token: free.token });
+    const refreshed = await call('POST', '/api/v1/admin/trade/fx/refresh', 200, { token: admin.token });
+    expect(refreshed.body.data).toEqual({ CBE: 1, MARKET: 'offline' });
+    const rates = await call('GET', '/api/v1/trade/fx/rates', 200);
+    expect(rates.body.data.rates[0]).toMatchObject({ source: 'CBE', currency: 'USD', sell: 51.1, mid: 51 });
+    await call('GET', '/api/v1/trade/fx/history', 403, { token: free.token });
+    await call('GET', '/api/v1/trade/fx/history', 400, { ...auth, query: { currency: 'XYZ' } });
+    const history = await call('GET', '/api/v1/trade/fx/history', 200, { ...auth, query: { days: 30 } });
+    expect(history.body.data.points).toEqual([{ day: today, cbe: 51, cbeBuy: 50.9, cbeSell: 51.1, market: null }]);
+
+    // Import finder: Jumia priced as a cross-border store, well under Noon.
+    const jumia = await prisma.sourceListing.findFirstOrThrow({ where: { externalId: 'endpoints-jumia-phone' } });
+    const rule = await prisma.landedCostRule.create({
+      data: { platformId: jumia.platformId, customsPct: 10, vatPct: 0, handlingFee: 0, shippingFlat: 0 },
+    });
+    await prisma.sourceListing.update({ where: { id: jumia.id }, data: { priceUsd: 30000 } });
+    await call('POST', '/api/v1/admin/trade/import-opportunities/rebuild', 403, { token: free.token });
+    const rebuilt = await call('POST', '/api/v1/admin/trade/import-opportunities/rebuild', 200, { token: admin.token });
+    expect(rebuilt.body.data).toEqual({ candidates: 1, opportunities: 1 });
+    await call('GET', '/api/v1/trade/import-opportunities', 403, { token: free.token });
+    const found = await call('GET', '/api/v1/trade/import-opportunities', 200, { ...auth, query: { minMarginPct: 10 } });
+    // 30000 + 10 % customs = 33000 against Noon's 42999
+    expect(found.body.data.items[0]).toMatchObject({ landedCost: 33000, localLowest: 42999, localStores: 1, marginEgp: 9999 });
+    expect(found.body.data.items[0].product.id).toBe(productId);
+
+    // FX impact on a tracked product: the landed cost follows the dollar.
+    await prisma.watchlistItem.upsert({
+      where: { userId_canonicalProductId: { userId: pro.id, canonicalProductId: productId } },
+      create: { userId: pro.id, canonicalProductId: productId },
+      update: {},
+    });
+    await call('GET', '/api/v1/trade/fx/impact', 403, { token: free.token });
+    const impact = await call('GET', '/api/v1/trade/fx/impact', 200, auth);
+    expect(impact.body.data.usd).toEqual({ rate: 51.1, source: 'CBE' });
+    const item = impact.body.data.items[0];
+    expect(item.scenarios.find((s: { changePct: number }) => s.changePct === 10)).toMatchObject({ landedCost: 36300 });
+    expect(item.breakEvenRate).toBeCloseTo(66.58, 1);
+
+    // Trend radar for this week.
+    await call('POST', '/api/v1/admin/trade/trend-radar/build', 403, { token: free.token, body: {} });
+    await call('POST', '/api/v1/admin/trade/trend-radar/build', 400, { token: admin.token, body: { week: 'last' } });
+    const built = await call('POST', '/api/v1/admin/trade/trend-radar/build', 200, { token: admin.token, body: { week: today } });
+    await call('GET', '/api/v1/trade/trend-radar', 403, { token: free.token });
+    const radar = await call('GET', '/api/v1/trade/trend-radar', 200, { ...auth, query: { week: today } });
+    expect(radar.body.data.weekStart).toBe(built.body.data.weekStart);
+    expect(radar.body.data.categories.length).toBe(built.body.data.categories);
+
+    // Clean up.
+    await prisma.sourceListing.update({ where: { id: jumia.id }, data: { priceUsd: jumia.priceUsd } });
+    await prisma.landedCostRule.delete({ where: { id: rule.id } });
+    await prisma.importOpportunity.deleteMany({});
+    cbe.mockRestore();
+    market.mockRestore();
     expectNoProblems();
   });
 

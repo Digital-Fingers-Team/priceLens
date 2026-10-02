@@ -12,6 +12,8 @@ export default registerAs('pricing', () => ({
   // derived client-side (rate(X->base) = rates[base] / rates[X]) so one fetch
   // covers every currency a connector might emit, not just the base currency.
   fxRatesApiUrl: process.env.FX_RATES_API_URL ?? 'https://open.er-api.com/v6/latest/USD',
+  // Central Bank of Egypt official rates page, stored daily by the FX tracker.
+  cbeRatesUrl: process.env.CBE_RATES_URL ?? 'https://www.cbe.org.eg/en/economic-research/statistics/cbe-exchange-rates',
   fxRatesEnabled: (process.env.FX_RATES_ENABLED ?? 'true') !== 'false',
   // How long a fetched rate table is trusted before refetching. Long-lived on
   // purpose: FX rates move slowly and ingestion can persist hundreds of

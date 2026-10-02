@@ -36,6 +36,9 @@ import {
   RUN_USED_MARKET_JOB,
   RUN_SELLER_REPRICER_JOB,
   RUN_RANK_TRACKING_JOB,
+  RUN_FX_REFRESH_JOB,
+  RUN_IMPORT_FINDER_JOB,
+  RUN_TREND_RADAR_JOB,
   ReconciliationJobData,
   StoreCoverageSweepJobData,
   StoreExpansionJobData,
@@ -49,6 +52,11 @@ import { CartWatchService } from '../buyer/cart-watch.service';
 import { UsedMarketService } from '../used-market/used-market.service';
 import { SellerToolsService } from '../seller-tools/seller-tools.service';
 import { RankTrackingService } from '../seller-tools/rank-tracking.service';
+import { FxTrackingService } from '../trade/fx-tracking.service';
+import { ImportFinderService } from '../trade/import-finder.service';
+import { TrendRadarService } from '../trade/trend-radar.service';
+import { FEATURES } from '../billing/plan-limits';
+import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
 
 @Processor(INGESTION_QUEUE)
 export class IngestionProcessor {
@@ -72,6 +80,10 @@ export class IngestionProcessor {
     private readonly usedMarket: UsedMarketService,
     private readonly sellerTools: SellerToolsService,
     private readonly rankTracking: RankTrackingService,
+    private readonly fxTracking: FxTrackingService,
+    private readonly importFinder: ImportFinderService,
+    private readonly trendRadar: TrendRadarService,
+    private readonly flags: FeatureFlagsService,
     @Optional() private readonly titleTranslation?: TitleTranslationService,
   ) {}
 
@@ -169,6 +181,27 @@ export class IngestionProcessor {
   @Process(RUN_RANK_TRACKING_JOB)
   async handleRankTracking() {
     return this.rankTracking.runAll();
+  }
+
+  /** CBE official and market rates, one row per source per currency per day. */
+  @Process(RUN_FX_REFRESH_JOB)
+  async handleFxRefresh() {
+    if (!(await this.flags.isEnabled(FEATURES.FX_TRACKING))) return { skipped: 'flag off' };
+    return this.fxTracking.refresh();
+  }
+
+  /** Import opportunities rebuilt from current prices (no scraping). */
+  @Process(RUN_IMPORT_FINDER_JOB)
+  async handleImportFinder() {
+    if (!(await this.flags.isEnabled(FEATURES.IMPORT_FINDER))) return { skipped: 'flag off' };
+    return this.importFinder.rebuild();
+  }
+
+  /** The trend radar for the week that just finished. */
+  @Process(RUN_TREND_RADAR_JOB)
+  async handleTrendRadar() {
+    if (!(await this.flags.isEnabled(FEATURES.TREND_RADAR))) return { skipped: 'flag off' };
+    return this.trendRadar.build();
   }
 
   /** Second-hand price ranges, one classifieds search every few seconds. */
