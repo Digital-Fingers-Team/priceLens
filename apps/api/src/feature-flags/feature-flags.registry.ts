@@ -66,6 +66,11 @@ const SHIPPED: FeatureKey[] = [
   // v2, phase 5
   FEATURES.IMAGE_SEARCH,
   FEATURES.ADVISOR,
+  // v2, phase 6
+  FEATURES.PROFIT_CALCULATOR,
+  FEATURES.BEST_PLATFORM,
+  FEATURES.REPRICER_SUGGEST,
+  FEATURES.RANK_TRACKING,
 ];
 
 const featureFlags = Object.fromEntries(

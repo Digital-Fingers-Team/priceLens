@@ -34,6 +34,8 @@ import {
   RUN_ALERT_DIGEST_JOB,
   RUN_CART_WATCH_JOB,
   RUN_USED_MARKET_JOB,
+  RUN_SELLER_REPRICER_JOB,
+  RUN_RANK_TRACKING_JOB,
   ReconciliationJobData,
   StoreCoverageSweepJobData,
   StoreExpansionJobData,
@@ -45,6 +47,8 @@ import { RenewalRemindersService } from '../billing/renewal-reminders.service';
 import { PriceRollupService } from '../prices/price-rollup.service';
 import { CartWatchService } from '../buyer/cart-watch.service';
 import { UsedMarketService } from '../used-market/used-market.service';
+import { SellerToolsService } from '../seller-tools/seller-tools.service';
+import { RankTrackingService } from '../seller-tools/rank-tracking.service';
 
 @Processor(INGESTION_QUEUE)
 export class IngestionProcessor {
@@ -66,6 +70,8 @@ export class IngestionProcessor {
     private readonly priceRollup: PriceRollupService,
     private readonly cartWatch: CartWatchService,
     private readonly usedMarket: UsedMarketService,
+    private readonly sellerTools: SellerToolsService,
+    private readonly rankTracking: RankTrackingService,
     @Optional() private readonly titleTranslation?: TitleTranslationService,
   ) {}
 
@@ -152,6 +158,19 @@ export class IngestionProcessor {
   }
 
   /** price_history -> price_daily. Idempotent; re-rolls the last two days. */
+  /** Repricer suggestions, after connecting links saved before we crawled them. */
+  @Process(RUN_SELLER_REPRICER_JOB)
+  async handleSellerRepricer() {
+    const connected = await this.sellerTools.connectPendingLinks();
+    return { connected, ...(await this.sellerTools.refreshSuggestions()) };
+  }
+
+  /** Sellers' positions in store search results, one search every few seconds. */
+  @Process(RUN_RANK_TRACKING_JOB)
+  async handleRankTracking() {
+    return this.rankTracking.runAll();
+  }
+
   /** Second-hand price ranges, one classifieds search every few seconds. */
   @Process(RUN_USED_MARKET_JOB)
   async handleUsedMarket() {

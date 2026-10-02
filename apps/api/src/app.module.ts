@@ -22,6 +22,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { IntelligenceModule } from './intelligence/intelligence.module';
 import { BuyerModule } from './buyer/buyer.module';
 import { UsedMarketModule } from './used-market/used-market.module';
+import { SellerToolsModule } from './seller-tools/seller-tools.module';
 import { LlmModule } from './llm/llm.module';
 import { ImageSearchModule } from './image-search/image-search.module';
 import { AdvisorModule } from './advisor/advisor.module';
@@ -133,6 +134,7 @@ export const ENV_FILES = resolveEnvFiles();
     IntelligenceModule,
     BuyerModule,
     UsedMarketModule,
+    SellerToolsModule,
     LlmModule,
     ImageSearchModule,
     AdvisorModule,

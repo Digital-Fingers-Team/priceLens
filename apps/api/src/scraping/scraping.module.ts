@@ -34,6 +34,6 @@ import { StoreCoverageService } from './store-coverage.service';
     LiveIngestionService,
     StoreCoverageService,
   ],
-  exports: [LiveIngestionService, StoreCoverageService],
+  exports: [LiveIngestionService, StoreCoverageService, ConnectorRegistry],
 })
 export class ScrapingModule {}

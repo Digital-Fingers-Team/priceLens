@@ -75,6 +75,9 @@ export default registerAs('retailers', () => ({
   // Second-hand ranges from OpenSooq (UsedMarketService): when, and how many products a night.
   usedMarketCron: process.env.USED_MARKET_CRON ?? '15 1 * * *',
   usedMarketBatch: parseInt(process.env.USED_MARKET_BATCH ?? '120', 10),
+  // Seller tools: repricer suggestions (hourly) and search-rank checks (daily).
+  sellerRepricerCron: process.env.SELLER_REPRICER_CRON ?? '50 * * * *',
+  rankTrackingCron: process.env.RANK_TRACKING_CRON ?? '30 2 * * *',
   storeCoverageSweepBatchSize: parseInt(process.env.STORE_COVERAGE_SWEEP_BATCH_SIZE ?? '100', 10),
   // How long to leave a product alone after the sweep has tried to expand it.
   // Without this, any product that cannot reach the target -- because no other

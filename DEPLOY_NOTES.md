@@ -54,3 +54,11 @@ New job: `run-used-market` (`USED_MARKET_CRON`, 01:15 UTC; `USED_MARKET_BATCH`, 
 ## Phase 5 — New input channels
 
 No migration. New routes: `POST /search/image` (Pro, multipart field `image`), `POST /advisor` (Pro), `POST /telegram/webhook` (Telegram only, secret header), `POST /admin/telegram/webhook` (admin, registers the webhook). Images are never written to disk or the database. Flag `telegram_bot` turns the bot off; `image_search` and `advisor` are plan features with their own flags.
+
+## Phase 6 — Seller tools
+
+Migration `20261001400000_v2_seller_tools` (additive): enums `RepricerStrategy`, `PriceChangeSource`; `seller_products` gains `listing_url`, floor/ceiling, repricer settings and the current suggestion; new tables `platform_fee_tables`, `price_change_logs`, `rank_keywords`, `rank_snapshots`. No data.
+
+**To do: enter platform fees in /admin/fee-tables** (Noon, Jumia, Amazon.eg …) from each store's seller fee schedule. Until then the profit calculator and best-platform finder say there are no fee tables.
+
+New jobs: `run-seller-repricer` (`SELLER_REPRICER_CRON`, hourly at :50; also connects links saved before we had crawled them) and `run-rank-tracking` (`RANK_TRACKING_CRON`, 02:30 UTC; one store search per distinct keyword, 2 s apart). The repricer only suggests; auto mode is unavailable (no official seller API connected).

@@ -69,9 +69,16 @@ Entitlements service + `@RequiresFeature` guard + `useEntitlements()` hook + `Up
 - [x] Telegram bot: `/start` links the account with the existing verification code, a product name or store link returns the best prices, a photo searches by image for Pro users. Per-chat daily limit (10 free / 100 paid). Webhook authenticated by `TELEGRAM_WEBHOOK_SECRET`
 - [ ] Review summaries: no review text is collected yet (tables exist since phase 3). Deferred until a review source is crawled
 
-## Phase 6 — Seller tools
-- [ ] Listing import (URL/CSV) · [ ] Competitor timeline (exists: verify) · [ ] New-competitor alert (exists: verify) · [ ] Profit calculator + `platform_fee_tables` · [ ] Best-platform finder · [ ] Repricer (suggestion mode, audit log) · [ ] Rank tracking
-
+## Phase 6 — Seller tools (`feat/phase-6-seller-tools`)
+- [x] Add products by store link or CSV (sku, name, cost, price, url; Arabic or English headers; up to 500 per file). A link we already track connects the product to the catalogue at once; other links are connected by the hourly job once crawled
+- [x] Competitor timeline: each store's daily lowest over 90 days (from `price_daily`), with the workspace's competitor events
+- [x] New-competitor alert: existing `NEW_ENTRANT` events now raise a WARNING, with "below your price" in the notification, when the newcomer undercuts the seller
+- [x] Profit calculator per platform: price − commission − fixed fee − shipping − expected returns − VAT (inside the price) − cost, plus the break-even price; fees from admin-maintained `platform_fee_tables` (per store, optionally per category) with "last updated" shown
+- [x] Best-platform finder: net profit at each store's current price (or the seller's own where that store has no offer), ranked
+- [x] Repricer, suggestion mode: beat or match the cheapest in-stock competitor, never below the floor or above the ceiling; hourly job; CSV export; full audit log (suggested / applied / edited / imported) in `price_change_logs`
+- [ ] Repricer auto mode (Seller Plus): no official seller API is connected for any store, so it is unavailable everywhere and says so. Never via scraping or stored credentials
+- [x] Search rank tracking: keyword + store, checked daily in the store's own search (first 48 results), 60-day history
+- [x] Admin: `/admin/fee-tables`. **No fees are seeded**: the owner enters them from each store's published seller fee schedule
 ## Phase 7 — Importers & traders
 - [ ] Import-opportunity finder · [ ] FX tracking (CBE + market) · [ ] Trend radar
 

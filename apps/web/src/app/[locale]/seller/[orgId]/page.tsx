@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/state';
 import { Table, TBody, Td, Th, THead } from '@/components/ui/table';
+import { SellerImport } from '@/components/seller/seller-tools';
 import { useDebounce } from '@/lib/hooks/use-debounce';
 import { useSellerProducts, useUpsertSellerProduct, useWorkspaceSummary } from '@/lib/hooks/use-seller';
 import { Link } from '@/lib/i18n/navigation';
@@ -211,6 +212,8 @@ export default function WorkspaceDashboard() {
           </Button>
         </CardBody>
       </Card>
+
+      <SellerImport orgId={orgId} />
 
       <TeamPanel orgId={orgId} />
     </div>

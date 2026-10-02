@@ -216,7 +216,9 @@ export class CompetitorDetectionService {
     const events: Array<{ type: CompetitorEventType; severity: EventSeverity; changePct: number | null }> = [];
 
     if (observation.isNew) {
-      events.push({ type: CompetitorEventType.NEW_ENTRANT, severity: EventSeverity.INFO, changePct: null });
+      // A newcomer already below the seller's own price matters more than one above it.
+      const below = ourPrice != null && observation.currentPrice < ourPrice;
+      events.push({ type: CompetitorEventType.NEW_ENTRANT, severity: below ? EventSeverity.WARNING : EventSeverity.INFO, changePct: null });
     }
 
     // Stock transitions require a genuine before-and-after; unknown stock
@@ -353,7 +355,10 @@ export class CompetitorDetectionService {
     });
 
     const money = (value: number) => `${Math.round(value).toLocaleString('en-US')} ${this.currency}`;
-    const title = this.headline(candidate.type, observation, productName);
+    const title =
+      candidate.type === CompetitorEventType.NEW_ENTRANT && candidate.severity === EventSeverity.WARNING
+        ? `${observation.platformName} started selling ${productName} below your price`
+        : this.headline(candidate.type, observation, productName);
     const body =
       candidate.changePct != null && observation.previousPrice != null
         ? `${observation.platformName}: ${money(observation.previousPrice)} → ${money(observation.currentPrice)} ` +

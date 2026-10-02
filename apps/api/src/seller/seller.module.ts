@@ -20,6 +20,6 @@ import { InvitesController } from './invites.controller';
     CompetitorDetectionService,
     InvitesService,
   ],
-  exports: [CompetitorDetectionService, OrganizationsService],
+  exports: [CompetitorDetectionService, OrganizationsService, SellerProductsService],
 })
 export class SellerModule {}

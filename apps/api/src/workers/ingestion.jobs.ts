@@ -23,6 +23,8 @@ export const RUN_PRICE_ROLLUP_JOB = 'run-price-rollup';
 export const RUN_ALERT_DIGEST_JOB = 'run-alert-digest';
 export const RUN_CART_WATCH_JOB = 'run-cart-watch';
 export const RUN_USED_MARKET_JOB = 'run-used-market';
+export const RUN_SELLER_REPRICER_JOB = 'run-seller-repricer';
+export const RUN_RANK_TRACKING_JOB = 'run-rank-tracking';
 
 /** run-live-ingestion: a category sweep over some or all stores. */
 export interface LiveIngestionJobData {

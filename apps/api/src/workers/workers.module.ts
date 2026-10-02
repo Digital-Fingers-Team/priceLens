@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { PricesModule } from '../prices/prices.module';
 import { BuyerModule } from '../buyer/buyer.module';
 import { UsedMarketModule } from '../used-market/used-market.module';
+import { SellerToolsModule } from '../seller-tools/seller-tools.module';
 import { ConfigService } from '@nestjs/config';
 import { AffiliateModule } from '../affiliate/affiliate.module';
 import { AFFILIATE_CONVERSION_QUEUE } from '../affiliate/affiliate.constants';
@@ -36,6 +37,7 @@ import { WorkerMemoryGuard } from './worker-memory-guard';
     PricesModule,
     BuyerModule,
     UsedMarketModule,
+    SellerToolsModule,
   ],
   providers: [
     IngestionProcessor,

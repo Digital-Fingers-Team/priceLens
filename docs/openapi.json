@@ -2695,6 +2695,484 @@
         ]
       }
     },
+    "/api/v1/seller/workspaces/{orgId}/import/csv": {
+      "post": {
+        "operationId": "SellerToolsController_importCsv",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportCsvDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      }
+    },
+    "/api/v1/seller/workspaces/{orgId}/import/url": {
+      "post": {
+        "operationId": "SellerToolsController_importUrl",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportUrlDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      }
+    },
+    "/api/v1/seller/workspaces/{orgId}/products/{productId}/profit": {
+      "get": {
+        "operationId": "SellerToolsController_profit",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "price",
+            "required": false,
+            "in": "query",
+            "description": "Price to test; the seller's own price when omitted.",
+            "schema": {
+              "minimum": 0.01,
+              "maximum": 10000000,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      }
+    },
+    "/api/v1/seller/workspaces/{orgId}/products/{productId}/best-platform": {
+      "get": {
+        "operationId": "SellerToolsController_bestPlatform",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      }
+    },
+    "/api/v1/seller/workspaces/{orgId}/products/{productId}/timeline": {
+      "get": {
+        "operationId": "SellerToolsController_timeline",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "days",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 7,
+              "maximum": 365,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      }
+    },
+    "/api/v1/seller/workspaces/{orgId}/products/{productId}/repricer": {
+      "get": {
+        "operationId": "SellerToolsController_repricer",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      },
+      "put": {
+        "operationId": "SellerToolsController_updateRepricer",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepricerSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      }
+    },
+    "/api/v1/seller/workspaces/{orgId}/products/{productId}/repricer/apply": {
+      "post": {
+        "operationId": "SellerToolsController_apply",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      }
+    },
+    "/api/v1/seller/workspaces/{orgId}/repricer/export": {
+      "get": {
+        "operationId": "SellerToolsController_exportSuggestions",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      }
+    },
+    "/api/v1/seller/rank-platforms": {
+      "get": {
+        "operationId": "SellerToolsController_rankPlatforms",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      }
+    },
+    "/api/v1/seller/workspaces/{orgId}/products/{productId}/ranks": {
+      "get": {
+        "operationId": "SellerToolsController_listRanks",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      },
+      "post": {
+        "operationId": "SellerToolsController_addRank",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddRankKeywordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      }
+    },
+    "/api/v1/seller/workspaces/{orgId}/ranks/{keywordId}": {
+      "delete": {
+        "operationId": "SellerToolsController_removeRank",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "keywordId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      }
+    },
+    "/api/v1/admin/fee-tables": {
+      "get": {
+        "operationId": "SellerToolsController_listFeeTables",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      },
+      "put": {
+        "operationId": "SellerToolsController_upsertFeeTable",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertFeeTableDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      }
+    },
+    "/api/v1/admin/fee-tables/{id}": {
+      "delete": {
+        "operationId": "SellerToolsController_deleteFeeTable",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "seller"
+        ]
+      }
+    },
     "/api/v1/billing/plans": {
       "get": {
         "operationId": "BillingController_listPlans",
@@ -4768,6 +5246,141 @@
         "required": [
           "platformId",
           "type"
+        ]
+      },
+      "ImportCsvDto": {
+        "type": "object",
+        "properties": {
+          "csv": {
+            "type": "string",
+            "description": "The file's text: a header row with sku and name, then one product per line.",
+            "minLength": 1,
+            "maxLength": 1000000
+          }
+        },
+        "required": [
+          "csv"
+        ]
+      },
+      "ImportUrlDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 1000,
+            "format": "uri"
+          },
+          "sku": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "cost": {
+            "type": "number",
+            "minimum": 0
+          },
+          "price": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "RepricerSettingsDto": {
+        "type": "object",
+        "properties": {
+          "strategy": {
+            "type": "string",
+            "nullable": true,
+            "description": "null turns the repricer off for this product.",
+            "enum": [
+              "BEAT_LOWEST",
+              "MATCH_LOWEST"
+            ]
+          },
+          "offset": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "floor": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0.01
+          },
+          "ceiling": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0.01
+          }
+        },
+        "required": [
+          "strategy"
+        ]
+      },
+      "AddRankKeywordDto": {
+        "type": "object",
+        "properties": {
+          "platformId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "keyword": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 160
+          }
+        },
+        "required": [
+          "platformId",
+          "keyword"
+        ]
+      },
+      "UpsertFeeTableDto": {
+        "type": "object",
+        "properties": {
+          "platformId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "categoryKey": {
+            "type": "string",
+            "description": "A category slug, or empty for the platform default.",
+            "maxLength": 64
+          },
+          "commissionPct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "fixedFee": {
+            "type": "number",
+            "minimum": 0
+          },
+          "shippingFee": {
+            "type": "number",
+            "minimum": 0
+          },
+          "returnRatePct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "vatPct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "platformId",
+          "commissionPct"
         ]
       },
       "CreateCheckoutDto": {

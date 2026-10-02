@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { MatchStatus, OrgRole, Prisma } from '@prisma/client';
+import { MatchStatus, OrgRole, PriceChangeSource, Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { EntitlementsService } from '../billing/entitlements.service';
 import { PlanLimitExceededException } from '../billing/billing.errors';
@@ -28,6 +28,7 @@ export interface SellerProductView {
   targetMarginPct: number | null;
   minMarginPct: number | null;
   mapPrice: number | null;
+  listingUrl: string | null;
   isActive: boolean;
   currency: string;
   position: MarketPosition;
@@ -142,6 +143,7 @@ export class SellerProductsService {
       targetMarginPct: product.targetMarginPct,
       minMarginPct: product.minMarginPct,
       mapPrice: product.mapPrice != null ? Number(product.mapPrice) : null,
+      listingUrl: product.listingUrl,
       isActive: product.isActive,
       currency: this.currency,
       position,
@@ -216,6 +218,23 @@ export class SellerProductsService {
           data: { ...data, orgId: organization.id, sku: input.sku.trim() },
         });
 
+    // The repricer's audit log covers every price the seller sets, not only suggestions.
+    const before = existing?.currentPrice != null ? Number(existing.currentPrice) : null;
+    const after = product.currentPrice != null ? Number(product.currentPrice) : null;
+    if (after !== null && before !== after) {
+      await this.prisma.priceChangeLog.create({
+        data: {
+          orgId: organization.id,
+          sellerProductId: product.id,
+          oldPrice: existing?.currentPrice ?? null,
+          newPrice: product.currentPrice,
+          source: PriceChangeSource.EDITED,
+          reason: 'EDITED',
+          actorUserId: userId,
+        },
+      });
+    }
+
     return { id: product.id, sku: product.sku };
   }
 
@@ -258,7 +277,7 @@ export class SellerProductsService {
   }
 
   /** Competitor prices per canonical product, one row per store. */
-  private async getCompetitorPrices(canonicalIds: string[]): Promise<Map<string, CompetitorPrice[]>> {
+  async getCompetitorPrices(canonicalIds: string[]): Promise<Map<string, CompetitorPrice[]>> {
     const map = new Map<string, CompetitorPrice[]>();
     if (canonicalIds.length === 0) return map;
 
@@ -323,7 +342,7 @@ export class SellerProductsService {
    * state: a cache that callers had to remember to prime would silently
    * include the seller's own listing the first time anyone forgot.
    */
-  private excludeOurOwnListing(
+  excludeOurOwnListing(
     competitors: CompetitorPrice[],
     ownPlatformId: string | null,
   ): CompetitorPrice[] {

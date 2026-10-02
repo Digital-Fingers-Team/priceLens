@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { ArrowLeft, Check, ExternalLink, Info } from 'lucide-react';
 import { PositionBadge } from '@/components/seller/position-badge';
+import { SellerTools } from '@/components/seller/seller-tools';
 import { Badge, type BadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
@@ -263,6 +264,8 @@ export default function SellerProductPage() {
           </p>
         </CardBody>
       </Card>
+
+      <SellerTools orgId={orgId} productId={product.id} currency={currency} hasCost={product.cost != null} />
     </div>
   );
 }

@@ -19,6 +19,8 @@ import {
   RUN_ALERT_DIGEST_JOB,
   RUN_CART_WATCH_JOB,
   RUN_USED_MARKET_JOB,
+  RUN_SELLER_REPRICER_JOB,
+  RUN_RANK_TRACKING_JOB,
 } from './ingestion.jobs';
 import { retryUntilDone } from '../common/redis-resilience';
 import { JOB_PRIORITY } from './ingestion-queue.service';
@@ -38,6 +40,8 @@ const PRICE_ROLLUP_JOB_ID = 'scheduled-price-rollup';
 const ALERT_DIGEST_JOB_ID = 'scheduled-alert-digest';
 const CART_WATCH_JOB_ID = 'scheduled-cart-watch';
 const USED_MARKET_JOB_ID = 'scheduled-used-market';
+const SELLER_REPRICER_JOB_ID = 'scheduled-seller-repricer';
+const RANK_TRACKING_JOB_ID = 'scheduled-rank-tracking';
 
 @Injectable()
 export class IngestionScheduler implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -198,8 +202,24 @@ export class IngestionScheduler implements OnApplicationBootstrap, OnApplication
       { jobId: USED_MARKET_JOB_ID, priority: JOB_PRIORITY.scheduled, repeat: { cron: usedCron } },
     );
 
+    // After competitor detection has seen the latest prices.
+    const repricerCron = this.configService.get<string>('retailers.sellerRepricerCron', '50 * * * *');
+    await this.queue.add(
+      RUN_SELLER_REPRICER_JOB,
+      {},
+      { jobId: SELLER_REPRICER_JOB_ID, priority: JOB_PRIORITY.scheduled, repeat: { cron: repricerCron } },
+    );
+
+    // Once a day, at night in Cairo: one store search per tracked keyword.
+    const rankCron = this.configService.get<string>('retailers.rankTrackingCron', '30 2 * * *');
+    await this.queue.add(
+      RUN_RANK_TRACKING_JOB,
+      {},
+      { jobId: RANK_TRACKING_JOB_ID, priority: JOB_PRIORITY.scheduled, repeat: { cron: rankCron } },
+    );
+
     this.logger.log(
-      `Scheduled used market (${usedCron}), cart watch (${cartCron}), alert digest (${digestCron}), price rollup (${rollupCron}), notification retry (${retryCron}), subscription maintenance (${maintenanceCron}), ` +
+      `Scheduled repricer (${repricerCron}), rank tracking (${rankCron}), used market (${usedCron}), cart watch (${cartCron}), alert digest (${digestCron}), price rollup (${rollupCron}), notification retry (${retryCron}), subscription maintenance (${maintenanceCron}), ` +
         `competitor detection (${detectionCron}), MAP sweep (${mapCron}), ` +
         `launch detection (${launchCron}), weekly reports (${reportsCron}) ` +
         `and Arabic titles (${translationCron})`,

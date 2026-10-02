@@ -23,6 +23,7 @@ import type { RetailerListing } from '../../src/scraping/interfaces/retailer-lis
 import { upsertCategories } from '../../seed/generators/generateProducts';
 import { generateStores } from '../../seed/generators/generateStores';
 import { DEFAULT_PLAN_BLUEPRINTS } from '../../src/billing/plan-limits';
+import { RankTrackingService } from '../../src/seller-tools/rank-tracking.service';
 
 /**
  * Every route, called at least once (B-12): the happy path, plus an
@@ -994,6 +995,90 @@ describe('Every endpoint (e2e)', () => {
       body: { update_id: 1 },
     });
     await call('POST', '/api/v1/admin/telegram/webhook', 403, { token: free.token });
+    expectNoProblems();
+  });
+
+  it('v2 seller tools: import, profit, best platform, repricer, timeline, ranks', async () => {
+    const auth = { token: pro.token };
+    const owned = await call('GET', '/api/v1/seller/workspaces', 200, auth);
+    const orgId = owned.body.data.find((w: { role: string }) => w.role === 'OWNER').id as string;
+    const params = { orgId };
+    const noonUrl = 'https://www.noon.com/p/endpoints-noon-phone';
+
+    // Import: a CSV whose link we track is connected to the catalogue; bad lines are reported.
+    await call('POST', '/api/v1/seller/workspaces/{orgId}/import/csv', 403, { token: free.token, params, body: { csv: 'sku,name' } });
+    const csv = await call('POST', '/api/v1/seller/workspaces/{orgId}/import/csv', 201, {
+      ...auth,
+      params,
+      body: { csv: `sku,name,cost,price,url\nEP-CSV-1,Phone,30000,42000,${noonUrl}?ref=x\nEP-CSV-2,,1,1,` },
+    });
+    expect(csv.body.data).toMatchObject({ created: 1, updated: 0, linked: 1 });
+    expect(csv.body.data.errors).toHaveLength(1);
+    const imported = await prisma.sellerProduct.findUniqueOrThrow({ where: { orgId_sku: { orgId, sku: 'EP-CSV-1' } } });
+    expect(imported.canonicalProductId).toBe(productId);
+    const product = { orgId, productId: imported.id };
+
+    await call('POST', '/api/v1/seller/workspaces/{orgId}/import/url', 400, { ...auth, params, body: { url: 'nope' } });
+    const byUrl = await call('POST', '/api/v1/seller/workspaces/{orgId}/import/url', 201, {
+      ...auth,
+      params,
+      body: { url: 'https://www.jumia.com.eg/p/endpoints-jumia-phone', cost: 30000 },
+    });
+    expect(byUrl.body.data).toMatchObject({ linked: true, created: true });
+
+    // Fees are admin-maintained; profit and best platform read them.
+    await call('PUT', '/api/v1/admin/fee-tables', 403, { token: free.token, body: { platformId, commissionPct: 10 } });
+    await call('PUT', '/api/v1/admin/fee-tables', 400, { token: admin.token, body: { platformId, commissionPct: 150 } });
+    const fees = await call('PUT', '/api/v1/admin/fee-tables', 200, {
+      token: admin.token,
+      body: { platformId, commissionPct: 10, vatPct: 0, notes: 'e2e' },
+    });
+    await call('GET', '/api/v1/admin/fee-tables', 200, { token: admin.token });
+    await call('GET', '/api/v1/seller/workspaces/{orgId}/products/{productId}/profit', 403, { token: free.token, params: product });
+    const profit = await call('GET', '/api/v1/seller/workspaces/{orgId}/products/{productId}/profit', 200, { ...auth, params: product });
+    // 42000 − 10% commission − 30000 cost
+    expect(profit.body.data.rows[0].breakdown).toMatchObject({ commission: 4200, netProfit: 7800 });
+    const best = await call('GET', '/api/v1/seller/workspaces/{orgId}/products/{productId}/best-platform', 200, { ...auth, params: product });
+    expect(best.body.data.rows[0]).toMatchObject({ marketPrice: 42999, priceSource: 'MARKET' });
+
+    // Repricer: suggestion only, never below the floor, every change logged.
+    await call('PUT', '/api/v1/seller/workspaces/{orgId}/products/{productId}/repricer', 400, {
+      ...auth,
+      params: product,
+      body: { strategy: 'BEAT_LOWEST', floor: 50000, ceiling: 40000 },
+    });
+    const repricer = await call('PUT', '/api/v1/seller/workspaces/{orgId}/products/{productId}/repricer', 200, {
+      ...auth,
+      params: product,
+      body: { strategy: 'BEAT_LOWEST', offset: 100, floor: 41450 },
+    });
+    expect(repricer.body.data).toMatchObject({ suggestedPrice: 41450, suggestionReason: 'HELD_AT_FLOOR', autoMode: { available: false } });
+    await call('GET', '/api/v1/seller/workspaces/{orgId}/products/{productId}/repricer', 200, { ...auth, params: product });
+    const applied = await call('POST', '/api/v1/seller/workspaces/{orgId}/products/{productId}/repricer/apply', 201, { ...auth, params: product });
+    expect(applied.body.data.currentPrice).toBe(41450);
+    expect(applied.body.data.log.map((l: { source: string }) => l.source)).toEqual(['APPLIED', 'SUGGESTED', 'IMPORTED']);
+    const exported = await call('GET', '/api/v1/seller/workspaces/{orgId}/repricer/export', 200, { ...auth, params });
+    expect(exported.body.data.csv).toContain('EP-CSV-1,Phone,41450,41450,HELD_AT_FLOOR');
+
+    await call('GET', '/api/v1/seller/workspaces/{orgId}/products/{productId}/timeline', 200, { ...auth, params: product, query: { days: 30 } });
+
+    // Search rank: the daily check finds the listing first in the store's results.
+    const platforms = await call('GET', '/api/v1/seller/rank-platforms', 200, auth);
+    const noon = platforms.body.data.find((p: { name: string }) => /noon/i.test(p.name));
+    await call('POST', '/api/v1/seller/workspaces/{orgId}/products/{productId}/ranks', 400, { ...auth, params: product, body: { platformId: noon.id, keyword: 'x' } });
+    const keyword = await call('POST', '/api/v1/seller/workspaces/{orgId}/products/{productId}/ranks', 201, {
+      ...auth,
+      params: product,
+      body: { platformId: noon.id, keyword: 'iPhone 15' },
+    });
+    await app.get(RankTrackingService).runAll(0);
+    const ranks = await call('GET', '/api/v1/seller/workspaces/{orgId}/products/{productId}/ranks', 200, { ...auth, params: product });
+    expect(ranks.body.data[0]).toMatchObject({ keyword: 'iphone 15', latest: { position: 1, scanned: 2 } });
+    await call('DELETE', '/api/v1/seller/workspaces/{orgId}/ranks/{keywordId}', 200, { ...auth, params: { orgId, keywordId: keyword.body.data.id } });
+
+    // Clean up.
+    await call('DELETE', '/api/v1/admin/fee-tables/{id}', 200, { token: admin.token, params: { id: fees.body.data.id } });
+    await prisma.sellerProduct.deleteMany({ where: { orgId, sku: { in: ['EP-CSV-1', byUrl.body.data.sku] } } });
     expectNoProblems();
   });
 

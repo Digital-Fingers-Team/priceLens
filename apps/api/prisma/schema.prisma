@@ -225,6 +225,8 @@ model Platform {
   landedCostRules  LandedCostRule[]
   promos           Promo[]
   warrantyRules    WarrantyRule[]
+  feeTables        PlatformFeeTable[]
+  rankKeywords     RankKeyword[]
 
   @@map("platforms")
 }
@@ -1086,6 +1088,8 @@ model Organization {
   reports     MarketReport[]
   apiKeys     ApiKey[]
   invites     OrganizationInvite[]
+  priceLogs   PriceChangeLog[]
+  rankKeywords RankKeyword[]
 
   @@index([platformId])
   @@map("organizations")
@@ -1155,6 +1159,18 @@ model SellerProduct {
   // Minimum advertised price the brand imposes on this SKU (stage 4).
   mapPrice Decimal? @map("map_price") @db.Decimal(12, 2)
 
+  // The seller's own listing, when they connected one by link or CSV.
+  listingUrl String? @map("listing_url") @db.VarChar(1000)
+
+  // Repricer (suggestion mode). Null strategy = repricer off for this SKU.
+  floorPrice       Decimal?          @map("floor_price") @db.Decimal(12, 2)
+  ceilingPrice     Decimal?          @map("ceiling_price") @db.Decimal(12, 2)
+  repricerStrategy RepricerStrategy? @map("repricer_strategy")
+  repricerOffset   Decimal           @default(1) @map("repricer_offset") @db.Decimal(12, 2)
+  suggestedPrice   Decimal?          @map("suggested_price") @db.Decimal(12, 2)
+  suggestionReason String?           @map("suggestion_reason") @db.VarChar(32)
+  suggestedAt      DateTime?         @map("suggested_at")
+
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1162,6 +1178,8 @@ model SellerProduct {
   organization     Organization      @relation(fields: [orgId], references: [id], onDelete: Cascade)
   canonicalProduct CanonicalProduct? @relation(fields: [canonicalProductId], references: [id], onDelete: SetNull)
   events           CompetitorEvent[]
+  priceLogs        PriceChangeLog[]
+  rankKeywords     RankKeyword[]
 
   @@unique([orgId, sku])
   @@index([orgId, isActive])
@@ -1694,4 +1712,92 @@ model UsedPriceSnapshot {
 
   @@index([canonicalProductId, capturedAt])
   @@map("used_price_snapshots")
+}
+
+// ── v2 phase 6: seller tools ──────────────────────────────────────────
+
+enum RepricerStrategy {
+  BEAT_LOWEST // a set amount below the cheapest competitor
+  MATCH_LOWEST
+}
+
+enum PriceChangeSource {
+  SUGGESTED // the repricer proposed it; nothing changed on any store
+  APPLIED // the seller accepted a suggestion (they change the store themselves)
+  EDITED // the seller typed a new price
+  IMPORTED // a CSV import set it
+}
+
+/// Admin-maintained selling fees per platform, optionally per category.
+/// categoryKey "" is the platform default.
+model PlatformFeeTable {
+  id            String   @id @default(uuid())
+  platformId    String   @map("platform_id")
+  categoryKey   String   @default("") @map("category_key") @db.VarChar(64)
+  commissionPct Float    @map("commission_pct")
+  fixedFee      Decimal  @default(0) @map("fixed_fee") @db.Decimal(12, 2)
+  shippingFee   Decimal  @default(0) @map("shipping_fee") @db.Decimal(12, 2)
+  returnRatePct Float    @default(0) @map("return_rate_pct")
+  vatPct        Float    @default(14) @map("vat_pct")
+  notes         String?  @db.VarChar(500)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  platform Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+
+  @@unique([platformId, categoryKey])
+  @@map("platform_fee_tables")
+}
+
+/// Every price a seller product moved to, or was advised to move to.
+model PriceChangeLog {
+  id              String            @id @default(uuid())
+  orgId           String            @map("org_id")
+  sellerProductId String            @map("seller_product_id")
+  oldPrice        Decimal?          @map("old_price") @db.Decimal(12, 2)
+  newPrice        Decimal?          @map("new_price") @db.Decimal(12, 2)
+  source          PriceChangeSource
+  reason          String            @db.VarChar(64)
+  actorUserId     String?           @map("actor_user_id")
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  organization  Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  sellerProduct SellerProduct @relation(fields: [sellerProductId], references: [id], onDelete: Cascade)
+
+  @@index([sellerProductId, createdAt])
+  @@index([orgId, createdAt])
+  @@map("price_change_logs")
+}
+
+/// A keyword whose search position the seller tracks on one platform.
+model RankKeyword {
+  id              String   @id @default(uuid())
+  orgId           String   @map("org_id")
+  sellerProductId String   @map("seller_product_id")
+  platformId      String   @map("platform_id")
+  keyword         String   @db.VarChar(160)
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  organization  Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  sellerProduct SellerProduct  @relation(fields: [sellerProductId], references: [id], onDelete: Cascade)
+  platform      Platform       @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  snapshots     RankSnapshot[]
+
+  @@unique([sellerProductId, platformId, keyword])
+  @@index([orgId])
+  @@map("rank_keywords")
+}
+
+/// One check: position null = not in the first `scanned` results.
+model RankSnapshot {
+  id        String   @id @default(uuid())
+  keywordId String   @map("keyword_id")
+  position  Int?
+  scanned   Int
+  checkedAt DateTime @default(now()) @map("checked_at")
+
+  keyword RankKeyword @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+
+  @@index([keywordId, checkedAt])
+  @@map("rank_snapshots")
 }
