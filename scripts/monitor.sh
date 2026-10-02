@@ -33,7 +33,7 @@ ALERT_ENV="${ALERT_ENV:-$HOME/.config/pricelens/alerts.env}"
 [[ -f "$ALERT_ENV" ]] && . "$ALERT_ENV"
 
 STATE_DIR="${STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/pricelens/monitor}"
-SITE="${SITE:-pricelens.work.gd}"
+SITE="${SITE:-pricelens.store}"
 API_PORT="${API_PORT:-3002}"
 BACKUP_DIR="${BACKUP_DIR:-$HOME/pricelens/backups/db}"
 DISK_PCT="${DISK_PCT:-85}"

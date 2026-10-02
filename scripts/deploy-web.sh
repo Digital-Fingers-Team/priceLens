@@ -200,7 +200,7 @@ sleep 2
 served=0
 for _ in $(seq 1 10); do
   code="$(curl -s -o /dev/null -w '%{http_code}' -m 5 \
-    --resolve "pricelens.work.gd:443:127.0.0.1" https://pricelens.work.gd/ || true)"
+    --resolve "pricelens.store:443:127.0.0.1" https://pricelens.store/ || true)"
   if [[ "$code" == "200" ]]; then served=1; break; fi
   sleep 2
 done
