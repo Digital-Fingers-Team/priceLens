@@ -4,7 +4,7 @@ import { EmptyState } from '@/components/ui/state';
 import { usePathname, useRouter } from '@/lib/i18n/navigation';
 import { useI18n } from '@/lib/i18n/provider';
 import { bestDealIds } from '@/lib/utils/price';
-import { filterByColor, offerColors, sortOffers } from '@/lib/utils/offers';
+import { filterByColor, groupByStore, offerColors, sortOffers } from '@/lib/utils/offers';
 import { cn } from '@/lib/utils/cn';
 import type { SourceListing } from '@/types/product.types';
 import { OfferRow } from './offer-row';
@@ -15,7 +15,8 @@ interface OfferListProps {
 
 /**
  * Every store's offer for this product, cheapest buyable first (audit 06,
- * U-02).
+ * U-02). One box per store: its cheapest offer leads, and its other offers
+ * fold under it, so a store listed five times is still one row to scan.
  *
  * Colors share one product (owner decision D-6), so when the offers name more
  * than one color a chip row filters them; the choice lives in the URL
@@ -44,6 +45,7 @@ export function OfferList({ listings }: OfferListProps) {
 
   const offers = sortOffers(filterByColor(listings, color));
   const bestDeals = bestDealIds(offers);
+  const stores = groupByStore(offers);
 
   function selectColor(next: string | null) {
     setRequested(next);
@@ -83,8 +85,8 @@ export function OfferList({ listings }: OfferListProps) {
       )}
 
       <ul className="divide-y divide-border overflow-hidden rounded border border-border bg-surface">
-        {offers.map((listing) => (
-          <OfferRow key={listing.id} listing={listing} isBest={bestDeals.has(listing.id)} />
+        {stores.map(([lead, ...more]) => (
+          <OfferRow key={lead.id} listing={lead} isBest={bestDeals.has(lead.id)} more={more} bestDeals={bestDeals} />
         ))}
       </ul>
     </div>

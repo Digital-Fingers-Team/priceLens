@@ -121,3 +121,53 @@ describe('OfferList in Arabic', () => {
     expect(screen.getByText('غير متوفر')).toBeTruthy();
   });
 });
+
+describe('OfferList, one box per store', () => {
+  beforeEach(() => setQuery(''));
+  afterEach(cleanup);
+
+  const jumia = store('p1', 'Jumia');
+  const many = [
+    listing({ id: 'j1', platform: jumia, priceUsd: 380, rawPrice: 18500, color: 'navy', rawTitle: 'A57 Navy' }),
+    listing({ id: 'j2', platform: jumia, priceUsd: 395, rawPrice: 19200, color: 'lilac', rawTitle: 'A57 Lilac' }),
+    listing({ id: 'j3', platform: jumia, priceUsd: 400, rawPrice: 19500, color: 'navy', rawTitle: 'A57 Navy dual SIM' }),
+    listing({ id: 'z', platform: store('p3', 'Amazon'), priceUsd: 390, rawPrice: 19000, color: 'navy' }),
+  ];
+
+  it('shows a store once, led by its cheapest offer, with the rest folded under a toggle', () => {
+    render(<OfferList listings={many} />);
+    expect(rowNames()).toEqual(['Jumia', 'Amazon']);
+    expect(screen.queryByText('A57 Lilac')).toBeNull();
+
+    const toggle = screen.getByRole('button', { name: /\+2 more offers/ });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(toggle.textContent).toMatch(/18,500.*19,500/);
+
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    const panel = screen.getByRole('list', { name: 'Other offers at Jumia' });
+    expect(within(panel).getAllByRole('listitem').map((li) => within(li).getByText(/^A57/).textContent)).toEqual([
+      'A57 Lilac',
+      'A57 Navy dual SIM',
+    ]);
+    expect(within(panel).getAllByRole('link', { name: 'Go to Jumia (opens in a new tab)' })[0].getAttribute('href')).toBe(
+      '/api/v1/affiliate/go/j2',
+    );
+  });
+
+  it('has no toggle for a store with one offer', () => {
+    render(<OfferList listings={offers} />);
+    expect(screen.queryByRole('button', { name: /more offer/ })).toBeNull();
+  });
+
+  it('regroups after a color filter', () => {
+    setQuery('color=navy');
+    render(<OfferList listings={many} />);
+    expect(screen.getByRole('button', { name: /\+1 more offer(?!s)/ })).toBeTruthy();
+  });
+
+  it('counts the other offers in Arabic', () => {
+    render(<OfferList listings={many} />, 'ar');
+    expect(screen.getByRole('button', { name: /\+عرضان آخران/ })).toBeTruthy();
+  });
+});

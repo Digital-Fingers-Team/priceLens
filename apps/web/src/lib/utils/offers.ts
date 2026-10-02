@@ -49,3 +49,18 @@ export function cheapestOffer<T extends Offer>(offers: readonly T[]): T | null {
   const best = bestDealIds(offers);
   return sortOffers(offers).find((offer) => best.has(offer.id)) ?? null;
 }
+
+/**
+ * One box per store: offers already in display order, grouped by store in
+ * the order each store first appears, so a store sits where its cheapest
+ * offer would. The first offer of each group leads it.
+ */
+export function groupByStore<T extends Offer & Pick<SourceListing, 'platform'>>(offers: readonly T[]): T[][] {
+  const groups = new Map<string, T[]>();
+  for (const offer of offers) {
+    const group = groups.get(offer.platform.id);
+    if (group) group.push(offer);
+    else groups.set(offer.platform.id, [offer]);
+  }
+  return [...groups.values()];
+}
