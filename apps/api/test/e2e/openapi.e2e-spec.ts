@@ -22,6 +22,7 @@ const COMMITTED = path.resolve(__dirname, '../../../../docs/openapi.json');
 const UNDOCUMENTED = [
   '/api/v1/billing/webhook', // @ApiExcludeController: Stripe calls it, not API clients
   '/api/v1/partner/', // @ApiExcludeController: its own snake_case contract
+  '/api/v1/telegram/webhook', // @ApiExcludeEndpoint: Telegram calls it, not API clients
 ];
 
 /** The plain-Express service banner in app.setup.ts. */

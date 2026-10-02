@@ -3565,6 +3565,59 @@
         ]
       }
     },
+    "/api/v1/search/image": {
+      "post": {
+        "operationId": "ImageSearchController_recognise",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Multipart field \"image\". Answers what it recognised and the search to run.",
+        "tags": [
+          "search"
+        ]
+      }
+    },
+    "/api/v1/advisor": {
+      "post": {
+        "operationId": "AdvisorController_ask",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskAdvisorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "advisor"
+        ]
+      }
+    },
     "/api/v1/deal-hunter": {
       "get": {
         "operationId": "DealHunterController_hunt",
@@ -3628,6 +3681,20 @@
         "summary": "Shows what the parser understood, without running a search.\n\nPublic and cheap: it powers live \"we read this as ...\" feedback as the\nuser types, which is what makes a natural-language box trustworthy rather\nthan a black box. It reveals nothing about pricing.",
         "tags": [
           "deal-hunter"
+        ]
+      }
+    },
+    "/api/v1/admin/telegram/webhook": {
+      "post": {
+        "operationId": "TelegramBotController_register",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "telegram"
         ]
       }
     },
@@ -5008,6 +5075,19 @@
         },
         "required": [
           "platformId"
+        ]
+      },
+      "AskAdvisorDto": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "message"
         ]
       },
       "IssueApiKeyDto": {

@@ -62,8 +62,12 @@ Entitlements service + `@RequiresFeature` guard + `useEntitlements()` hook + `Up
 - [x] Unit price (per kg / litre) from size-labelled titles, on the product page
 - [ ] Grocery stores (Breadfast, Talabat Mart) and pharmacies (El Ezaby, Chefaa, Yodawy): app-first or bot-walled; none exposes a catalogue we can read over the web. Deferred until a reachable source exists
 
-## Phase 5 — New input channels
-- [ ] Image / screenshot search · [ ] Telegram bot · [ ] Advisor
+## Phase 5 — New input channels (`feat/phase-5-input-channels`)
+- [x] LLM layer behind one interface: Gemini (default, reuses the search keys) then Claude when `ANTHROPIC_API_KEY` is set; a failing provider is paused and the next one tried; every answer is validated before use
+- [x] Image / screenshot search (Pro): photo → recognised product → normal search. JPEG/PNG/WebP up to 5 MB, kept in memory only, never stored; daily cap per user (`IMAGE_SEARCH_DAILY_LIMIT`)
+- [x] Advisor (Pro, `/advisor`): the model only rewrites the request into a search and picks among Deal Hunter results; it never supplies products or prices (picks are checked against the candidate ids). Without a model, Deal Hunter's top 3 are shown. Daily cap (`ADVISOR_DAILY_LIMIT`)
+- [x] Telegram bot: `/start` links the account with the existing verification code, a product name or store link returns the best prices, a photo searches by image for Pro users. Per-chat daily limit (10 free / 100 paid). Webhook authenticated by `TELEGRAM_WEBHOOK_SECRET`
+- [ ] Review summaries: no review text is collected yet (tables exist since phase 3). Deferred until a review source is crawled
 
 ## Phase 6 — Seller tools
 - [ ] Listing import (URL/CSV) · [ ] Competitor timeline (exists: verify) · [ ] New-competitor alert (exists: verify) · [ ] Profit calculator + `platform_fee_tables` · [ ] Best-platform finder · [ ] Repricer (suggestion mode, audit log) · [ ] Rank tracking

@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { RedisCacheService } from '../../common/cache/redis-cache.service';
 import { ConfigService } from '@nestjs/config';
 import { NotificationChannelType } from '@prisma/client';
 import axios, { AxiosInstance } from 'axios';
@@ -17,7 +18,10 @@ export class TelegramChannel implements NotificationChannelDriver {
   private readonly logger = new Logger(TelegramChannel.name);
   private readonly http: AxiosInstance | null;
 
-  constructor(private readonly config: ConfigService) {
+  constructor(
+    private readonly config: ConfigService,
+    @Optional() private readonly cache?: RedisCacheService,
+  ) {
     const token = this.config.get<string>('notifications.telegramBotToken', '');
     if (!token) {
       this.logger.warn('TELEGRAM_BOT_TOKEN is not set — Telegram notifications are disabled');
@@ -72,6 +76,11 @@ export class TelegramChannel implements NotificationChannelDriver {
    */
   async findChatIdByVerificationCode(code: string): Promise<string | null> {
     if (!this.http) return null;
+
+    // With the price bot's webhook set, Telegram no longer serves getUpdates;
+    // the bot stores the codes it receives here instead.
+    const fromBot = await this.cache?.client.get(`tg-verify:${code.toUpperCase()}`).catch(() => null);
+    if (fromBot) return fromBot;
 
     try {
       const response = await this.http.get('/getUpdates', { params: { limit: 100, timeout: 0 } });

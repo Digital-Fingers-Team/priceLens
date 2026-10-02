@@ -975,6 +975,28 @@ describe('Every endpoint (e2e)', () => {
     expectNoProblems();
   });
 
+  it('v2 input channels: image search, advisor, Telegram bot', async () => {
+    // Image search is a Pro feature; with no photo attached it is a 400.
+    await call('POST', '/api/v1/search/image', 403, { token: free.token });
+    await call('POST', '/api/v1/search/image', 400, { token: pro.token });
+
+    // The advisor: no model configured in tests, so it answers from Deal Hunter alone.
+    await call('POST', '/api/v1/advisor', 403, { token: free.token, body: { message: 'iphone 15' } });
+    await call('POST', '/api/v1/advisor', 400, { token: pro.token, body: { message: 'x' } });
+    const advice = await call('POST', '/api/v1/advisor', 201, { token: pro.token, body: { message: 'iphone 15' } });
+    expect(advice.body.data.generatedBy).toBe('rules');
+    for (const pick of advice.body.data.picks) expect(typeof pick.product.productId).toBe('string');
+
+    // Telegram: no webhook secret configured, so every call is refused.
+    await call('POST', '/api/v1/telegram/webhook', 403, { body: { update_id: 1 } });
+    await call('POST', '/api/v1/telegram/webhook', 403, {
+      headers: { 'x-telegram-bot-api-secret-token': '' },
+      body: { update_id: 1 },
+    });
+    await call('POST', '/api/v1/admin/telegram/webhook', 403, { token: free.token });
+    expectNoProblems();
+  });
+
   it('calls every registered route', () => {
     interface Layer {
       route?: { path: string; methods: Record<string, boolean> };

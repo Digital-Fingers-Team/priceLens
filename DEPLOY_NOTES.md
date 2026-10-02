@@ -9,7 +9,8 @@ What the owner needs to know to run the v2 features: credentials to create, what
 | Paymob (cards, wallets, Fawry) | `PAYMOB_SECRET_KEY`, `PAYMOB_PUBLIC_KEY`, `PAYMOB_HMAC_SECRET`, `PAYMOB_INTEGRATION_IDS` | Not offered at checkout. Wallet/InstaPay keeps working. Paymob needs a registered business; the owner said on 2026-09-29 the business is not registered yet. |
 | Paymob callback | In the Paymob dashboard, set the transaction-processed callback to `https://pricelens.work.gd/api/v1/billing/webhook/paymob` | Payments would not activate plans |
 | Email (invites, alerts) | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_FROM` | Invitations show a link to copy by hand; email alerts are recorded as SKIPPED |
-| Telegram alerts | `TELEGRAM_BOT_TOKEN` | Telegram channel inert (SKIPPED) |
+| Telegram alerts and bot | `TELEGRAM_BOT_TOKEN` (from @BotFather), `TELEGRAM_WEBHOOK_SECRET` (any long random string) | Telegram channel inert (SKIPPED); the bot refuses every webhook call. After setting both, redeploy, then as admin `POST /api/v1/admin/telegram/webhook` once |
+| Image search, advisor (optional second model) | `ANTHROPIC_API_KEY` | Gemini (the existing `GEMINI_API_KEY(S)`) does the work alone. With no model at all, image search answers 503 and the advisor falls back to Deal Hunter's top picks |
 | Browser push | `WEB_PUSH_PUBLIC_KEY`, `WEB_PUSH_PRIVATE_KEY`, `WEB_PUSH_SUBJECT` | **Done on this server** (generated 2026-10-01, our own keys: no account). Regenerating them signs every browser out of push |
 | Stripe (optional) | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, plus a Stripe Price id on each plan | Stripe checkout hidden |
 
@@ -49,3 +50,7 @@ New job: `run-cart-watch` (`CART_WATCH_CRON`, hourly at :40).
 Migration `20261001300000_v2_coverage`: enum `StoreKind`, `platforms.kind` (B.TECH, 2B, Elaraby, Dream 2000 → OFFLINE_CHAIN), new platforms **Tradeline** and **Compumarts**, table `used_price_snapshots` (aggregates only).
 
 New job: `run-used-market` (`USED_MARKET_CRON`, 01:15 UTC; `USED_MARKET_BATCH`, 120 products, one OpenSooq request every 3 s). Flag `used_market` turns it and the product-page range off.
+
+## Phase 5 — New input channels
+
+No migration. New routes: `POST /search/image` (Pro, multipart field `image`), `POST /advisor` (Pro), `POST /telegram/webhook` (Telegram only, secret header), `POST /admin/telegram/webhook` (admin, registers the webhook). Images are never written to disk or the database. Flag `telegram_bot` turns the bot off; `image_search` and `advisor` are plan features with their own flags.

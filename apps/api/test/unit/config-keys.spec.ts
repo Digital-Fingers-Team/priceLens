@@ -6,6 +6,7 @@ import authConfig from '../../src/config/auth.config';
 import billingConfig from '../../src/config/billing.config';
 import databaseConfig from '../../src/config/database.config';
 import notificationsConfig from '../../src/config/notifications.config';
+import llmConfig from '../../src/config/llm.config';
 import pricingConfig from '../../src/config/pricing.config';
 import redisConfig from '../../src/config/redis.config';
 import retailersConfig from '../../src/config/retailers.config';
@@ -23,6 +24,7 @@ const FACTORIES = [
   authConfig,
   billingConfig,
   databaseConfig,
+  llmConfig,
   notificationsConfig,
   pricingConfig,
   redisConfig,

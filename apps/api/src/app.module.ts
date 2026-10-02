@@ -22,6 +22,10 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { IntelligenceModule } from './intelligence/intelligence.module';
 import { BuyerModule } from './buyer/buyer.module';
 import { UsedMarketModule } from './used-market/used-market.module';
+import { LlmModule } from './llm/llm.module';
+import { ImageSearchModule } from './image-search/image-search.module';
+import { AdvisorModule } from './advisor/advisor.module';
+import { TelegramBotModule } from './telegram-bot/telegram-bot.module';
 import { DealHunterModule } from './deal-hunter/deal-hunter.module';
 import { SellerModule } from './seller/seller.module';
 import { BrandModule } from './brand/brand.module';
@@ -38,6 +42,7 @@ import pricingConfig from './config/pricing.config';
 import affiliateConfig from './config/affiliate.config';
 import billingConfig from './config/billing.config';
 import notificationsConfig from './config/notifications.config';
+import llmConfig from './config/llm.config';
 import { resolveEnvFiles } from './config/env-files';
 import { validateEnv } from './config/env.validation';
 import { RedisCacheModule } from './common/cache/redis-cache.module';
@@ -61,6 +66,7 @@ export const ENV_FILES = resolveEnvFiles();
         pricingConfig,
         affiliateConfig,
         billingConfig,
+        llmConfig,
         notificationsConfig,
       ],
       // Shared with apps/web from the repo root — see /.env.example and
@@ -127,6 +133,10 @@ export const ENV_FILES = resolveEnvFiles();
     IntelligenceModule,
     BuyerModule,
     UsedMarketModule,
+    LlmModule,
+    ImageSearchModule,
+    AdvisorModule,
+    TelegramBotModule,
     DealHunterModule,
     SellerModule,
     BrandModule,

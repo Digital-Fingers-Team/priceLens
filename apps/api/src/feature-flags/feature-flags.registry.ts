@@ -24,6 +24,7 @@ export const OPERATIONAL_FLAGS = {
   WARRANTY_INFO: 'warranty_info',
   SELLER_CAUTION: 'seller_caution',
   USED_MARKET: 'used_market',
+  TELEGRAM_BOT: 'telegram_bot',
 } as const;
 
 export type OperationalFlag = (typeof OPERATIONAL_FLAGS)[keyof typeof OPERATIONAL_FLAGS];
@@ -62,6 +63,9 @@ const SHIPPED: FeatureKey[] = [
   FEATURES.CARD_OFFERS,
   FEATURES.VERIFIED_COUPONS,
   FEATURES.CART_WATCH,
+  // v2, phase 5
+  FEATURES.IMAGE_SEARCH,
+  FEATURES.ADVISOR,
 ];
 
 const featureFlags = Object.fromEntries(
@@ -107,6 +111,10 @@ export const FLAG_REGISTRY: Record<FlagKey, FlagDefinition> = {
   [OPERATIONAL_FLAGS.USED_MARKET]: {
     defaultOn: true,
     description: 'Second-hand price range from OpenSooq (aggregates only), and its daily sweep',
+  },
+  [OPERATIONAL_FLAGS.TELEGRAM_BOT]: {
+    defaultOn: true,
+    description: 'The Telegram price bot (also needs TELEGRAM_BOT_TOKEN and TELEGRAM_WEBHOOK_SECRET)',
   },
   [OPERATIONAL_FLAGS.RENEWAL_REMINDERS]: {
     defaultOn: true,

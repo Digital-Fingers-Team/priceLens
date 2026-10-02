@@ -15,6 +15,8 @@ export default registerAs('notifications', () => ({
   // ─── Telegram ──────────────────────────────────────────────────────────
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN ?? '',
   telegramApiBase: process.env.TELEGRAM_API_BASE ?? 'https://api.telegram.org',
+  // The bot's webhook secret (any long random string); Telegram echoes it on every call.
+  telegramWebhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET ?? '',
 
   // How many notifications one user can be sent per hour across all channels.
   // Protects users from an alert storm (a scrape glitch that moves a thousand

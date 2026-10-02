@@ -7,6 +7,7 @@ import { useSuggest } from '@/lib/hooks/use-search';
 import { useRouter } from '@/lib/i18n/navigation';
 import { useI18n } from '@/lib/i18n/provider';
 import { cn } from '@/lib/utils/cn';
+import { ImageSearchButton } from './image-search-button';
 import { useDebounce } from '@/lib/hooks/use-debounce';
 
 interface SearchBarProps {
@@ -136,6 +137,7 @@ export function SearchBar({ initialValue = '', size = 'default', onSearch, class
               <X className="h-4 w-4" />
             </button>
           )}
+          {!query && <ImageSearchButton className={cn('absolute', isHero ? 'end-12' : 'end-10')} />}
 
           <button
             type="submit"
