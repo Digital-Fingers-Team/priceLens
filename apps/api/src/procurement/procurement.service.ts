@@ -49,7 +49,7 @@ export function cheapestPerStore(
 export function quoteTotal(items: Array<{ unitPrice: number | null; quantity: number }>): number | null {
   const priced = items.filter((item) => item.unitPrice != null);
   if (priced.length === 0) return null;
-  return priced.reduce((sum, item) => sum + (item.unitPrice as number) * item.quantity, 0);
+  return Math.round(priced.reduce((sum, item) => sum + (item.unitPrice as number) * item.quantity, 0) * 100) / 100;
 }
 
 type QuoteWithItems = ProcurementQuote & { items: ProcurementQuoteItem[] };
@@ -344,7 +344,7 @@ export class ProcurementService {
         storeSlug: item.storeSlug,
         storeKind: item.storeKind,
         unitPrice,
-        lineTotal: unitPrice != null ? unitPrice * item.quantity : null,
+        lineTotal: unitPrice != null ? Math.round(unitPrice * item.quantity * 100) / 100 : null,
         inStock: item.inStock,
         listingUrl: item.listingUrl,
         alternatives: item.alternatives as unknown as QuoteOffer[],

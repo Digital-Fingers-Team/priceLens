@@ -48,16 +48,20 @@ function fontPath(): string | null {
   return candidates.find((candidate) => existsSync(candidate)) ?? null;
 }
 
-const ARABIC = /[؀-ۿ]/;
+const ARABIC = /[\u0600-\u06FF]/;
 
 /**
- * Arabic text is shaped by the font but PDFKit lays it out left to right, so a
- * purely Arabic cell is reversed word by word to read correctly.
+ * PDFKit shapes Arabic letters with the bundled font but lays words out left to
+ * right and drops plain spaces between Arabic words. For text with Arabic, the
+ * word order is reversed so it reads right to left, spaces become no-break
+ * spaces (which survive) and Arabic-Indic digits become ASCII digits (which
+ * would otherwise come out reversed).
  */
-function visual(text: string): string {
+const visual = (text: string): string => {
   if (!ARABIC.test(text)) return text;
-  return text.split(' ').reverse().join(' ');
-}
+  const digits = text.replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660));
+  return digits.split(' ').reverse().join('\u00A0');
+};
 
 /** A simple paginated report: title, key facts, then one table per section. */
 export function renderPdf(input: PdfInput): Promise<Buffer> {
@@ -122,6 +126,8 @@ export function renderPdf(input: PdfInput): Promise<Buffer> {
     const range = doc.bufferedPageRange();
     for (let i = 0; i < range.count; i++) {
       doc.switchToPage(range.start + i);
+      // Writing below the bottom margin would add a blank page, so drop it for the footer.
+      doc.page.margins.bottom = 0;
       doc.fontSize(8).fillColor('#999').text(`PriceLens · ${i + 1}/${range.count}`, 40, doc.page.height - 30, {
         width,
         align: 'center',
