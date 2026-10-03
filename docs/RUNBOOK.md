@@ -95,6 +95,10 @@ Without either, alerts only reach the journal
 (`journalctl --user -u pricelens-monitor`). Test delivery:
 `MONITOR_TEST=1 ~/pricelens/scripts/monitor.sh`.
 
+Live status board: `scripts/status-report.sh` (timer `pricelens-status.timer`, every 5 min) edits one Telegram
+message in place (services, catalog, ingestion now/next, visitors online, Gemini key health).
+`STATUS_DRY=1` prints it; `STATUS_RESEND=1` posts a fresh one (to pin).
+
 ## The API answers 502 but the container is healthy
 
 nginx resolved the old address of a recreated API container. Reload it:

@@ -1,0 +1,6 @@
+[Unit]
+Description=PriceLens live status board for Telegram (scripts/status-report.sh)
+
+[Service]
+Type=oneshot
+ExecStart=%h/pricelens/scripts/status-report.sh
