@@ -89,5 +89,13 @@ Done by Claude in the repo: migrations, code, tests (lint, typecheck, unit, inte
 
 ## Smoke test
 
-Not run: it needs the deployed site. After step 1, check: home, search, a product page, `/pricing`, a test-mode checkout (admin-only `mock_checkout`), one alert end to end, `/seller` dashboard, `/importers`, `/business`, `/developers`, and an API key request (`GET /api/v1/partner/whoami` returns 200 with the key). Record the results here.
+Deployed 2026-10-03 (API and worker, then web; migration `20261003100000_v2_business` applied; backup `~/backups/pricelens-20261003-034953-pre-phase8.dump`).
 
+Checked against https://pricelens.store after the deploy:
+- 200: `/`, `/en`, `/ar`, `/search?q=iphone`, `/pricing`, `/developers` (English and Arabic), `/business`, `/seller`, `/importers`
+- `GET /api/v1/partner/whoami` without a key answers 401 with the key instructions; `GET /api/v1/trade/fx/rates` answers 200 (empty until the first FX refresh)
+- Seeds applied: 60 platform fee rows (Jumia, Amazon.eg) and the NBE and ALEXBANK 6-month Noon installment plans; import finder produced 21 opportunities
+
+Not checked (they need a signed-in account, which Claude does not have): test-mode checkout, one alert end to end, the seller dashboard with data, `/business` actions (MAP, authorized sellers, report PDF, quote PDF) and an API key call with a real key. Check them once by hand, and look at one Arabic PDF.
+
+Known: the worker queue holds a backlog of tens of thousands of low-priority `run-store-expansion` jobs, so jobs enqueued by hand can wait a long time for a free slot. FX rates and the trend radar fill in when their queued runs (or the scheduled runs at 07:20 / 13:20 UTC and Saturday 04:40 UTC) reach a slot.

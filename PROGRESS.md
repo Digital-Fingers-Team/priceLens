@@ -98,5 +98,5 @@ Entitlements service + `@RequiresFeature` guard + `useEntitlements()` hook + `Up
 - [x] Tests: pricing math (landed cost, installments, profit, repricer, FX, trade), billing webhooks and manual payments, alert integration, fixture tests for the Shopify-search chains, B.TECH, OpenSooq and the CBE rates page; e2e covers every route
 - [x] Full checks: lint, typecheck, unit, integration, e2e, web tests, API and web builds
 - [x] README (features, jobs), DEPLOY_NOTES (credentials, per-phase notes, release checklist)
-- [ ] Deploy phase 8 and smoke test: owner steps in DEPLOY_NOTES "Release checklist" (Claude is blocked from production)
-- [ ] Tag v2.0.0 after the deploy
+- [x] Deploy phase 8 (API, worker, web) and smoke test of public pages (signed-in checks listed in DEPLOY_NOTES)
+- [x] Tag v2.0.0
