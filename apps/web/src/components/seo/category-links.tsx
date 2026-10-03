@@ -14,7 +14,7 @@ function LinkList({ categories, current }: { categories: CategoryLink[]; current
           <Link
             href={`/categories/${category.slug}`}
             aria-current={category.slug === current ? 'page' : undefined}
-            className="inline-flex h-9 items-center rounded-sm border border-border-strong px-3 text-sm text-fg transition-colors hover:border-fg/60 aria-[current=page]:border-brand aria-[current=page]:text-brand"
+            className="inline-flex h-9 items-center rounded-sm border border-border-strong px-3 text-sm text-fg transition-colors hover:border-fg/60 aria-[current=page]:border-brand aria-[current=page]:text-brand-text"
           >
             {category.name}
           </Link>

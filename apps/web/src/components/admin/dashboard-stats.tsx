@@ -57,7 +57,7 @@ export function DashboardStats() {
         icon={TrendingUp}
         label="Match Rate"
         value={stats.matchRate}
-        color="text-brand"
+        color="text-brand-text"
         sub={`${formatNumber(stats.listings.accepted)} accepted`}
       />
       <StatCard

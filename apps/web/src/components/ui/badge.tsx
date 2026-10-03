@@ -1,11 +1,13 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils/cn';
 
-export type BadgeVariant = 'neutral' | 'brand' | 'success' | 'warning' | 'danger' | 'info' | 'outline';
+export type BadgeVariant = 'neutral' | 'brand' | 'savings' | 'success' | 'warning' | 'danger' | 'info' | 'outline';
 
 const variants: Record<BadgeVariant, string> = {
   neutral: 'bg-surface-2 text-muted',
   brand: 'bg-brand-soft text-brand-soft-fg',
+  // Money saved only (discounts, the lowest price): coral is a background.
+  savings: 'bg-accent text-accent-fg',
   success: 'bg-success-soft text-success',
   warning: 'bg-warning-soft text-warning',
   danger: 'bg-danger-soft text-danger',

@@ -52,7 +52,7 @@ export function Navbar() {
   return (
     <header className="glass sticky top-0 z-40 border-b">
       <div className="mx-auto flex h-16 max-w-page items-center justify-between gap-4 px-4 sm:px-6">
-        <Link href="/" className="flex shrink-0 items-center text-brand" aria-label={t.nav.home}>
+        <Link href="/" className="flex shrink-0 items-center text-brand-text" aria-label={t.nav.home}>
           {/* The wordmark needs room the phone header does not have, so the
               lens mark alone stands in below sm. */}
           <LensMark className="h-8 w-auto sm:hidden" />

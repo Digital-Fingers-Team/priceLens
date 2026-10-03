@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 
-type TokenName = 'brand' | 'muted' | 'fg' | 'border' | 'surface' | 'info' | 'danger' | 'success';
+type TokenName = 'brand' | 'brand-text' | 'accent' | 'muted' | 'fg' | 'border' | 'surface' | 'info' | 'danger' | 'success';
 
 function read(names: readonly TokenName[]): Record<TokenName, string> {
   const style = getComputedStyle(document.documentElement);

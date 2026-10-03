@@ -93,7 +93,7 @@ function OnlinePay({ planKey, providers }: { planKey: string; providers: OnlineP
             </p>
           )}
           <h2 className="flex items-center gap-2 text-base font-semibold text-fg">
-            <CreditCard className="h-4 w-4 text-brand" aria-hidden />
+            <CreditCard className="h-4 w-4 text-brand-text" aria-hidden />
             {t.pay.onlineTitle}
           </h2>
           <p className="text-sm text-muted">{t.pay.onlineLede}</p>

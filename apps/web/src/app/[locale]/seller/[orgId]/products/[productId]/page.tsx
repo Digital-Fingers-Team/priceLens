@@ -242,7 +242,7 @@ export default function SellerProductPage() {
               <dl className="flex flex-wrap items-end gap-x-8 gap-y-4">
                 <div className="flex flex-col gap-1">
                   <dt className="label-mono text-muted">{t.seller.recommended}</dt>
-                  <dd className="text-2xl font-semibold tabular-nums text-brand">{fmt.currency(rec.recommendedPrice, currency)}</dd>
+                  <dd className="text-2xl font-semibold tabular-nums text-brand-text">{fmt.currency(rec.recommendedPrice, currency)}</dd>
                 </div>
                 <Metric label={t.seller.floor} value={fmt.currency(rec.floorPrice, currency)} />
                 <Metric label={t.seller.targetPrice} value={fmt.currency(rec.targetPrice, currency)} />

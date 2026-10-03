@@ -65,7 +65,7 @@ function ProductLink({ product }: { product: TradeProduct | null }) {
   const { locale } = useI18n();
   if (!product) return null;
   return (
-    <Link href={`/products/${product.slug}`} className="line-clamp-2 text-fg hover:text-brand">
+    <Link href={`/products/${product.slug}`} className="line-clamp-2 text-fg hover:text-brand-text">
       {productTitle(product, locale)}
     </Link>
   );
@@ -282,7 +282,7 @@ function FxToday() {
   );
 }
 
-const CHART_TOKENS = ['brand', 'muted', 'border', 'info'] as const;
+const CHART_TOKENS = ['brand-text', 'muted', 'border', 'info'] as const;
 
 function FxHistoryCard() {
   const { t, tf, fmt, locale } = useI18n();
@@ -341,7 +341,7 @@ function FxHistoryCard() {
                   formatter={(value) => (typeof value === 'number' ? fmt.number(value) : '—')}
                   contentStyle={{ fontSize: 12 }}
                 />
-                <Line type="monotone" dataKey="cbe" name={t.trade.fx.cbe} stroke={colors.brand} strokeWidth={2} dot={false} connectNulls />
+                <Line type="monotone" dataKey="cbe" name={t.trade.fx.cbe} stroke={colors['brand-text']} strokeWidth={2} dot={false} connectNulls />
                 <Line
                   type="monotone"
                   dataKey="market"
@@ -523,7 +523,7 @@ function TrendRadarBody() {
                 <tr key={entry.category?.id}>
                   <Td>
                     {entry.category && (
-                      <Link href={`/categories/${entry.category.slug}`} className="text-fg hover:text-brand">
+                      <Link href={`/categories/${entry.category.slug}`} className="text-fg hover:text-brand-text">
                         {entry.category.name}
                       </Link>
                     )}

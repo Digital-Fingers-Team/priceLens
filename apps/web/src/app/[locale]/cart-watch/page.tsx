@@ -37,7 +37,7 @@ function Baskets() {
     <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-10 sm:px-6">
       <header className="flex flex-col gap-1">
         <h1 className="flex items-center gap-2 text-xl font-semibold text-fg">
-          <ShoppingBasket className="h-5 w-5 text-brand" aria-hidden />
+          <ShoppingBasket className="h-5 w-5 text-brand-text" aria-hidden />
           {t.baskets.title}
         </h1>
         <p className="text-sm text-muted">{t.baskets.lede}</p>
@@ -84,7 +84,7 @@ function BasketCard({ cart }: { cart: CartWatch }) {
         <ul className="flex flex-col divide-y divide-border">
           {cart.items.map((item) => (
             <li key={item.product.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-              <Link href={`/products/${item.product.slug}`} className="min-w-0 flex-1 truncate text-sm text-fg hover:text-brand">
+              <Link href={`/products/${item.product.slug}`} className="min-w-0 flex-1 truncate text-sm text-fg hover:text-brand-text">
                 {item.qty > 1 ? `${item.qty} × ` : ''}
                 {productTitle(item.product, locale)}
               </Link>

@@ -41,7 +41,7 @@ export async function RelatedProducts({
         <h2 id="related-heading" className="text-lg font-semibold text-fg">
           {tf(t.seo.relatedTitle, { name: categoryName })}
         </h2>
-        <Link href={`/categories/${categorySlug}`} className="label-mono text-brand hover:underline">
+        <Link href={`/categories/${categorySlug}`} className="label-mono text-brand-text hover:underline">
           {categoryName}
         </Link>
       </div>

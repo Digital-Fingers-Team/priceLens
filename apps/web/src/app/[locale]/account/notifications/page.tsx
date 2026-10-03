@@ -121,7 +121,7 @@ function ChannelCard({
         {!isInApp && !allowed && (
           <p className="rounded border border-warning/40 bg-warning-soft px-3 py-2 text-xs text-fg">
             {tf(t.channels.notInPlan, { channel: copy.label })}{' '}
-            <Link href="/pricing" className="font-medium text-brand underline">
+            <Link href="/pricing" className="font-medium text-brand-text underline">
               {t.billing.seePlans}
             </Link>
           </p>

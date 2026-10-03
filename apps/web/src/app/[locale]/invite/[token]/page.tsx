@@ -47,7 +47,7 @@ export default function InvitePage() {
       <Card>
         <CardBody className="flex flex-col gap-4">
           <h1 className="flex items-center gap-2 text-lg font-semibold text-fg">
-            <Users className="h-5 w-5 text-brand" aria-hidden />
+            <Users className="h-5 w-5 text-brand-text" aria-hidden />
             <span dir="auto">{tf(t.invite.title, { workspace: data.workspace })}</span>
           </h1>
           <p className="text-sm text-fg" dir="auto">

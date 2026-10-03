@@ -301,7 +301,7 @@ function Repricer({ base, currency }: { base: string; currency: string }) {
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-sm bg-surface-2 p-3">
           <div className="flex flex-col gap-1">
             <span className="label-mono text-muted">{t.sellerTools.suggested}</span>
-            <span className="text-lg font-semibold tabular-nums text-brand">{fmt.currency(data.suggestedPrice, currency)}</span>
+            <span className="text-lg font-semibold tabular-nums text-brand-text">{fmt.currency(data.suggestedPrice, currency)}</span>
             {data.suggestionReason && <span className="text-xs text-muted">{reasons[data.suggestionReason] ?? data.suggestionReason}</span>}
           </div>
           {data.suggestedPrice != null && data.suggestedPrice !== data.currentPrice && (

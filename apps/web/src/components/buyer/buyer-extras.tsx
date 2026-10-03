@@ -69,7 +69,7 @@ function InstallmentsBlock({ data }: { data: BuyerExtras }) {
     <SectionCard
       section={section}
       title={t.buyer.installmentsTitle}
-      icon={<Wallet className="h-4 w-4 text-brand" aria-hidden />}
+      icon={<Wallet className="h-4 w-4 text-brand-text" aria-hidden />}
       lockedTitle={tp(t.buyer.installmentsLocked, section.count)}
     >
       <Table>
@@ -121,7 +121,7 @@ function PromoLine({ promo, currency }: { promo: PromoItem; currency: string }) 
         </span>
       </div>
       {promo.saving > 0 && promo.priceAfter !== null && (
-        <span className="text-sm font-semibold tabular-nums text-success">
+        <span className="rounded-sm bg-accent px-2 py-1 text-sm font-semibold tabular-nums text-accent-fg">
           −{fmt.currency(promo.saving, currency)} → {fmt.currency(promo.priceAfter, currency)}
         </span>
       )}
@@ -137,7 +137,7 @@ function CardOffersBlock({ data }: { data: BuyerExtras }) {
     <SectionCard
       section={section}
       title={t.buyer.cardsTitle}
-      icon={<CreditCard className="h-4 w-4 text-brand" aria-hidden />}
+      icon={<CreditCard className="h-4 w-4 text-brand-text" aria-hidden />}
       lockedTitle={tp(t.buyer.cardsLocked, section.count)}
     >
       <ul className="flex flex-col gap-3">
@@ -149,7 +149,7 @@ function CardOffersBlock({ data }: { data: BuyerExtras }) {
         ))}
       </ul>
       {signedIn && !section.banksSet && (
-        <Link href="/account/banks" className="text-xs font-medium text-brand underline">
+        <Link href="/account/banks" className="text-xs font-medium text-brand-text underline">
           {t.buyer.setBanks}
         </Link>
       )}
@@ -177,7 +177,7 @@ function CouponsBlock({ data }: { data: BuyerExtras }) {
     <SectionCard
       section={section}
       title={t.buyer.couponsTitle}
-      icon={<Ticket className="h-4 w-4 text-brand" aria-hidden />}
+      icon={<Ticket className="h-4 w-4 text-brand-text" aria-hidden />}
       lockedTitle={tp(t.buyer.couponsLocked, section.count)}
     >
       <ul className="flex flex-col divide-y divide-border">
@@ -225,7 +225,7 @@ function WarrantyBlock({ data }: { data: BuyerExtras }) {
     <Card>
       <CardHeader>
         <h3 className="flex items-center gap-2 text-sm font-semibold text-fg">
-          <ShieldCheck className="h-4 w-4 text-brand" aria-hidden />
+          <ShieldCheck className="h-4 w-4 text-brand-text" aria-hidden />
           {t.buyer.warrantyTitle}
         </h3>
       </CardHeader>

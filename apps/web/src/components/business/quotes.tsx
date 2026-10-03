@@ -212,7 +212,7 @@ function QuoteView({ orgId, quoteId, onBack }: { orgId: string; quoteId: string;
                       <span className="flex items-center gap-1">
                         {item.store}
                         {item.listingUrl && (
-                          <a href={item.listingUrl} target="_blank" rel="noopener noreferrer nofollow" className="text-brand">
+                          <a href={item.listingUrl} target="_blank" rel="noopener noreferrer nofollow" className="text-brand-text">
                             <ExternalLink className="h-4 w-4" aria-hidden />
                           </a>
                         )}

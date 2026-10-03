@@ -18,7 +18,7 @@ const variantStyles: Record<Variant, string> = {
   primary: 'bg-brand text-brand-fg hover:bg-brand-hover active:bg-brand-hover',
   secondary: 'border border-border bg-surface text-fg hover:bg-surface-2 active:bg-surface-2',
   ghost: 'text-muted hover:bg-surface-2 hover:text-fg active:bg-surface-2',
-  outline: 'border border-border-strong text-fg hover:border-brand hover:text-brand active:bg-surface-2',
+  outline: 'border border-border-strong text-fg hover:border-brand hover:text-brand-text active:bg-surface-2',
   danger: 'border border-danger/40 bg-danger-soft text-danger hover:border-danger active:bg-danger-soft',
 };
 

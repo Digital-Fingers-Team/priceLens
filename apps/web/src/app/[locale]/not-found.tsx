@@ -10,7 +10,7 @@ export default function NotFound() {
   const { t } = useI18n();
   return (
     <div className="mx-auto flex max-w-page flex-col items-start gap-6 px-4 py-24 sm:px-6">
-      <p className="label-mono text-brand">404</p>
+      <p className="label-mono text-brand-text">404</p>
       <div className="flex max-w-md flex-col gap-2">
         <h1 className="text-2xl font-semibold text-fg">{t.errors.notFoundTitle}</h1>
         <p className="text-base text-muted">{t.errors.notFoundBody}</p>

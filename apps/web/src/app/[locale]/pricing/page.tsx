@@ -106,7 +106,7 @@ export default function PricingPage() {
   return (
     <div className="mx-auto flex max-w-page flex-col gap-10 px-4 py-12 sm:px-6">
       <header className="flex max-w-2xl flex-col gap-2">
-        <p className="label-mono text-brand">{t.nav.pricing}</p>
+        <p className="label-mono text-brand-text">{t.nav.pricing}</p>
         <h1 className="text-2xl font-semibold text-fg">{t.pricing.title}</h1>
         <p className="text-base text-muted">{t.pricing.lede}</p>
       </header>
@@ -160,7 +160,7 @@ export default function PricingPage() {
                   <ul className="flex flex-1 flex-col gap-2 border-t border-border pt-4">
                     {planHighlights(plan, i18n).map((line) => (
                       <li key={line} className="flex items-start gap-2 text-sm text-fg">
-                        <Check className="mt-1 h-4 w-4 shrink-0 text-brand" aria-hidden />
+                        <Check className="mt-1 h-4 w-4 shrink-0 text-brand-text" aria-hidden />
                         <span>{line}</span>
                       </li>
                     ))}

@@ -36,7 +36,7 @@ export function PaymentsQueue() {
             onClick={() => setView(i)}
             className={cn(
               'rounded px-3 py-2 text-sm font-medium',
-              view === i ? 'bg-brand-soft text-brand border border-brand/20' : 'text-muted hover:bg-surface-2',
+              view === i ? 'bg-brand-soft text-brand-text border border-brand/20' : 'text-muted hover:bg-surface-2',
             )}
           >
             {v.label}

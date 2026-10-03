@@ -56,7 +56,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 className={cn(
                   'flex items-center gap-3 px-3 py-2 rounded text-sm font-medium transition-colors',
                   active
-                    ? 'bg-brand-soft text-brand border border-brand/20'
+                    ? 'bg-brand-soft text-brand-text border border-brand/20'
                     : 'text-muted hover:bg-surface-2 hover:text-fg',
                 )}
               >

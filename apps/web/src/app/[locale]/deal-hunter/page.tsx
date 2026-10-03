@@ -40,7 +40,7 @@ export default function DealHunterPage() {
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-10 sm:px-6">
       <header className="flex max-w-2xl flex-col gap-2">
-        <p className="label-mono text-brand">{t.nav.dealHunter}</p>
+        <p className="label-mono text-brand-text">{t.nav.dealHunter}</p>
         <h1 className="text-2xl font-semibold text-fg">{t.dealHunter.title}</h1>
         <p className="text-base text-muted">{t.dealHunter.lede}</p>
       </header>
@@ -175,7 +175,7 @@ function MatchCard({ match, rank }: { match: DealHunterMatch; rank: number }) {
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <div className="flex flex-wrap items-start justify-between gap-2">
-          <Link href={`/products/${match.slug}`} dir="auto" className="text-sm font-medium text-fg hover:text-brand">
+          <Link href={`/products/${match.slug}`} dir="auto" className="text-sm font-medium text-fg hover:text-brand-text">
             {match.title}
           </Link>
           <div className="flex shrink-0 flex-col items-end gap-1">

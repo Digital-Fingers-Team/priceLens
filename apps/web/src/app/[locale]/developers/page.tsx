@@ -23,7 +23,7 @@ export default function DevelopersPage() {
     <div className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-10 sm:px-6">
       <header className="flex flex-col gap-1">
         <h1 className="flex items-center gap-2 text-xl font-semibold text-fg">
-          <Code2 className="h-5 w-5 text-brand" aria-hidden />
+          <Code2 className="h-5 w-5 text-brand-text" aria-hidden />
           {d.title}
         </h1>
         <p className="text-sm text-muted">{d.lede}</p>

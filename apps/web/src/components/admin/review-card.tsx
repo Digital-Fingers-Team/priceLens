@@ -83,7 +83,7 @@ export function ReviewCard({ item }: ReviewCardProps) {
 
           <div className="flex items-center gap-3 text-xs text-muted">
             {item.sourceListing.rawPrice != null && (
-              <span className="font-semibold text-brand">
+              <span className="font-semibold text-brand-text">
                 {formatCurrency(item.sourceListing.rawPrice ?? undefined, item.sourceListing.rawCurrency)}
               </span>
             )}
@@ -91,7 +91,7 @@ export function ReviewCard({ item }: ReviewCardProps) {
               href={safeExternalHref(item.sourceListing.externalUrl)}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 hover:text-brand transition-colors"
+              className="flex items-center gap-1 hover:text-brand-text transition-colors"
               onClick={(e) => e.stopPropagation()}
             >
               View listing <ExternalLink className="w-4 h-4" aria-hidden />

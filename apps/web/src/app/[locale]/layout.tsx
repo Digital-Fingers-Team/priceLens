@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { IBM_Plex_Mono, IBM_Plex_Sans, IBM_Plex_Sans_Arabic } from 'next/font/google';
 import { Suspense } from 'react';
 import { Providers } from '@/components/layout/providers';
@@ -10,6 +10,7 @@ import { getI18n, resolveLocale } from '@/lib/i18n/server';
 import { I18nProvider } from '@/lib/i18n/provider';
 import { baseMetadata } from '@/lib/seo';
 import { THEME_SCRIPT } from '@/lib/theme';
+import designTokens from '../../../design-tokens';
 
 // IBM Plex: Sans (variable, Latin), Sans Arabic, Mono (audit 07, UI-05).
 // Arabic and Mono are not preloaded: the browser fetches them when a glyph
@@ -29,6 +30,8 @@ const plexMono = IBM_Plex_Mono({
   display: 'swap',
   preload: false,
 });
+
+export const viewport: Viewport = { themeColor: designTokens.themes.light.brand };
 
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));

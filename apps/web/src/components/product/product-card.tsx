@@ -84,7 +84,7 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
           {hasPrice ? (
             <p className="flex flex-wrap items-baseline gap-x-2">
               <span className="text-xs text-muted">{t.product.from}</span>
-              <span className="whitespace-nowrap text-base font-semibold tabular-nums text-brand">
+              <span className="whitespace-nowrap text-base font-semibold tabular-nums text-brand-text">
                 {fmt.currency(product.minPriceUsd, currency)}
               </span>
               {hasPriceRange && (
@@ -111,7 +111,7 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
         disabled={isPending}
         className={cn(
           'absolute end-2 top-2 z-10 flex h-10 w-10 items-center justify-center rounded-full border transition-colors disabled:opacity-50',
-          isWatched ? 'border-brand bg-brand-soft text-brand' : 'border-border bg-surface/90 text-muted hover:text-fg',
+          isWatched ? 'border-brand bg-brand-soft text-brand-text' : 'border-border bg-surface/90 text-muted hover:text-fg',
         )}
         aria-pressed={isAuthenticated ? isWatched : undefined}
         aria-label={

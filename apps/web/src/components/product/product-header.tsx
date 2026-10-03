@@ -130,7 +130,7 @@ export function ProductHeader({ product }: { product: CanonicalProduct }) {
                 <p className="text-sm text-muted">
                   {t.product.cheapestAt} <span className="font-medium text-fg">{cheapest.platform.name}</span>
                   {' · '}
-                  <a href="#offers" className="text-brand hover:underline">
+                  <a href="#offers" className="text-brand-text hover:underline">
                     {tp(t.product.compareAll, storeCount)}
                   </a>
                 </p>
@@ -172,7 +172,7 @@ export function ProductHeader({ product }: { product: CanonicalProduct }) {
                 size="lg"
                 loading={watchlistPending}
                 aria-pressed={isWatched}
-                leftIcon={<Heart className={isWatched ? 'h-4 w-4 fill-current text-brand' : 'h-4 w-4'} aria-hidden />}
+                leftIcon={<Heart className={isWatched ? 'h-4 w-4 fill-current text-brand-text' : 'h-4 w-4'} aria-hidden />}
                 onClick={() => toggleWatchlist({ productId: product.id, isWatched })}
               >
                 {isWatched ? t.product.watching : t.product.watch}
@@ -187,7 +187,7 @@ export function ProductHeader({ product }: { product: CanonicalProduct }) {
               variant="outline"
               size="lg"
               aria-pressed={isWatched}
-              leftIcon={<Heart className={isWatched ? 'h-4 w-4 fill-current text-brand' : 'h-4 w-4'} aria-hidden />}
+              leftIcon={<Heart className={isWatched ? 'h-4 w-4 fill-current text-brand-text' : 'h-4 w-4'} aria-hidden />}
               onClick={() => toggleWatchlist({ productId: product.id, isWatched })}
             >
               {isWatched ? t.product.saved : t.product.saveWithoutAccount}

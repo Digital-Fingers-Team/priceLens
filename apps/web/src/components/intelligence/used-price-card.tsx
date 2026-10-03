@@ -16,7 +16,7 @@ export function UsedPriceCard({ productId, newPrice }: { productId: string; newP
     <Card>
       <CardBody className="flex flex-col gap-2">
         <p className="flex items-center gap-2 text-sm font-semibold text-fg">
-          <Recycle className="h-4 w-4 text-brand" aria-hidden />
+          <Recycle className="h-4 w-4 text-brand-text" aria-hidden />
           {tf(t.used.title, { from: fmt.currency(data.p25, 'EGP'), to: fmt.currency(data.p75, 'EGP') })}
         </p>
         <p className="text-xs text-muted">
@@ -26,7 +26,7 @@ export function UsedPriceCard({ productId, newPrice }: { productId: string; newP
         <p className="text-xs text-muted">
           {t.used.note}{' '}
           {data.searchUrl && (
-            <a href={data.searchUrl} target="_blank" rel="nofollow noopener noreferrer" className="text-brand underline">
+            <a href={data.searchUrl} target="_blank" rel="nofollow noopener noreferrer" className="text-brand-text underline">
               {t.used.see}
             </a>
           )}

@@ -201,7 +201,7 @@ function Violations({ orgId }: { orgId: string }) {
                 <Td className="text-muted">{fmt.date(violation.detectedAt)}</Td>
                 <Td>
                   {violation.listingUrl && (
-                    <a href={violation.listingUrl} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1 text-brand hover:underline">
+                    <a href={violation.listingUrl} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1 text-brand-text hover:underline">
                       <ExternalLink className="h-4 w-4" aria-hidden />
                       <span className="sr-only">{t.business.map.evidence}</span>
                     </a>
@@ -338,7 +338,7 @@ function UnauthorizedListings({ orgId }: { orgId: string }) {
                 </Td>
                 <Td className="text-muted">{fmt.date(listing.lastSeenAt)}</Td>
                 <Td>
-                  <a href={listing.listingUrl} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1 text-brand hover:underline">
+                  <a href={listing.listingUrl} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1 text-brand-text hover:underline">
                     <ExternalLink className="h-4 w-4" aria-hidden />
                     <span className="sr-only">{t.business.sellers.link}</span>
                   </a>

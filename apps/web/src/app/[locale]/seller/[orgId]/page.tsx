@@ -151,7 +151,7 @@ export default function WorkspaceDashboard() {
                 return (
                   <tr key={product.id} className="hover:bg-surface-2">
                     <Td>
-                      <Link href={`/seller/${orgId}/products/${product.id}`} className="font-mono text-xs text-brand hover:underline" dir="ltr">
+                      <Link href={`/seller/${orgId}/products/${product.id}`} className="font-mono text-xs text-brand-text hover:underline" dir="ltr">
                         {product.sku}
                       </Link>
                     </Td>

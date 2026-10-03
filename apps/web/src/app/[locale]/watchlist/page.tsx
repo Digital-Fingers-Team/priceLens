@@ -94,12 +94,12 @@ function WatchlistContent() {
                 )}
               </Link>
               <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <Link href={`/products/${product.slug}`} dir="auto" className="line-clamp-1 text-sm font-medium text-fg hover:text-brand">
+                <Link href={`/products/${product.slug}`} dir="auto" className="line-clamp-1 text-sm font-medium text-fg hover:text-brand-text">
                   {productTitle(product, locale)}
                 </Link>
                 <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
                   {item.bestPrice != null ? (
-                    <span className="text-base font-semibold tabular-nums text-brand">{fmt.currency(Number(item.bestPrice))}</span>
+                    <span className="text-base font-semibold tabular-nums text-brand-text">{fmt.currency(Number(item.bestPrice))}</span>
                   ) : (
                     <span className="text-sm text-muted">{t.product.noCurrentPrice}</span>
                   )}

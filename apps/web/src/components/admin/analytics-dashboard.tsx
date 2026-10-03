@@ -399,7 +399,7 @@ export function AnalyticsDashboard() {
             className={cn(
               'px-3 py-2 rounded text-sm font-medium border transition-colors',
               days === r.days
-                ? 'bg-brand-soft text-brand border-brand/20'
+                ? 'bg-brand-soft text-brand-text border-brand/20'
                 : 'border-border text-muted hover:bg-surface-2 hover:text-fg',
             )}
           >

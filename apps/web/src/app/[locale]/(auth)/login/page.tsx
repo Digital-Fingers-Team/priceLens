@@ -62,7 +62,7 @@ export default function LoginPage() {
 
       <p className="text-center text-sm text-muted">
         {t.auth.noAccount}{' '}
-        <Link href="/register" className="font-medium text-brand hover:underline">
+        <Link href="/register" className="font-medium text-brand-text hover:underline">
           {t.auth.createFree}
         </Link>
       </p>

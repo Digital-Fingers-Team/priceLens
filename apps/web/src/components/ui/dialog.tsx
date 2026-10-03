@@ -52,7 +52,7 @@ export function Dialog({ open, onClose, title, description, variant = 'modal', f
         if (event.target === ref.current) onClose();
       }}
       className={cn(
-        'glass max-h-sheet w-full overflow-hidden border border-border p-0 text-fg shadow-lg backdrop:bg-moss-900/50',
+        'glass max-h-sheet w-full overflow-hidden border border-border p-0 text-fg shadow-lg backdrop:bg-scrim/60',
         variant === 'sheet'
           ? 'mb-0 mt-auto max-w-none animate-sheet-up rounded-t-md md:m-auto md:max-w-lg md:animate-enter md:rounded-md'
           : 'm-auto max-w-lg animate-enter rounded-md',

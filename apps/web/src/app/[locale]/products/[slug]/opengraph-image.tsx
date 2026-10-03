@@ -22,8 +22,8 @@ export const contentType = 'image/png';
 export const revalidate = 3600;
 
 // The card is drawn without CSS (satori), so the tokens are read directly.
-const { moss } = designTokens;
-const MOSS = { bg: moss[900], panel: moss[800], accent: moss[200], fg: moss[50], muted: moss[300] };
+const { ink } = designTokens;
+const INK = { bg: ink[700], panel: ink[600], accent: ink[100], fg: ink[50], muted: ink[200] };
 
 // Loaded once per server process. The server runs from apps/web.
 let fonts: Promise<{ name: string; data: Buffer; weight: 600 | 700; style: 'normal' }[]> | null = null;
@@ -87,12 +87,12 @@ export default async function Image({ params }: { params: Promise<{ locale: stri
           justifyContent: 'space-between',
           alignItems: align,
           padding: 64,
-          background: MOSS.bg,
-          color: MOSS.fg,
+          background: INK.bg,
+          color: INK.fg,
           fontFamily: 'Plex',
         }}
       >
-        <div style={{ display: 'flex', fontSize: 36, fontWeight: 600, color: MOSS.accent }}>Pricelens</div>
+        <div style={{ display: 'flex', fontSize: 36, fontWeight: 600, color: INK.accent }}>Pricelens</div>
         <Line
           text={title.length > 110 ? `${title.slice(0, 107)}…` : title}
           rtl={rtl}
@@ -101,7 +101,7 @@ export default async function Image({ params }: { params: Promise<{ locale: stri
         <div style={{ display: 'flex', flexDirection: row, alignItems: 'flex-end', justifyContent: 'space-between', width: '100%' }}>
           {min != null ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: align }}>
-              <Line text={t.seo.ogFrom} rtl={rtl} style={{ fontSize: 28, color: MOSS.muted }} />
+              <Line text={t.seo.ogFrom} rtl={rtl} style={{ fontSize: 28, color: INK.muted }} />
               <Line text={fmt.currency(min, product?.priceStats.currency)} rtl={rtl} style={{ fontSize: 72, fontWeight: 700 }} />
             </div>
           ) : (
@@ -111,7 +111,7 @@ export default async function Image({ params }: { params: Promise<{ locale: stri
             <Line
               text={tp(t.seo.ogStores, stores)}
               rtl={rtl}
-              style={{ padding: '12px 24px', background: MOSS.panel, fontSize: 30, color: MOSS.accent }}
+              style={{ padding: '12px 24px', background: INK.panel, fontSize: 30, color: INK.accent }}
             />
           )}
         </div>

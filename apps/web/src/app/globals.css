@@ -80,17 +80,10 @@
     @apply font-mono text-xs font-medium uppercase tracking-wider;
   }
 
-  /* The glass recipe (the "bubble" identity), used on the sticky header,
-     sheets and menus only. Solid surface where backdrop-filter is missing. */
+  /* Flat raised surface for the sticky header, sheets and menus: a solid
+     surface with a hairline border, no blur. */
   .glass {
-    background-color: rgb(var(--color-surface) / 0.97);
-    border-color: rgb(var(--color-border) / 0.8);
-  }
-  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-    .glass {
-      background-color: rgb(var(--color-surface) / 0.72);
-      -webkit-backdrop-filter: blur(16px) saturate(1.4);
-      backdrop-filter: blur(16px) saturate(1.4);
-    }
+    background-color: rgb(var(--color-surface));
+    border-color: rgb(var(--color-border));
   }
 }

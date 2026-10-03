@@ -203,7 +203,7 @@ function ApiKeys({ orgId }: { orgId: string }) {
         <CardHeader className="flex-wrap">
           <div className="flex flex-col gap-1">
             <h2 className="flex items-center gap-2 text-base font-semibold text-fg">
-              <KeyRound className="h-4 w-4 text-brand" aria-hidden />
+              <KeyRound className="h-4 w-4 text-brand-text" aria-hidden />
               {t.business.api.title}
             </h2>
             <p className="text-sm text-muted">{t.business.api.lede}</p>

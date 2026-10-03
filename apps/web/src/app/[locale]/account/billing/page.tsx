@@ -140,7 +140,7 @@ function BillingContent() {
 
       <p className="text-xs text-muted">
         {t.account.needSeller}{' '}
-        <Link href="/pricing" className="text-brand hover:underline">
+        <Link href="/pricing" className="text-brand-text hover:underline">
           {t.account.seeIncluded}
         </Link>
       </p>

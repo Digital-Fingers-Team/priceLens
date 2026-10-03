@@ -90,9 +90,9 @@ describe('design tokens', () => {
     // Every text color on every background it is used on: 4.5:1 (WCAG AA).
     const pairs: Array<[string, string]> = [];
     for (const bg of ['bg', 'surface', 'surface-2']) {
-      for (const fg of ['fg', 'muted', 'brand', 'success', 'warning', 'danger', 'info']) pairs.push([fg, bg]);
+      for (const fg of ['fg', 'muted', 'brand-text', 'success', 'warning', 'danger', 'info']) pairs.push([fg, bg]);
     }
-    pairs.push(['brand-fg', 'brand'], ['brand-soft-fg', 'brand-soft'], ['fg', 'brand-soft'], ['muted', 'brand-soft']);
+    pairs.push(['brand-fg', 'brand'], ['brand-soft-fg', 'brand-soft'], ['fg', 'brand-soft'], ['muted', 'brand-soft'], ['brand-text', 'brand-soft'], ['accent-fg', 'accent']);
     for (const s of ['success', 'warning', 'danger', 'info']) pairs.push([s, `${s}-soft`], ['fg', `${s}-soft`]);
 
     it(`${mode}: text contrast is at least 4.5:1`, () => {

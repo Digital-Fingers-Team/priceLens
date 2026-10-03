@@ -78,7 +78,7 @@ export function DesignSystem() {
       <Section title="Brand">
         <div className="flex flex-wrap items-center gap-6 text-fg">
           <Wordmark className="h-8 w-auto" />
-          <LensMark className="h-10 w-10 text-brand" />
+          <LensMark className="h-10 w-10 text-brand-text" />
         </div>
       </Section>
 

@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine } from 'recharts';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceDot } from 'recharts';
 import { Tabs } from '@/components/ui/tabs';
 import { EmptyState, ErrorState } from '@/components/ui/state';
 import { PRICE_HISTORY_DAYS } from '@/config/constants';
@@ -10,7 +10,7 @@ import { intlLocale } from '@/lib/i18n/config';
 import { useI18n } from '@/lib/i18n/provider';
 import { PriceChartSkeleton } from './price-chart-skeleton';
 
-const TOKENS = ['brand', 'muted', 'border', 'info'] as const;
+const TOKENS = ['brand-text', 'accent', 'muted', 'border', 'info'] as const;
 
 type TooltipPayloadEntry = {
   dataKey?: string;
@@ -57,6 +57,8 @@ export function PriceChart({ productId }: { productId: string }) {
 
   const chartData = data.chart.filter((p) => p.min != null);
   const avgValue = data.summary.avgPrice;
+  // The lowest recorded price is the saving worth pointing at (coral).
+  const lowest = chartData.reduce<(typeof chartData)[number] | null>((low, p) => (low == null || (p.min as number) < (low.min as number) ? p : low), null);
   const dayLabel = new Intl.DateTimeFormat(intlLocale(locale), { month: 'numeric', day: 'numeric' });
   const compact = new Intl.NumberFormat(intlLocale(locale), { notation: 'compact', maximumFractionDigits: 1 });
 
@@ -127,13 +129,16 @@ export function PriceChart({ productId }: { productId: string }) {
                 type="monotone"
                 dataKey="min"
                 name={t.chart.best}
-                stroke={colors.brand}
+                stroke={colors['brand-text']}
                 strokeWidth={2}
-                fill={colors.brand}
+                fill={colors['brand-text']}
                 fillOpacity={0.08}
                 dot={false}
-                activeDot={{ r: 4, strokeWidth: 0, fill: colors.brand }}
+                activeDot={{ r: 4, strokeWidth: 0, fill: colors['brand-text'] }}
               />
+              {lowest && (
+                <ReferenceDot x={lowest.date} y={lowest.min as number} r={6} fill={colors.accent} stroke={colors['brand-text']} strokeWidth={2} ifOverflow="extendDomain" />
+              )}
             </AreaChart>
           </ResponsiveContainer>
         )}
@@ -147,7 +152,7 @@ export function PriceChart({ productId }: { productId: string }) {
               <div key={p.platformId} className="flex items-center gap-2">
                 <dt className="font-medium text-fg">{p.name}</dt>
                 <dd className="tabular-nums text-muted">
-                  <span className="text-brand">{fmt.currency(p.minPrice)}</span> – {fmt.currency(p.maxPrice)}
+                  <span className="text-brand-text">{fmt.currency(p.minPrice)}</span> – {fmt.currency(p.maxPrice)}
                 </dd>
               </div>
             ))}

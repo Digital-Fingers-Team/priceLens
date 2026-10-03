@@ -58,7 +58,7 @@ export function OfferRow({
             <Image src={listing.platform.logoUrl} alt="" className="h-5 w-5 rounded-sm object-contain" width={20} height={20} />
           ) : null}
           <span className="font-medium text-fg">{store}</span>
-          {isBest && <Badge variant="brand">{t.product.bestDeal}</Badge>}
+          {isBest && <Badge variant="savings">{t.product.bestDeal}</Badge>}
           {listing.platform.kind === 'OFFLINE_CHAIN' && (
             <Badge variant="outline" title={t.product.hasStoresHint}>
               {t.product.hasStores}

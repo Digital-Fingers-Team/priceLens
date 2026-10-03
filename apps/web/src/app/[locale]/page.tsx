@@ -61,9 +61,9 @@ export default async function HomePage({ params }: Props) {
       <section className="border-b border-border">
         <div className="mx-auto flex max-w-page flex-col gap-8 px-4 py-16 sm:px-6 lg:py-24">
           <div className="flex max-w-2xl flex-col gap-4">
-            <p className="label-mono text-brand">{t.home.eyebrow}</p>
+            <p className="label-mono text-brand-text">{t.home.eyebrow}</p>
             <h1 className="text-balance text-2xl font-semibold text-fg">
-              {t.home.headline} <span className="text-brand">{t.home.headlineAccent}</span>
+              {t.home.headline} <span className="text-brand-text">{t.home.headlineAccent}</span>
             </h1>
             <p className="max-w-xl text-balance text-base text-muted">{t.home.lede}</p>
           </div>
@@ -83,7 +83,7 @@ export default async function HomePage({ params }: Props) {
             not a popularity signal we do not measure. */}
         <div className="flex items-baseline justify-between gap-4">
           <h2 className="text-lg font-semibold text-fg">{t.home.mostCompared}</h2>
-          <Link href="/search?sortBy=listingCount" className="label-mono text-brand hover:underline">
+          <Link href="/search?sortBy=listingCount" className="label-mono text-brand-text hover:underline">
             {t.home.seeAll}
           </Link>
         </div>

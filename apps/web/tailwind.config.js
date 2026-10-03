@@ -6,7 +6,7 @@
  * does not exist.
  */
 const plugin = require('tailwindcss/plugin');
-const { moss, themes, cssVariables } = require('./design-tokens');
+const { themes, cssVariables } = require('./design-tokens');
 
 const token = (name) => `rgb(var(--color-${name}) / <alpha-value>)`;
 const semantic = Object.fromEntries(Object.keys(themes.light).map((name) => [name, token(name)]));
@@ -22,7 +22,6 @@ module.exports = {
       transparent: 'transparent',
       current: 'currentColor',
       inherit: 'inherit',
-      moss,
       ...semantic,
     },
     fontFamily: {

@@ -45,14 +45,14 @@ export function AlertsSection() {
           const isTriggered = alert.status === 'TRIGGERED';
           return (
             <li key={alert.id} className={cn('flex items-center gap-4 p-4', isTriggered && 'bg-brand-soft/40')}>
-              {isTriggered && <BellRing className="h-4 w-4 shrink-0 text-brand" aria-hidden />}
+              {isTriggered && <BellRing className="h-4 w-4 shrink-0 text-brand-text" aria-hidden />}
               <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <Link href={`/products/${alert.canonicalProduct.slug}`} dir="auto" className="line-clamp-1 text-sm font-medium text-fg hover:text-brand">
+                <Link href={`/products/${alert.canonicalProduct.slug}`} dir="auto" className="line-clamp-1 text-sm font-medium text-fg hover:text-brand-text">
                   {productTitle(alert.canonicalProduct, locale)}
                 </Link>
                 <p className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
                   {isTriggered && alert.triggeredPrice != null ? (
-                    <span className="text-sm font-semibold tabular-nums text-brand">
+                    <span className="text-sm font-semibold tabular-nums text-brand-text">
                       {tf(t.watchlist.hit, { price: fmt.currency(Number(alert.triggeredPrice)) })}
                     </span>
                   ) : (

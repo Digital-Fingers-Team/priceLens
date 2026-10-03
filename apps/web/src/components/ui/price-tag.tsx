@@ -24,7 +24,7 @@ export function PriceTag({ amount, currency, size = 'md', emphasis, was, classNa
   const { fmt } = useI18n();
   return (
     <span className={cn('inline-flex flex-wrap items-baseline gap-x-2', className)}>
-      <span className={cn('whitespace-nowrap tabular-nums', sizes[size], emphasis ? 'text-brand' : 'text-fg')}>
+      <span className={cn('whitespace-nowrap tabular-nums', sizes[size], emphasis ? 'text-brand-text' : 'text-fg')}>
         {fmt.currency(amount, currency)}
       </span>
       {was != null && amount != null && was > amount && (
