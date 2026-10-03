@@ -21,6 +21,9 @@ import { withTimeout } from '../common/redis-resilience';
  */
 export const ENQUEUE_TIMEOUT_MS = 1_000;
 
+/** Waiting jobs above which new store expansions are not queued. */
+export const DEFAULT_EXPANSION_MAX_WAITING = 100;
+
 /**
  * Bull priorities, 1 = first. A shopper waiting on a search must not queue
  * behind hundreds of background store expansions: it did, for 45 minutes.
@@ -65,8 +68,21 @@ export class IngestionQueue {
     );
   }
 
-  /** Search the stores missing one product. Deduplicated per product. */
+  /**
+   * Search the stores missing one product. Deduplicated per product.
+   *
+   * Skipped while the queue already holds STORE_EXPANSION_MAX_WAITING jobs
+   * (default 100). Expansions run for minutes each and every page that shows
+   * an under-covered product adds one, so the backlog only grew (66,000 jobs
+   * once). Worse, Bull puts a cron job that comes due at the head of the wait
+   * list whatever its priority, so every scheduled job (alerts, MAP sweep, FX,
+   * billing) sat behind the whole pile for days. A skipped product is queued
+   * again the next time a page shows it.
+   */
   async enqueueStoreExpansion(productId: string, targetStores: number): Promise<void> {
+    const max = parseInt(process.env.STORE_EXPANSION_MAX_WAITING ?? '', 10) || DEFAULT_EXPANSION_MAX_WAITING;
+    const waiting = await withTimeout(this.queue.getWaitingCount(), ENQUEUE_TIMEOUT_MS, 'Count waiting jobs');
+    if (waiting >= max) return;
     await this.add(
       RUN_STORE_EXPANSION_JOB,
       { productId, targetStores },

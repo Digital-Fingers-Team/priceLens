@@ -9,9 +9,10 @@ import {
   RUN_STORE_EXPANSION_JOB,
 } from '../../src/workers/ingestion.jobs';
 
-function fakeQueue() {
+function fakeQueue(waiting = 0) {
   const add = jest.fn(async () => ({ id: 42 }));
-  return { queue: { add } as unknown as Queue, add };
+  const getWaitingCount = jest.fn(async () => waiting);
+  return { queue: { add, getWaitingCount } as unknown as Queue, add };
 }
 
 const ON_DEMAND = { removeOnComplete: true, removeOnFail: true };
@@ -34,6 +35,16 @@ describe('IngestionQueue (producer)', () => {
       priority: JOB_PRIORITY.storeExpansion,
       ...ON_DEMAND,
     });
+  });
+
+  it('stops queueing store expansions while the queue is backed up', async () => {
+    const full = fakeQueue(100);
+    await new IngestionQueue(full.queue).enqueueStoreExpansion('p-1', 4);
+    expect(full.add).not.toHaveBeenCalled();
+
+    const room = fakeQueue(99);
+    await new IngestionQueue(room.queue).enqueueStoreExpansion('p-1', 4);
+    expect(room.add).toHaveBeenCalledTimes(1);
   });
 
   it('runs a shopper search before background store expansions', () => {
