@@ -96,6 +96,13 @@ Checked against https://pricelens.store after the deploy:
 - `GET /api/v1/partner/whoami` without a key answers 401 with the key instructions; `GET /api/v1/trade/fx/rates` answers 200 (empty until the first FX refresh)
 - Seeds applied: 60 platform fee rows (Jumia, Amazon.eg) and the NBE and ALEXBANK 6-month Noon installment plans; import finder produced 21 opportunities
 
-Not checked (they need a signed-in account, which Claude does not have): test-mode checkout, one alert end to end, the seller dashboard with data, `/business` actions (MAP, authorized sellers, report PDF, quote PDF) and an API key call with a real key. Check them once by hand, and look at one Arabic PDF.
+Signed-in checks, run on 2026-10-03 as the admin account (granted Enterprise for 3 days; test data removed afterwards, the empty workspace "PriceLens Smoke Test" remains):
+- Brand workspace: created; MAP set on a product; authorized-seller list and unauthorized listings answer; MAP violations list answers; weekly report generated, PDF and CSV download
+- Procurement quote: two lines priced across stores (Jumia, Noon, AliExpress matches), totals, PDF and CSV; an Arabic quote renders right to left, one page, with the footer
+- API key: created with scopes, `whoami`, `search`, `market/stats`, `events` and `products/{id}/market` answer 200, usage counted, revoked key answers 401
+- Alert: a watchlist alert was created and fired on its own, with an in-app notification
+- Checkout: with `mock_checkout` on (admin only) an invoice and redirect to the test pay page are created; the flag was turned back off. The payment itself was not completed so the admin plan stayed unchanged
+- Fixes found by the test and deployed: PDFs had a blank second page and no footer; Arabic and mixed Arabic/English text came out in the wrong order; quote totals had float noise
+- FX rates (12 rows) and trend signals (60) were filled by running the services directly, because queued runs were stuck behind the store-expansion backlog
 
 Known: the worker queue holds a backlog of tens of thousands of low-priority `run-store-expansion` jobs, so jobs enqueued by hand can wait a long time for a free slot. FX rates and the trend radar fill in when their queued runs (or the scheduled runs at 07:20 / 13:20 UTC and Saturday 04:40 UTC) reach a slot.
