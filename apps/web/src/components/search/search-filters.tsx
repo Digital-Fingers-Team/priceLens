@@ -165,14 +165,14 @@ export function SearchFilters({ applied, onApply }: SearchFiltersProps) {
     );
   }
 
-  if (!open) return <div className="shrink-0 lg:sticky lg:top-24">{trigger}</div>;
+  if (!open) return <div className="shrink-0">{trigger}</div>;
 
   return (
-    <aside className="flex w-80 shrink-0 flex-col gap-6 rounded border border-border bg-surface p-6 lg:sticky lg:top-24">
+    <aside className="flex w-80 shrink-0 flex-col gap-6 rounded-md border border-border bg-surface p-6 lg:sticky lg:top-24">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-fg">{t.search.filters}</h2>
         <IconButton size="sm" aria-label={t.search.closeFilters} onClick={toggleOpen} className="-me-2">
-          <X className="h-4 w-4" />
+          <X className="h-4 w-4" aria-hidden />
         </IconButton>
       </div>
       {fields}

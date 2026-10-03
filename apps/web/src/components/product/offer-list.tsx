@@ -84,7 +84,7 @@ export function OfferList({ listings }: OfferListProps) {
         </div>
       )}
 
-      <ul className="divide-y divide-border overflow-hidden rounded border border-border bg-surface">
+      <ul className="divide-y divide-border overflow-hidden rounded-md border border-border bg-surface">
         {stores.map(([lead, ...more]) => (
           <OfferRow key={lead.id} listing={lead} isBest={bestDeals.has(lead.id)} more={more} bestDeals={bestDeals} />
         ))}

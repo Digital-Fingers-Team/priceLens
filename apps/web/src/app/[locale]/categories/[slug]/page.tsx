@@ -110,7 +110,7 @@ export default async function CategoryPage({ params, searchParams }: PageProps) 
 
       <CategoryPagination slug={slug} page={page} totalPages={totalPages} />
 
-      <CategoryLinks groups={groupCategories(t, categories, locale)} title={t.seo.categoriesTitle} current={slug} />
+      <CategoryLinks groups={groupCategories(t, categories, locale)} title={t.seo.categoriesTitle} current={slug} locale={locale} />
     </div>
   );
 }

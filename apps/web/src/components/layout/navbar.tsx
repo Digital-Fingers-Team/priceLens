@@ -1,9 +1,10 @@
 'use client';
 import { useState } from 'react';
-import { Heart, User, LogOut, Shield, Menu, X, Sparkles, Building2, Bell, Tag, ShoppingBasket, MessageCircleQuestion, Ship, Briefcase } from 'lucide-react';
+import { Heart, User, LogOut, Shield, Menu as MenuIcon, X, Sparkles, Building2, Bell, Tag, ShoppingBasket, MessageCircleQuestion, Ship, Briefcase } from 'lucide-react';
 import { LensMark, Wordmark } from '@/components/brand/logo';
 import { NotificationBell } from '@/components/notifications/notification-bell';
-import { Button, IconButton } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/button';
+import { Menu, menuItemClass } from '@/components/ui/menu';
 import { buttonClassName } from '@/components/ui/button-styles';
 import { SearchBar } from '@/components/search/search-bar';
 import { useAuthStore } from '@/lib/store/auth.store';
@@ -48,6 +49,9 @@ export function Navbar() {
       : []),
     ...(flags.isOn('map_monitoring') ? [{ href: '/business', label: t.nav.business, Icon: Briefcase }] : []),
   ];
+  const PRIMARY = ['/watchlist', '/deal-hunter'];
+  const primaryLinks = memberLinks.filter(({ href }) => PRIMARY.includes(href));
+  const toolLinks = memberLinks.filter(({ href }) => !PRIMARY.includes(href));
 
   return (
     <header className="glass sticky top-0 z-40 border-b">
@@ -61,13 +65,15 @@ export function Navbar() {
 
         {!onSearchPage && <SearchBar className="hidden max-w-xl flex-1 md:flex" />}
 
-        <nav aria-label={t.nav.main} className="hidden items-center gap-1 md:flex">
+        <nav aria-label={t.nav.main} className="hidden shrink-0 items-center gap-1 lg:flex">
           {/* Signed-in state is only known after the stored session is read
               on the client; showing the guest links first would flash
               "Sign in" at people who are signed in. */}
           {!hasHydrated ? null : isAuthenticated ? (
             <>
-              {memberLinks.map(({ href, label }) => (
+              {/* Two destinations inline, the rest under Tools and the account
+                  menu, so the bar stays on one line at every desktop width. */}
+              {primaryLinks.map(({ href, label }) => (
                 <Link
                   key={href}
                   href={href}
@@ -77,23 +83,54 @@ export function Navbar() {
                   {label}
                 </Link>
               ))}
-              <NotificationBell />
-              {isAdmin && (
-                <Link href="/admin" className={buttonClassName({ variant: 'ghost', size: 'sm' })}>
-                  {t.nav.admin}
-                </Link>
+              {toolLinks.length > 0 && (
+                <Menu label={t.nav.tools}>
+                  {(closeMenu) =>
+                    toolLinks.map(({ href, label, Icon }) => (
+                      <Link
+                        key={href}
+                        href={href}
+                        onClick={closeMenu}
+                        aria-current={pathname.startsWith(href) ? 'page' : undefined}
+                        className={menuItemClass}
+                      >
+                        <Icon className="h-4 w-4 text-muted" aria-hidden /> {label}
+                      </Link>
+                    ))
+                  }
+                </Menu>
               )}
+              <NotificationBell />
               <span className="mx-1 h-6 w-px bg-border" aria-hidden />
-              <Link
-                href="/account/billing"
-                className="max-w-40 truncate px-2 text-sm text-muted transition-colors hover:text-fg"
-                dir="auto"
-              >
-                {user?.displayName ?? user?.username}
-              </Link>
-              <Button variant="ghost" size="sm" loading={loggingOut} onClick={() => logout()}>
-                {t.common.signOut}
-              </Button>
+              <Menu label={<span dir="auto">{user?.displayName ?? user?.username}</span>} icon={<User className="h-4 w-4" aria-hidden />}>
+                {(closeMenu) => (
+                  <>
+                    <Link href="/account/billing" onClick={closeMenu} className={menuItemClass}>
+                      <User className="h-4 w-4 text-muted" aria-hidden /> {t.nav.account}
+                    </Link>
+                    <Link href="/notifications" onClick={closeMenu} className={menuItemClass}>
+                      <Bell className="h-4 w-4 text-muted" aria-hidden /> {t.nav.notifications}
+                    </Link>
+                    {isAdmin && (
+                      <Link href="/admin" onClick={closeMenu} className={menuItemClass}>
+                        <Shield className="h-4 w-4 text-muted" aria-hidden /> {t.nav.admin}
+                      </Link>
+                    )}
+                    <span className="my-1 h-px bg-border" aria-hidden />
+                    <button
+                      type="button"
+                      disabled={loggingOut}
+                      onClick={() => {
+                        closeMenu();
+                        logout();
+                      }}
+                      className={menuItemClass}
+                    >
+                      <LogOut className="flip-rtl h-4 w-4 text-muted" aria-hidden /> {t.common.signOut}
+                    </button>
+                  </>
+                )}
+              </Menu>
             </>
           ) : (
             <>
@@ -114,19 +151,19 @@ export function Navbar() {
         </nav>
 
         <IconButton
-          className="-me-2 md:hidden"
+          className="-me-2 lg:hidden"
           aria-label={mobileOpen ? t.nav.closeMenu : t.nav.openMenu}
           aria-expanded={mobileOpen}
           aria-controls="mobile-menu"
           onClick={() => setMobileOpen(!mobileOpen)}
         >
-          {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          {mobileOpen ? <X className="h-5 w-5" aria-hidden /> : <MenuIcon className="h-5 w-5" aria-hidden />}
         </IconButton>
       </div>
 
       {mobileOpen && (
-        <div id="mobile-menu" className="flex flex-col gap-4 border-t border-border px-4 py-4 md:hidden">
-          {!onSearchPage && <SearchBar onSearch={handleMobileSearch} />}
+        <div id="mobile-menu" className="flex max-h-sheet flex-col gap-4 overflow-y-auto overscroll-contain border-t border-border px-4 py-4 lg:hidden">
+          {!onSearchPage && <SearchBar onSearch={handleMobileSearch} className="md:hidden" />}
 
           <nav aria-label={t.nav.mobile} className="flex flex-col gap-1">
             {/* Same destinations as the desktop bar (audit 06, U-10). */}

@@ -11,6 +11,7 @@ import { ErrorState } from '@/components/ui/state';
 import { useSearch } from '@/lib/hooks/use-search';
 import { useRouter } from '@/lib/i18n/navigation';
 import { useI18n } from '@/lib/i18n/provider';
+import { useSearchStore } from '@/lib/store/search.store';
 import { parseSearchParams, searchHref, withChanges } from '@/lib/search-url';
 import { cn } from '@/lib/utils/cn';
 import type { SearchFilters as SearchFiltersType, SearchResponse } from '@/types/search.types';
@@ -24,6 +25,7 @@ export interface InitialSearch {
 
 export function SearchPageClient({ initial }: { initial: InitialSearch | null }) {
   const { t, tp } = useI18n();
+  const filtersOpen = useSearchStore((state) => state.isFilterPanelOpen);
   const router = useRouter();
   const searchParams = useSearchParams();
   // The URL is the state (FE-03): no copy in a store to drift from it.
@@ -101,8 +103,10 @@ export function SearchPageClient({ initial }: { initial: InitialSearch | null })
         <SortSelect value={filters} onChange={navigate} />
       </div>
 
-      {/* Stacks below lg (the filters open as a sheet there). */}
-      <div className="flex flex-col items-stretch gap-6 lg:flex-row lg:items-start lg:gap-8">
+      {/* Side by side only while the sidebar is open: collapsed, the Filters
+          button sits above the results and they use the full width. Below lg
+          the filters open as a sheet. */}
+      <div className={cn('flex flex-col items-stretch gap-6', filtersOpen && 'lg:flex-row lg:items-start lg:gap-8')}>
         <SearchFilters applied={filters} onApply={navigate} />
 
         <div className="flex min-w-0 flex-1 flex-col gap-8">

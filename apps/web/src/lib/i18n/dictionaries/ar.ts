@@ -36,6 +36,14 @@ export const ar: Dictionary = {
     refine: 'تصفية وترتيب',
     categoriesTitle: 'تصفح حسب الفئة',
     otherCategories: 'أخرى',
+    moreCategories: {
+      zero: 'لا مزيد',
+      one: 'وفئة أخرى',
+      two: 'وفئتان أخريان',
+      few: 'و{count} فئات أخرى',
+      many: 'و{count} فئة أخرى',
+      other: 'و{count} فئة أخرى',
+    },
     ogStores: {
       zero: 'لا متاجر بعد',
       one: 'في متجر واحد',
@@ -77,6 +85,7 @@ export const ar: Dictionary = {
     account: 'الحساب والخطة',
     admin: 'الإدارة',
     pricing: 'الأسعار والخطط',
+    tools: 'الأدوات',
     openMenu: 'فتح القائمة',
     closeMenu: 'إغلاق القائمة',
     alerts: 'التنبيهات',
@@ -93,6 +102,10 @@ export const ar: Dictionary = {
   footer: {
     label: 'تذييل الصفحة',
     browse: 'تصفّح',
+    tagline: 'بحث واحد وسعر كل متجر. صُنع في مصر للمشترين والبائعين.',
+    shoppers: 'للمشترين',
+    sellers: 'للبائعين',
+    developers: 'واجهة API',
     copyright: '© {year} Pricelens. الأسعار من المتاجر نفسها، وتُراجَع باستمرار.',
   },
   theme: {
@@ -108,8 +121,25 @@ export const ar: Dictionary = {
     headline: 'بحث واحد.',
     headlineAccent: 'كل الأسعار.',
     lede: 'قارن الأسعار في أمازون ونون وجوميا وغيرها. نجمع المنتجات المتطابقة معًا لترى النطاق الحقيقي للسعر.',
-    features: ['مقارنة بين المتاجر', 'تاريخ الأسعار', 'تنبيهات انخفاض السعر'],
     mostCompared: 'الأكثر مقارنة',
+    live: {
+      stores: {
+        zero: 'لا متاجر الآن',
+        one: 'متاح الآن في متجر واحد',
+        two: 'متاح الآن في متجرين',
+        few: 'متاح الآن في {count} متاجر',
+        many: 'متاح الآن في {count} متجرًا',
+        other: 'متاح الآن في {count} متجر',
+      },
+      cheapest: 'الأرخص',
+      save: 'وفّر {amount} عن أعلى سعر',
+      open: 'قارن الكل',
+    },
+    sellers: {
+      title: 'تبيع على نون أو جوميا أو أمازون؟',
+      body: 'اعرف ترتيب سعرك، وصافي ربحك على كل منصة بعد الرسوم، ومتى ينزل منافس تحت سعرك.',
+      cta: 'خطط البائعين',
+    },
     seeAll: 'عرض الكل',
     trendingUnavailable: 'المنتجات الأكثر مقارنة غير متاحة الآن.',
     trendingEmpty: 'لا توجد منتجات بعد. جرّب البحث بالأعلى.',
@@ -120,10 +150,10 @@ export const ar: Dictionary = {
     imageNotFound: 'لم نتعرّف على المنتج. جرّب صورة أوضح أو اكتب اسمه.',
     imageTooBig: 'حجم الصورة أكبر من 5 ميجابايت.',
     label: 'ابحث عن المنتجات',
-    placeholder: 'ابحث عن منتج أو ماركة أو موديل...',
+    placeholder: 'ابحث عن منتج أو ماركة أو موديل…',
     clear: 'مسح البحث',
     submit: 'بحث',
-    searching: 'جارٍ البحث...',
+    searching: 'جارٍ البحث…',
     resultsFor: 'نتائج البحث عن',
     allProducts: 'كل المنتجات',
     productCount: {
@@ -147,7 +177,7 @@ export const ar: Dictionary = {
     category: 'الفئة',
     anyCategory: 'كل الفئات',
     brand: 'الماركة',
-    brandPlaceholder: 'أبل، سوني، ديل...',
+    brandPlaceholder: 'أبل، سوني، ديل…',
     minPrice: 'أقل سعر',
     maxPrice: 'أعلى سعر',
     tier: 'الفئة السعرية',
@@ -186,6 +216,14 @@ export const ar: Dictionary = {
     to: 'إلى {price}',
     noCurrentPrice: 'لا يوجد سعر حالي',
     noStoresYet: 'لا متاجر بعد',
+    cardStores: {
+      zero: 'لا متاجر بعد',
+      one: 'في متجر واحد',
+      two: 'في متجرين',
+      few: 'في {count} متاجر',
+      many: 'في {count} متجرًا',
+      other: 'في {count} متجر',
+    },
     compareStores: {
       zero: 'لا متاجر للمقارنة',
       one: 'متجر واحد',
@@ -813,6 +851,10 @@ export const ar: Dictionary = {
     },
   },
   pricing: {
+    forShoppers: 'للمشترين',
+    forShoppersLede: 'اعرف السعر الحقيقي قبل الشراء، وتنبّه عندما ينخفض.',
+    forSellers: 'للبائعين والشركات',
+    forSellersLede: 'راقب المنافسين، وسعّر وهامش ربحك أمامك، واكتشف ما يستحق الاستيراد.',
     plans: {
       FREE: { name: 'مجاني', description: 'قارن الأسعار، وتابع عددًا محدودًا من المنتجات، واحصل على تنبيهات أساسية.' },
       PLUS: {

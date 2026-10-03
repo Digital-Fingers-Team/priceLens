@@ -32,7 +32,13 @@ const plexMono = IBM_Plex_Mono({
   preload: false,
 });
 
-export const viewport: Viewport = { themeColor: designTokens.themes.light.brand };
+// The browser chrome matches the page in either theme.
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: designTokens.themes.light.surface },
+    { media: '(prefers-color-scheme: dark)', color: designTokens.themes.dark.surface },
+  ],
+};
 
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
@@ -80,7 +86,7 @@ export default async function LocaleLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
-      <body className="flex min-h-screen flex-col">
+      <body className="flex min-h-dvh flex-col">
         <I18nProvider locale={locale} dict={t}>
           <Providers>
             <a

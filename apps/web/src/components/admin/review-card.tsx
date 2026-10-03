@@ -147,7 +147,7 @@ export function ReviewCard({ item }: ReviewCardProps) {
                 <div className="flex-1 h-2 rounded-full bg-surface-2 overflow-hidden">
                   <div
                     className={cn(
-                      'h-full rounded-full transition-all',
+                      'h-full rounded-full',
                       step.score >= 0.8
                         ? 'bg-success'
                         : step.score >= 0.6
@@ -177,7 +177,7 @@ export function ReviewCard({ item }: ReviewCardProps) {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              placeholder="Add context about your decision..."
+              placeholder="Add context about your decision…"
               className="w-full px-3 py-2 rounded text-sm bg-surface border border-border-strong text-fg placeholder:text-muted resize-none"
             />
           </div>

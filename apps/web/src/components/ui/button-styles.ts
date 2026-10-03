@@ -25,12 +25,14 @@ const variantStyles: Record<Variant, string> = {
 const sizeStyles: Record<Size, string> = {
   sm: 'px-3 gap-2',
   md: 'px-4 gap-2',
-  lg: 'px-6 gap-2 text-sm',
+  lg: 'px-6 gap-2 text-base',
 };
 
-// Mono uppercase labels on buttons (the owner's reference card).
+// Sentence-case labels in the text face: they read as actions, work the same
+// in Arabic (which has no case) and stay legible at small sizes. The mono
+// capitals are kept for data labels (.label-mono). A slight press on :active.
 const baseStyles =
-  'inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded font-mono text-xs font-medium uppercase tracking-wider transition-colors disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50';
+  'inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded text-sm font-medium transition active:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50';
 
 /**
  * Button styling for elements that are not buttons -- chiefly a `<Link>` that

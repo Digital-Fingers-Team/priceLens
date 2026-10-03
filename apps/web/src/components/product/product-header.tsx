@@ -60,14 +60,14 @@ export function ProductHeader({ product }: { product: CanonicalProduct }) {
 
   return (
     <section className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-12">
-      <div className="relative aspect-square overflow-hidden rounded border border-border bg-media">
+      <div className="relative aspect-square overflow-hidden rounded-md border border-border bg-media">
         {product.imageUrl ? (
           <Image
             src={product.imageUrl}
             alt={productTitle(product, locale)}
             fill
             sizes="(max-width: 1024px) 100vw, 50vw"
-            className="object-contain p-8"
+            className="object-contain p-8 mix-blend-multiply"
             priority
           />
         ) : (
@@ -86,7 +86,7 @@ export function ProductHeader({ product }: { product: CanonicalProduct }) {
             <Badge variant="outline">{t.tiers[product.tier] ?? product.tier}</Badge>
             <Badge variant="neutral">{categoryName}</Badge>
           </div>
-          <h1 dir="auto" className="text-xl font-semibold text-fg sm:text-2xl">
+          <h1 dir="auto" className="text-xl font-semibold text-fg lg:text-2xl">
             {productTitle(product, locale)}
           </h1>
           {attrs.length > 0 && (
@@ -103,7 +103,7 @@ export function ProductHeader({ product }: { product: CanonicalProduct }) {
           )}
         </div>
 
-        <div className="flex flex-col gap-3 rounded border border-border bg-surface p-4 sm:p-6">
+        <div className="flex flex-col gap-3 rounded-md border border-border bg-surface p-4 shadow-sm sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
             <p className="label-mono text-muted">{tp(t.product.priceAcross, storeCount)}</p>
             <p className="text-xs text-muted">{tp(t.product.listings, listingCount)}</p>
@@ -125,6 +125,11 @@ export function ProductHeader({ product }: { product: CanonicalProduct }) {
                   </div>
                 )}
               </div>
+              {hasRange && priceStats.max != null && (
+                <p className="w-fit rounded-sm bg-accent px-2 py-1 text-xs font-medium text-accent-fg">
+                  {tf(t.home.live.save, { amount: fmt.currency(priceStats.max - priceStats.min, priceStats.currency) })}
+                </p>
+              )}
 
               {cheapest && (
                 <p className="text-sm text-muted">

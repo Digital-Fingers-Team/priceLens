@@ -47,7 +47,7 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
   // Below sm the card is a compact row, so a phone shows several results per
   // screen instead of one (audit 06, U-06/U-07).
   return (
-    <article className="group relative flex h-full min-w-0 overflow-hidden rounded border border-border bg-surface transition-colors hover:border-border-strong focus-within:border-brand sm:flex-col">
+    <article className="group relative flex h-full min-w-0 overflow-hidden rounded-md border border-border bg-surface transition hover:border-border-strong hover:shadow focus-within:border-brand sm:flex-col">
       <div className="relative aspect-square w-28 shrink-0 bg-media sm:aspect-product sm:w-full">
         {product.imageUrl ? (
           <Image
@@ -56,7 +56,7 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
             fill
             sizes="(max-width: 640px) 112px, (max-width: 1024px) 50vw, 25vw"
             priority={priority}
-            className="object-contain p-2 sm:p-4"
+            className="object-contain p-2 mix-blend-multiply transition-transform duration-300 group-hover:scale-105 sm:p-4"
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-muted">
@@ -80,11 +80,11 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
           </Link>
         </h3>
 
-        <div className="mt-auto flex flex-col gap-1">
+        <div className="mt-auto flex flex-col gap-2">
           {hasPrice ? (
             <p className="flex flex-wrap items-baseline gap-x-2">
               <span className="text-xs text-muted">{t.product.from}</span>
-              <span className="whitespace-nowrap text-base font-semibold tabular-nums text-brand-text">
+              <span className="whitespace-nowrap text-lg font-semibold tabular-nums text-fg">
                 {fmt.currency(product.minPriceUsd, currency)}
               </span>
               {hasPriceRange && (
@@ -96,9 +96,14 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
           ) : (
             <p className="text-sm text-muted">{t.product.noCurrentPrice}</p>
           )}
-          <p className="flex items-center justify-between gap-2 text-xs text-muted">
-            <span>{product.listingCount === 0 ? t.product.noStoresYet : tp(t.product.compareStores, storeTotal)}</span>
-            <span className="hidden sm:inline">{t.tiers[product.tier] ?? product.tier}</span>
+          {/* How many stores: the number that makes a comparison worth opening. */}
+          <p
+            className={cn(
+              'w-fit rounded-sm px-2 py-1 text-xs font-medium',
+              storeTotal > 1 ? 'bg-brand-soft text-brand-soft-fg' : 'bg-surface-2 text-muted',
+            )}
+          >
+            {product.listingCount === 0 ? t.product.noStoresYet : tp(t.product.cardStores, storeTotal)}
           </p>
         </div>
       </div>

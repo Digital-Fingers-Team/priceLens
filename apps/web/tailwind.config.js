@@ -28,7 +28,8 @@ module.exports = {
       sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
       mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
     },
-    // Six sizes. Line heights are the Latin ones; :lang(ar) opens them up
+    // Six text sizes plus two display sizes (3xl, 4xl) for page heroes and
+    // big prices. Line heights are the Latin ones; :lang(ar) opens them up
     // in globals.css (Arabic needs taller lines for its marks).
     fontSize: {
       xs: ['0.75rem', { lineHeight: '1rem' }],
@@ -37,6 +38,8 @@ module.exports = {
       lg: ['1.25rem', { lineHeight: '1.75rem' }],
       xl: ['1.5rem', { lineHeight: '2rem' }],
       '2xl': ['2rem', { lineHeight: '2.5rem' }],
+      '3xl': ['2.5rem', { lineHeight: '3rem', letterSpacing: '-0.02em' }],
+      '4xl': ['3.25rem', { lineHeight: '3.75rem', letterSpacing: '-0.03em' }],
     },
     fontWeight: {
       normal: '400',

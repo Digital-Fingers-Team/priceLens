@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils/cn';
 const sizes = {
   sm: 'text-sm font-medium',
   md: 'text-base font-semibold',
-  lg: 'text-2xl font-semibold',
+  lg: 'text-3xl font-semibold',
 } as const;
 
 interface PriceTagProps {

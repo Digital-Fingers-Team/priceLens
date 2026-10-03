@@ -21,7 +21,7 @@ function renderSearchBar(initialValue?: string) {
   return { ...view, setInitialValue: (value: string) => view.rerender(tree(value)) };
 }
 
-const input = () => screen.getByPlaceholderText('Search products, brands, models...');
+const input = () => screen.getByPlaceholderText('Search products, brands, models…');
 
 describe('SearchBar', () => {
   beforeEach(() => {

@@ -73,10 +73,10 @@ export function Dialog({ open, onClose, title, description, variant = 'modal', f
               )}
             </div>
             <IconButton size="sm" aria-label={t.common.close} onClick={onClose} className="-me-2">
-              <X className="h-4 w-4" />
+              <X className="h-4 w-4" aria-hidden />
             </IconButton>
           </div>
-          <div className="overflow-y-auto px-4 py-4 sm:px-6">{children}</div>
+          <div className="overflow-y-auto overscroll-contain px-4 py-4 sm:px-6">{children}</div>
           {footer && <div className="flex justify-end gap-2 border-t border-border px-4 py-3 sm:px-6">{footer}</div>}
         </div>
       )}

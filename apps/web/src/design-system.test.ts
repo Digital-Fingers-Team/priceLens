@@ -36,7 +36,7 @@ const RULES: Array<{ name: string; pattern: RegExp; allow?: string[] }> = [
   // Arbitrary values (`mt-[13px]`); arbitrary variants (`aria-[invalid=true]:`) are fine.
   { name: 'arbitrary value', pattern: /\b[a-z][a-z0-9-]*-\[[^\]\s]+\](?!:)/ },
   { name: 'physical direction (use ms/me/ps/pe/start/end)', pattern: /(?<![\w-])-?(?:ml|mr|pl|pr|left|right)-(?:\d|px|auto|full)|\btext-(?:left|right)\b|\b(?:rounded|border)-(?:l|r|tl|tr|bl|br)\b/ },
-  { name: 'off-scale type size', pattern: /\btext-(?:[3-9]xl)\b/ },
+  { name: 'off-scale type size', pattern: /\btext-(?:[5-9]xl)\b/ },
   { name: 'off-scale weight', pattern: /\bfont-(?:thin|extralight|light|bold|extrabold|black)\b/ },
   { name: 'off-scale radius', pattern: /\brounded-(?:lg|xl|2xl|3xl)\b/ },
   { name: 'off-grid spacing', pattern: /(?<![\w.])-?[a-z-]+-[0-3]\.5\b/ },

@@ -310,6 +310,12 @@ export class SearchService {
     }[sortBy];
 
     const direction = sortDir === 'desc' ? Prisma.sql`DESC` : Prisma.sql`ASC`;
+    if (sortBy === 'listingCount') {
+      // "Most compared" means most stores. Raw rows put a wardrobe one store
+      // lists 37 times above a phone sold by four stores, and the card shows
+      // the per-store count, so the order looked random.
+      return Prisma.sql`COUNT(DISTINCT sl.platform_id) ${direction}, COUNT(sl.id) ${direction}, cp.updated_at DESC`;
+    }
     return Prisma.sql`${column} ${direction} NULLS LAST, cp.updated_at DESC`;
   }
 
