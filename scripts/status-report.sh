@@ -9,7 +9,8 @@
 #
 # Run by pricelens-status.timer every 5 minutes.
 # Settings (same file as monitor.sh): ALERT_TELEGRAM_BOT_TOKEN, ALERT_TELEGRAM_CHAT_ID;
-# optional STATUS_TELEGRAM_CHAT_ID to post the board somewhere other than the alert chat.
+# optional STATUS_TELEGRAM_CHAT_IDS (space-separated) to post the board somewhere other than
+# the alert chats. One board per chat, each edited in place.
 #
 #   STATUS_DRY=1 scripts/status-report.sh    print the message, send nothing
 #   STATUS_RESEND=1 scripts/status-report.sh post a fresh message (new board, e.g. to pin)
@@ -24,7 +25,7 @@ SITE="${SITE:-pricelens.store}"
 API_PORT="${API_PORT:-3002}"
 ONLINE_WINDOW_MIN="${ONLINE_WINDOW_MIN:-5}"
 CONTAINERS="${CONTAINERS:-pricelens-api pricelens-worker pricelens-proxy pricelens-postgres pricelens-redis}"
-CHAT_ID="${STATUS_TELEGRAM_CHAT_ID:-${ALERT_TELEGRAM_CHAT_ID:-}}"
+CHAT_IDS="${STATUS_TELEGRAM_CHAT_IDS:-${ALERT_TELEGRAM_CHAT_ID:-} ${ALERT_TELEGRAM_EXTRA_CHAT_IDS:-}}"
 mkdir -p "$STATE_DIR"
 
 work="$(mktemp -d)"
@@ -232,20 +233,45 @@ if [[ -n "${STATUS_DRY:-}" ]]; then
   exit 0
 fi
 
-[[ -n "${ALERT_TELEGRAM_BOT_TOKEN:-}" && -n "$CHAT_ID" ]] || { echo "status-report: no Telegram settings in $ALERT_ENV" >&2; exit 1; }
+[[ -n "${ALERT_TELEGRAM_BOT_TOKEN:-}" && -n "$CHAT_IDS" ]] || { echo "status-report: no Telegram settings in $ALERT_ENV" >&2; exit 1; }
 api="https://api.telegram.org/bot${ALERT_TELEGRAM_BOT_TOKEN}"
-id_file="$STATE_DIR/status-message-id"
-[[ -n "${STATUS_RESEND:-}" ]] && rm -f "$id_file"
 
-if [[ -s "$id_file" ]]; then
-  res="$(curl -s -m 15 "$api/editMessageText" --data-urlencode "chat_id=$CHAT_ID" --data-urlencode "message_id=$(cat "$id_file")" \
-    --data-urlencode "parse_mode=HTML" --data-urlencode "disable_web_page_preview=true" --data-urlencode "text=$message")"
-  # Unchanged text comes back as "message is not modified": fine. Anything else (deleted message): post anew.
-  if grep -q '"ok":true' <<<"$res" || grep -q 'not modified' <<<"$res"; then exit 0; fi
-  rm -f "$id_file"
-fi
+# Messages other people posted since the board (the bot only sees them in groups once
+# BotFather /setprivacy is Disabled): when there are any, post a fresh board at the bottom
+# instead of editing the one that scrolled up. Pending updates are left unread.
+curl -s -m 15 "$api/getUpdates" > "$work/updates.json" || true
 
-res="$(curl -s -m 15 "$api/sendMessage" --data-urlencode "chat_id=$CHAT_ID" --data-urlencode "parse_mode=HTML" \
-  --data-urlencode "disable_notification=true" --data-urlencode "disable_web_page_preview=true" --data-urlencode "text=$message")"
-mid="$(sed -n 's/.*"message_id":\([0-9]*\).*/\1/p' <<<"$res" | head -1)"
-if [[ -n "$mid" ]]; then echo "$mid" > "$id_file"; else echo "status-report: telegram send failed: $res" >&2; exit 1; fi
+latest_incoming() {
+  CHAT="$1" node -e '
+let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => {
+  let max = 0;
+  try { for (const u of JSON.parse(s).result || []) { const m = u.message; if (m && String(m.chat.id) === process.env.CHAT && m.message_id > max) max = m.message_id; } } catch {}
+  console.log(max);
+});' < "$work/updates.json"
+}
+
+rc=0
+for CHAT_ID in $CHAT_IDS; do
+  id_file="$STATE_DIR/status-message-id.$CHAT_ID"
+  [[ "$CHAT_ID" == "-5429407202" && ! -e "$id_file" && -s "$STATE_DIR/status-message-id" ]] && mv "$STATE_DIR/status-message-id" "$id_file"
+  [[ -n "${STATUS_RESEND:-}" ]] && rm -f "$id_file"
+
+  if [[ -s "$id_file" ]]; then
+    board_id="$(cat "$id_file")"
+    if (( $(latest_incoming "$CHAT_ID") > board_id )); then
+      rm -f "$id_file"
+    else
+      res="$(curl -s -m 15 "$api/editMessageText" --data-urlencode "chat_id=$CHAT_ID" --data-urlencode "message_id=$board_id" \
+        --data-urlencode "parse_mode=HTML" --data-urlencode "disable_web_page_preview=true" --data-urlencode "text=$message")"
+      # Unchanged text comes back as "message is not modified": fine. Anything else (deleted message): post anew.
+      if grep -q '"ok":true' <<<"$res" || grep -q 'not modified' <<<"$res"; then continue; fi
+      rm -f "$id_file"
+    fi
+  fi
+
+  res="$(curl -s -m 15 "$api/sendMessage" --data-urlencode "chat_id=$CHAT_ID" --data-urlencode "parse_mode=HTML" \
+    --data-urlencode "disable_notification=true" --data-urlencode "disable_web_page_preview=true" --data-urlencode "text=$message")"
+  mid="$(sed -n 's/.*"message_id":\([0-9]*\).*/\1/p' <<<"$res" | head -1)"
+  if [[ -n "$mid" ]]; then echo "$mid" > "$id_file"; else echo "status-report: telegram send to $CHAT_ID failed: $res" >&2; rc=1; fi
+done
+exit $rc

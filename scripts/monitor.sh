@@ -21,6 +21,7 @@
 #
 # Alert delivery, first configured wins (settings in $ALERT_ENV, chmod 600):
 #   ALERT_TELEGRAM_BOT_TOKEN + ALERT_TELEGRAM_CHAT_ID   Telegram message
+#     (+ optional ALERT_TELEGRAM_EXTRA_CHAT_IDS, space-separated, e.g. a group)
 #   ALERT_COMMAND                                       any command; the alert text on stdin
 #   neither                                             written to stdout (the journal)
 #
@@ -113,9 +114,12 @@ fi
 send() {
   local text="[PriceLens] $1"
   if [[ -n "${ALERT_TELEGRAM_BOT_TOKEN:-}" && -n "${ALERT_TELEGRAM_CHAT_ID:-}" ]]; then
-    curl -s -m 10 -o /dev/null "https://api.telegram.org/bot${ALERT_TELEGRAM_BOT_TOKEN}/sendMessage" \
-      --data-urlencode "chat_id=${ALERT_TELEGRAM_CHAT_ID}" --data-urlencode "text=$text" \
-      || echo "telegram delivery failed: $text" >&2
+    local chat
+    for chat in ${ALERT_TELEGRAM_CHAT_ID} ${ALERT_TELEGRAM_EXTRA_CHAT_IDS:-}; do
+      curl -s -m 10 -o /dev/null "https://api.telegram.org/bot${ALERT_TELEGRAM_BOT_TOKEN}/sendMessage" \
+        --data-urlencode "chat_id=${chat}" --data-urlencode "text=$text" \
+        || echo "telegram delivery failed ($chat): $text" >&2
+    done
   elif [[ -n "${ALERT_COMMAND:-}" ]]; then
     printf '%s\n' "$text" | bash -c "$ALERT_COMMAND" || echo "ALERT_COMMAND failed: $text" >&2
   fi
