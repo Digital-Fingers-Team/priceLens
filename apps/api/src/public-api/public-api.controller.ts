@@ -5,7 +5,7 @@ import { CompetitorEventType } from '@prisma/client';
 import { Public } from '../common/decorators';
 import { ApiKeyGuard, ApiKeyRequest, RequiresApiScope } from './api-key.guard';
 import { MarketDataService } from './market-data.service';
-import { MarketQueryDto } from './dto/public-api.dto';
+import { MarketQueryDto, PartnerSearchDto } from './dto/public-api.dto';
 
 /**
  * The enterprise API.
@@ -37,6 +37,13 @@ export class PublicApiController {
   @RequiresApiScope('market:read')
   getProductMarket(@Param('sku') sku: string, @Query() query: MarketQueryDto) {
     return this.marketData.getProductMarket(sku, query.days ?? 90);
+  }
+
+  /** GET /api/v1/partner/search?q=...: find a product's identifier to use with the other routes. */
+  @Get('search')
+  @RequiresApiScope('market:read')
+  search(@Query() query: PartnerSearchDto) {
+    return this.marketData.searchProducts(query.q, query.limit ?? 10);
   }
 
   @Get('market/stats')

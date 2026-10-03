@@ -1663,6 +1663,106 @@
         ]
       }
     },
+    "/api/v1/brand/workspaces/{orgId}/map/violations.csv": {
+      "get": {
+        "operationId": "BrandController_violationsCsv",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "brand"
+        ]
+      }
+    },
+    "/api/v1/brand/workspaces/{orgId}/authorized-retailers": {
+      "get": {
+        "operationId": "BrandController_listAuthorized",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "brand"
+        ]
+      },
+      "put": {
+        "operationId": "BrandController_setAuthorized",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetAuthorizedRetailersDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "brand"
+        ]
+      }
+    },
+    "/api/v1/brand/workspaces/{orgId}/unauthorized-sellers": {
+      "get": {
+        "operationId": "BrandController_listUnauthorized",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "brand"
+        ]
+      }
+    },
     "/api/v1/brand/workspaces/{orgId}/distribution/summary": {
       "get": {
         "operationId": "BrandController_distributionSummary",
@@ -2002,6 +2102,68 @@
           }
         },
         "summary": "Generate on demand. Idempotent for a given period.",
+        "tags": [
+          "brand"
+        ]
+      }
+    },
+    "/api/v1/brand/workspaces/{orgId}/reports/{reportId}/csv": {
+      "get": {
+        "operationId": "BrandController_reportCsv",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "reportId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "brand"
+        ]
+      }
+    },
+    "/api/v1/brand/workspaces/{orgId}/reports/{reportId}/pdf": {
+      "get": {
+        "operationId": "BrandController_reportPdf",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "reportId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
         "tags": [
           "brand"
         ]
@@ -4398,6 +4560,293 @@
         ]
       }
     },
+    "/api/v1/procurement/workspaces/{orgId}/quotes": {
+      "get": {
+        "operationId": "ProcurementController_list",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "procurement"
+        ]
+      },
+      "post": {
+        "operationId": "ProcurementController_create",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateQuoteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "procurement"
+        ]
+      }
+    },
+    "/api/v1/procurement/workspaces/{orgId}/quotes/{quoteId}": {
+      "get": {
+        "operationId": "ProcurementController_get",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "quoteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "procurement"
+        ]
+      },
+      "delete": {
+        "operationId": "ProcurementController_remove",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "quoteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "procurement"
+        ]
+      }
+    },
+    "/api/v1/procurement/workspaces/{orgId}/quotes/{quoteId}/reprice": {
+      "post": {
+        "operationId": "ProcurementController_reprice",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "quoteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "procurement"
+        ]
+      }
+    },
+    "/api/v1/procurement/workspaces/{orgId}/quotes/{quoteId}/finalize": {
+      "post": {
+        "operationId": "ProcurementController_finalize",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "quoteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "procurement"
+        ]
+      }
+    },
+    "/api/v1/procurement/workspaces/{orgId}/quotes/{quoteId}/items/{itemId}": {
+      "patch": {
+        "operationId": "ProcurementController_updateItem",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "quoteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateQuoteItemDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "procurement"
+        ]
+      }
+    },
+    "/api/v1/procurement/workspaces/{orgId}/quotes/{quoteId}/csv": {
+      "get": {
+        "operationId": "ProcurementController_csv",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "quoteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "procurement"
+        ]
+      }
+    },
+    "/api/v1/procurement/workspaces/{orgId}/quotes/{quoteId}/pdf": {
+      "get": {
+        "operationId": "ProcurementController_pdf",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "quoteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "procurement"
+        ]
+      }
+    },
     "/api/v1/workspaces/{orgId}/api-keys": {
       "get": {
         "operationId": "ApiKeysController_list",
@@ -5111,6 +5560,22 @@
         "required": [
           "email",
           "role"
+        ]
+      },
+      "SetAuthorizedRetailersDto": {
+        "type": "object",
+        "properties": {
+          "platformIds": {
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": [
+          "platformIds"
         ]
       },
       "UpsertBrandWatchDto": {
@@ -5933,6 +6398,88 @@
         "required": [
           "message"
         ]
+      },
+      "QuoteItemDto": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 255
+          },
+          "specs": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 500
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "maxUnitPrice": {
+            "type": "number",
+            "minimum": 0
+          },
+          "note": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "query"
+        ]
+      },
+      "CreateQuoteDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 160
+          },
+          "notes": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 1000
+          },
+          "items": {
+            "minItems": 1,
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuoteItemDto"
+            }
+          }
+        },
+        "required": [
+          "title",
+          "items"
+        ]
+      },
+      "UpdateQuoteItemDto": {
+        "type": "object",
+        "properties": {
+          "canonicalProductId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "note": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 500
+          },
+          "maxUnitPrice": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
       },
       "IssueApiKeyDto": {
         "type": "object",

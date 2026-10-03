@@ -8,6 +8,22 @@ Price comparison for Egyptian stores. PriceLens collects listings from Amazon, N
 
 [ARCHITECTURE.md](ARCHITECTURE.md) explains how it fits together (system, data flow, the matching pipeline, queues), with decisions recorded in [docs/adr](docs/adr/). [PROJECT_MAP.md](PROJECT_MAP.md) is the file-level map (modules, jobs, ports, environment), and `audit/` holds the state of each overhaul phase.
 
+## What PriceLens does (v2)
+
+| For | Features |
+|---|---|
+| Everyone | Search, price history, buy/wait verdict, installments, bank and coupon offers, used-market range, unit prices |
+| Buyer Pro | Price alerts (email, Telegram, web push), baskets, image search, advisor, Telegram bot |
+| Sellers | Workspaces, competitor tracking and alerts, profit calculator, best platform, repricer (suggestions), rank tracking, CSV/link import |
+| Seller Plus | FX tracking and impact, import finder, trend radar |
+| Enterprise (business) | MAP monitoring, authorized-seller checks, market reports (PDF/CSV), procurement quotes (PDF/CSV), data API with keys ([/developers](apps/web/src/app/%5Blocale%5D/developers/page.tsx)) |
+
+Every feature sits behind a plan entitlement and a feature flag (`/admin/flags`, or `FEATURE_<KEY>` in `.env`). Anything that needs an external account (Paymob, SMTP, Telegram, an LLM key) stays switched off until its variables are set: see [DEPLOY_NOTES.md](DEPLOY_NOTES.md) for what each one needs and what runs without it.
+
+### Background jobs
+
+All run in the `pricelens-worker` container on the `ingestion` queue; each has a cron variable in `.env.example` and can be run now from the admin API (`/admin/...`). The scheduled ones: price rollup, alert digest, cart watch, used market, seller repricer, rank tracking, FX refresh, import finder, trend radar, MAP sweep, launch detection and weekly reports. Run a job by hand by enqueueing its name (for example `run-weekly-reports`) on the `ingestion` queue.
+
 ## Prerequisites
 
 - Node.js 22 (`.nvmrc`; the Docker images use 22)

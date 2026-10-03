@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { CompetitorEventType } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { OfferPolicy, liveOfferWhere } from '../prices/offer-rules';
+import { SearchService } from '../search/search.service';
 import { PriceIntelligenceService } from '../intelligence/price-intelligence.service';
 import {
   computeHistoryStats,
@@ -75,10 +76,36 @@ export class MarketDataService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly intelligence: PriceIntelligenceService,
+    private readonly search: SearchService,
     config: ConfigService,
   ) {
     this.currency = config.get<string>('pricing.fxBaseCurrency', 'EGP');
     this.offerPolicy = { maxAgeDays: config.get<number>('pricing.offerMaxAgeDays', 7) };
+  }
+
+  /** Catalogue search by name; returns identifiers the other routes accept. */
+  async searchProducts(q: string, limit: number) {
+    const result = await this.search.search({ q, limit, page: 1 } as never, { liveFetch: false });
+    const hits = result.hits as Array<{
+      id: string;
+      slug: string;
+      title: string;
+      brand: string | null;
+      minPriceUsd: number | null;
+      listingCount: number;
+    }>;
+    return {
+      query: q,
+      currency: this.currency,
+      results: hits.map((hit) => ({
+        id: hit.id,
+        slug: hit.slug,
+        title: hit.title,
+        brand: hit.brand,
+        lowest_price: hit.minPriceUsd,
+        retailers: hit.listingCount,
+      })),
+    };
   }
 
   /**

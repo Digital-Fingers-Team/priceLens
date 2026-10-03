@@ -1,4 +1,4 @@
-import { IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString, IsUUID, Length, Max, Min } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString, IsUUID, Length, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ReportPeriod } from '@prisma/client';
 
@@ -64,4 +64,11 @@ export class GenerateReportDto {
   @IsOptional()
   @IsEnum(ReportPeriod)
   period?: ReportPeriod;
+}
+
+export class SetAuthorizedRetailersDto {
+  @IsArray()
+  @ArrayMaxSize(200)
+  @IsUUID('4', { each: true })
+  platformIds!: string[];
 }

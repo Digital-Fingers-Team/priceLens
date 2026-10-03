@@ -27,3 +27,16 @@ export class MarketQueryDto {
   @Max(730)
   days?: number;
 }
+
+export class PartnerSearchDto {
+  @IsString()
+  @Length(2, 200)
+  q!: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(25)
+  limit?: number;
+}

@@ -86,8 +86,13 @@ Entitlements service + `@RequiresFeature` guard + `useEntitlements()` hook + `Up
 - [x] Trend radar: weekly (Saturday–Friday, Cairo) `trend_signals` for categories and products: new listings / stores, interest, median week-on-week move of the lowest price. New listings include stores we just started covering; the page says so
 - [x] `/importers` page (three tabs, Arabic + English), navbar link; admin endpoints to run each job now
 
-## Phase 8 — Business
-- [ ] MAP (exists: add UI) · [ ] Unauthorized sellers (distribution exists: add UI) · [ ] Reports (exist: add PDF/CSV + UI) · [ ] Public API (exists: add key UI + docs page) · [ ] Procurement quotes
+## Phase 8 — Business (`feat/phase-8-business`)
+- [x] MAP: `/business/{org}` MAP tab: set a MAP per product, violations table with evidence (price, time, listing link), acknowledge, CSV export. Per-violation notifications already existed
+- [x] Authorized sellers: brand ticks its approved stores (`authorized_retailers`); listings of its products at other stores are listed, with "below MAP" marked. Nothing is reported until at least one store is ticked
+- [x] Reports: three new sections (average prices by category, discount frequency by store, share of offers per store), PDF and CSV download, UI with the generated reports. Generation stays on-demand plus the Monday job (cheap database aggregates, no queue needed)
+- [x] Public API: key UI (create with scopes, copy once, revoke, 30-day usage), `GET /partner/search`, and the public `/developers` documentation page. Swagger is off in production, so the page is the documentation
+- [x] Procurement quotes (`procurement_quotes`, `/procurement/workspaces/{org}/quotes`): one line per item (name, quantity, budget), matched by search (drops trailing words when nothing matches, and shows the matched title), lowest live offer per line with other stores' prices, totals, over-budget flag, final status, PDF and CSV. No delivery terms are held, so the quote says to confirm them
+- [ ] MAP email digest: alerts go through the notification channels per violation (email once SMTP is set); no separate digest
 
 ## Phase 9 — QA, GitHub, deploy
 - [ ] Tests · [ ] README / DEPLOY_NOTES · [ ] tag v2.0.0 · [ ] smoke test

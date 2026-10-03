@@ -31,6 +31,7 @@ import { TelegramBotModule } from './telegram-bot/telegram-bot.module';
 import { DealHunterModule } from './deal-hunter/deal-hunter.module';
 import { SellerModule } from './seller/seller.module';
 import { BrandModule } from './brand/brand.module';
+import { ProcurementModule } from './procurement/procurement.module';
 import { PublicApiModule } from './public-api/public-api.module';
 import { HealthModule } from './health/health.module';
 import { AnalyticsModule } from './analytics/analytics.module';
@@ -144,6 +145,7 @@ export const ENV_FILES = resolveEnvFiles();
     DealHunterModule,
     SellerModule,
     BrandModule,
+    ProcurementModule,
     PublicApiModule,
     HealthModule,
     AnalyticsModule,

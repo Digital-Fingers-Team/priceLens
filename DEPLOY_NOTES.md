@@ -70,3 +70,10 @@ Migration `20261002100000_v2_importers` (additive): enums `FxSource`, `TrendScop
 New jobs: `run-fx-refresh` (`FX_REFRESH_CRON`, 07:20 and 13:20 UTC), `run-import-finder` (`IMPORT_FINDER_CRON`, 04:10 UTC) and `run-trend-radar` (`TREND_RADAR_CRON`, Saturday 04:40 UTC). Each is skipped when its plan feature flag (`fx_tracking`, `import_finder`, `trend_radar`) is off. No keys needed: the CBE page (`CBE_RATES_URL`) is public; it rejects requests without a browser user agent, so a layout change or block shows up as a failed CBE refresh in the worker log while the market rate keeps being stored.
 
 Rate history starts on deploy day: "a month ago" stays empty for 30 days. Import opportunities only exist for stores with a landed-cost rule (/admin/landed-cost-rules). Run once after deploy: `POST /admin/trade/fx/refresh`, `/admin/trade/import-opportunities/rebuild`, `/admin/trade/trend-radar/build`.
+
+## Phase 8 — Business
+
+Migration `20261003100000_v2_business` (additive): enum `QuoteStatus`; tables `authorized_retailers`, `procurement_quotes`, `procurement_quote_items`. No data. New dependency `pdfkit`; the PDF font (`apps/api/assets/fonts/DejaVuSans.ttf`) ships in the image with the rest of `apps/api`. Arabic text in PDFs is shaped by the font but laid out simply (whole Arabic cells are reversed word by word); check an Arabic quote once by eye.
+
+New feature key `procurement_quotes` (Enterprise, flag on by default). New routes: `/brand/workspaces/{org}/map/violations.csv`, `/authorized-retailers`, `/unauthorized-sellers`, `/reports/{id}/csv|pdf`, `/procurement/workspaces/{org}/quotes/...`, `/partner/search`. New web pages: `/business`, `/business/{org}`, `/developers`. No new jobs and no new environment variables. Enterprise is not self-serve: give a user the plan from /admin to try it.
+

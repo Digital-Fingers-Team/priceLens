@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { Heart, User, LogOut, Shield, Menu, X, Sparkles, Building2, Bell, Tag, ShoppingBasket, MessageCircleQuestion, Ship } from 'lucide-react';
+import { Heart, User, LogOut, Shield, Menu, X, Sparkles, Building2, Bell, Tag, ShoppingBasket, MessageCircleQuestion, Ship, Briefcase } from 'lucide-react';
 import { LensMark, Wordmark } from '@/components/brand/logo';
 import { NotificationBell } from '@/components/notifications/notification-bell';
 import { Button, IconButton } from '@/components/ui/button';
@@ -46,6 +46,7 @@ export function Navbar() {
     ...(['import_finder', 'fx_tracking', 'trend_radar'].some((flag) => flags.isOn(flag))
       ? [{ href: '/importers', label: t.nav.importers, Icon: Ship }]
       : []),
+    ...(flags.isOn('map_monitoring') ? [{ href: '/business', label: t.nav.business, Icon: Briefcase }] : []),
   ];
 
   return (

@@ -180,4 +180,5 @@ export const FEATURES = {
   MARKET_REPORTS: 'market_reports',
   API_ACCESS: 'api_access',
   TEAM_SEATS: 'team_seats',
+  PROCUREMENT_QUOTES: 'procurement_quotes',
 } as const;

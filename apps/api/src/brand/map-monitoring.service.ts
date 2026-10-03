@@ -10,6 +10,7 @@ import {
 import { PrismaService } from '../database/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { OrganizationsService } from '../seller/organizations.service';
+import { toCsv } from './export-formats';
 
 export interface MapSweepResult {
   productsChecked: number;
@@ -296,5 +297,25 @@ export class MapMonitoringService {
         acknowledgedAt: event.acknowledgedAt?.toISOString() ?? null,
       };
     });
+  }
+
+  /** Violations with their evidence (price, time, URL), for sending to a retailer. */
+  async exportViolationsCsv(userId: string, orgId: string): Promise<string> {
+    const violations = await this.listViolations(userId, orgId, { limit: 500 });
+    return toCsv(
+      ['detected_at', 'sku', 'product', 'retailer', 'map_price', 'advertised_price', 'difference_pct', 'currency', 'url', 'acknowledged'],
+      violations.map((violation) => [
+        violation.detectedAt,
+        violation.sku,
+        violation.productName,
+        violation.retailer,
+        violation.mapPrice,
+        violation.advertisedPrice,
+        violation.differencePct.toFixed(1),
+        this.currency,
+        violation.listingUrl,
+        violation.acknowledgedAt ? 'yes' : 'no',
+      ]),
+    );
   }
 }

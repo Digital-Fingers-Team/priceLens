@@ -505,6 +505,17 @@ describe('Every endpoint (e2e)', () => {
 
     await call('GET', '/api/v1/brand/workspaces/{orgId}/map/violations', 200, { ...auth, params });
     await call('GET', '/api/v1/brand/workspaces/{orgId}/map/violations', 403, { token: free.token, params });
+    const violationsCsv = await call('GET', '/api/v1/brand/workspaces/{orgId}/map/violations.csv', 200, { ...auth, params });
+    expect(violationsCsv.text).toContain('retailer');
+    await call('GET', '/api/v1/brand/workspaces/{orgId}/map/violations.csv', 403, { token: free.token, params });
+
+    await call('GET', '/api/v1/brand/workspaces/{orgId}/unauthorized-sellers', 200, { ...auth, params });
+    const retailers = await call('GET', '/api/v1/brand/workspaces/{orgId}/authorized-retailers', 200, { ...auth, params });
+    expect(retailers.body.data.declared).toBe(false);
+    await call('PUT', '/api/v1/brand/workspaces/{orgId}/authorized-retailers', 200, { ...auth, params, body: { platformIds: [platformId] } });
+    await call('PUT', '/api/v1/brand/workspaces/{orgId}/authorized-retailers', 400, { ...auth, params, body: { platformIds: ['nope'] } });
+    const declared = await call('GET', '/api/v1/brand/workspaces/{orgId}/unauthorized-sellers', 200, { ...auth, params });
+    expect(declared.body.data.declared).toBe(true);
     await call('GET', '/api/v1/brand/workspaces/{orgId}/distribution/summary', 200, { ...auth, params });
     await call('GET', '/api/v1/brand/workspaces/{orgId}/distribution', 200, { ...auth, params });
     await call('GET', '/api/v1/brand/workspaces/{orgId}/distribution/retailers', 200, { ...auth, params });
@@ -526,6 +537,55 @@ describe('Every endpoint (e2e)', () => {
       ...auth,
       params: { orgId, reportId: report.body.data?.id ?? MISSING_ID },
     });
+    const reportParams = { orgId, reportId: report.body.data?.id ?? MISSING_ID };
+    const reportCsv = await call('GET', '/api/v1/brand/workspaces/{orgId}/reports/{reportId}/csv', 200, { ...auth, params: reportParams });
+    expect(reportCsv.text).toContain('Share of offers per store');
+    const reportPdf = await call('GET', '/api/v1/brand/workspaces/{orgId}/reports/{reportId}/pdf', 200, { ...auth, params: reportParams });
+    expect(reportPdf.headers['content-type']).toContain('application/pdf');
+    await call('GET', '/api/v1/brand/workspaces/{orgId}/reports/{reportId}/pdf', 404, { ...auth, params: { orgId, reportId: MISSING_ID } });
+    expectNoProblems();
+  });
+
+  it('procurement quotes', async () => {
+    const auth = { token: brand.token };
+    const params = { orgId: brandOrgId };
+    const base = '/api/v1/procurement/workspaces/{orgId}/quotes';
+
+    await call('GET', base, 403, { token: free.token, params });
+    await call('POST', base, 400, { ...auth, params, body: { title: 'x', items: [] } });
+    const created = await call('POST', base, 201, {
+      ...auth,
+      params,
+      body: { title: 'Office phones', items: [{ query: 'Apple iPhone 15 128GB', quantity: 10 }, { query: 'zzzz no such thing' }] },
+    });
+    const quote = created.body.data;
+    expect(quote.items).toHaveLength(2);
+    expect(quote.items[0].unitPrice).not.toBeNull();
+    expect(quote.items[1].unitPrice).toBeNull();
+    expect(quote.total).toBe(quote.items[0].unitPrice * 10);
+
+    const qp = { ...params, quoteId: quote.id ?? MISSING_ID };
+    await call('GET', base, 200, { ...auth, params });
+    await call('GET', `${base}/{quoteId}`, 200, { ...auth, params: qp });
+    await call('GET', `${base}/{quoteId}`, 404, { ...auth, params: { ...params, quoteId: MISSING_ID } });
+    const patched = await call('PATCH', `${base}/{quoteId}/items/{itemId}`, 200, {
+      ...auth,
+      params: { ...qp, itemId: quote.items[0].id ?? MISSING_ID },
+      body: { quantity: 2 },
+    });
+    expect(patched.body.data.total).toBe(quote.items[0].unitPrice * 2);
+    await call('POST', `${base}/{quoteId}/reprice`, 201, { ...auth, params: qp });
+    const csv = await call('GET', `${base}/{quoteId}/csv`, 200, { ...auth, params: qp });
+    expect(csv.text).toContain('unit_price');
+    const pdf = await call('GET', `${base}/{quoteId}/pdf`, 200, { ...auth, params: qp });
+    expect(pdf.headers['content-type']).toContain('application/pdf');
+    await call('POST', `${base}/{quoteId}/finalize`, 201, { ...auth, params: qp });
+    await call('PATCH', `${base}/{quoteId}/items/{itemId}`, 400, {
+      ...auth,
+      params: { ...qp, itemId: quote.items[0].id ?? MISSING_ID },
+      body: { quantity: 3 },
+    });
+    await call('DELETE', `${base}/{quoteId}`, 200, { ...auth, params: qp });
     expectNoProblems();
   });
 
@@ -545,6 +605,9 @@ describe('Every endpoint (e2e)', () => {
     await call('GET', '/api/v1/partner/market/stats', 200, { ...key, query: { brand: 'Apple' } });
     await call('GET', '/api/v1/partner/products/{sku}/market', 404, { ...key, params: { sku: 'NO-SUCH-SKU' } });
     await call('GET', '/api/v1/partner/events', 200, key);
+    const found = await call('GET', '/api/v1/partner/search', 200, { ...key, query: { q: 'iphone 15' } });
+    expect(found.body.data.results.length).toBeGreaterThan(0);
+    await call('GET', '/api/v1/partner/search', 400, { ...key, query: { q: 'a' } });
 
     await call('DELETE', '/api/v1/workspaces/{orgId}/api-keys/{keyId}', 200, {
       ...auth,

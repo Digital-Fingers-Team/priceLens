@@ -75,6 +75,8 @@ const SHIPPED: FeatureKey[] = [
   FEATURES.IMPORT_FINDER,
   FEATURES.FX_TRACKING,
   FEATURES.TREND_RADAR,
+  // v2, phase 8
+  FEATURES.PROCUREMENT_QUOTES,
 ];
 
 const featureFlags = Object.fromEntries(

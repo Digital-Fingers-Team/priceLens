@@ -230,6 +230,7 @@ model Platform {
   feeTables           PlatformFeeTable[]
   rankKeywords        RankKeyword[]
   importOpportunities ImportOpportunity[]
+  authorizedFor       AuthorizedRetailer[]
 
   @@map("platforms")
 }
@@ -1083,18 +1084,20 @@ model Organization {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  platform     Platform?             @relation(fields: [platformId], references: [id], onDelete: SetNull)
-  members      OrganizationMember[]
-  products     SellerProduct[]
-  events       CompetitorEvent[]
-  alertRules   CompetitorAlertRule[]
-  brandWatches BrandWatch[]
-  discoveries  ProductDiscovery[]
-  reports      MarketReport[]
-  apiKeys      ApiKey[]
-  invites      OrganizationInvite[]
-  priceLogs    PriceChangeLog[]
-  rankKeywords RankKeyword[]
+  platform            Platform?             @relation(fields: [platformId], references: [id], onDelete: SetNull)
+  members             OrganizationMember[]
+  products            SellerProduct[]
+  events              CompetitorEvent[]
+  alertRules          CompetitorAlertRule[]
+  brandWatches        BrandWatch[]
+  discoveries         ProductDiscovery[]
+  reports             MarketReport[]
+  apiKeys             ApiKey[]
+  invites             OrganizationInvite[]
+  priceLogs           PriceChangeLog[]
+  rankKeywords        RankKeyword[]
+  authorizedRetailers AuthorizedRetailer[]
+  procurementQuotes   ProcurementQuote[]
 
   @@index([platformId])
   @@map("organizations")
@@ -1385,6 +1388,88 @@ model MarketReport {
   @@unique([orgId, period, periodStart])
   @@index([orgId, periodEnd])
   @@map("market_reports")
+}
+
+// A store a brand has approved to sell its products.
+//
+// With no rows the brand has not declared a list, and nothing is reported as
+// unauthorized: absence of a list is not the same as "nobody is authorized".
+model AuthorizedRetailer {
+  id         String   @id @default(uuid())
+  orgId      String   @map("org_id")
+  platformId String   @map("platform_id")
+  note       String?  @db.VarChar(255)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  platform     Platform     @relation(fields: [platformId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, platformId])
+  @@map("authorized_retailers")
+}
+
+// ─── Procurement quotes ──────────────────────────────────────────────────────
+
+enum QuoteStatus {
+  DRAFT
+  FINAL
+}
+
+// A company's shopping list priced across the stores we track.
+//
+// Each item stores the offer chosen when the quote was priced, because a
+// quotation dated Tuesday has to keep saying what was true on Tuesday.
+model ProcurementQuote {
+  id          String      @id @default(uuid())
+  orgId       String      @map("org_id")
+  createdBy   String?     @map("created_by")
+  title       String      @db.VarChar(160)
+  notes       String?     @db.VarChar(1000)
+  status      QuoteStatus @default(DRAFT)
+  currency    String      @default("EGP") @db.VarChar(3)
+  /// Sum of the chosen offers x quantity, for the items that found one.
+  totalAmount Decimal?    @map("total_amount") @db.Decimal(14, 2)
+  pricedAt    DateTime?   @map("priced_at")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  organization Organization           @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  items        ProcurementQuoteItem[]
+
+  @@index([orgId, createdAt])
+  @@map("procurement_quotes")
+}
+
+model ProcurementQuoteItem {
+  id       String @id @default(uuid())
+  quoteId  String @map("quote_id")
+  position Int    @default(0)
+
+  /// What the company asked for, in their words ("Lenovo IdeaPad 3 i5 8GB").
+  query        String   @db.VarChar(255)
+  specs        String?  @db.VarChar(500)
+  quantity     Int      @default(1)
+  /// Their budget per unit; an offer above it is shown but flagged.
+  maxUnitPrice Decimal? @map("max_unit_price") @db.Decimal(12, 2)
+  /// The company's own note for this line (delivery terms, site, urgency).
+  note         String?  @db.VarChar(500)
+
+  canonicalProductId String?   @map("canonical_product_id")
+  matchedTitle       String?   @map("matched_title") @db.VarChar(255)
+  store              String?   @db.VarChar(128)
+  storeSlug          String?   @map("store_slug") @db.VarChar(64)
+  storeKind          String?   @map("store_kind") @db.VarChar(24)
+  unitPrice          Decimal?  @map("unit_price") @db.Decimal(12, 2)
+  inStock            Boolean?  @map("in_stock")
+  listingUrl         String?   @map("listing_url")
+  /// Next-best offers at other stores, as of pricing time.
+  alternatives       Json      @default("[]")
+  pricedAt           DateTime? @map("priced_at")
+
+  quote ProcurementQuote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@index([quoteId, position])
+  @@map("procurement_quote_items")
 }
 
 // ─── Enterprise API ──────────────────────────────────────────────────────────
