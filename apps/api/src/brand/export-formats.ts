@@ -48,8 +48,8 @@ function fontPath(): string | null {
   return candidates.find((candidate) => existsSync(candidate)) ?? null;
 }
 
-const ARABIC = /[؀-ۿ]/;
-const RUNS = /[؀-ۿ]+(?:[  ]+[؀-ۿ]+)*|[^؀-ۿ]+/g;
+const ARABIC = /[\u0600-\u06FF]/;
+const RUNS = /[\u0600-\u06FF]+(?:[ \u00A0]+[\u0600-\u06FF]+)*|[^\u0600-\u06FF]+/g;
 const HAS_WORD = /[\p{L}\p{N}]/u;
 
 /**
@@ -63,12 +63,12 @@ const HAS_WORD = /[\p{L}\p{N}]/u;
  */
 export function bidiSegments(text: string): string[] {
   if (!ARABIC.test(text)) return [text];
-  const ascii = text.replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660));
+  const ascii = text.replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660));
   const runs = ascii.match(RUNS) ?? [];
   const rtl = ARABIC.test(ascii.trimStart()[0] ?? '');
   const shaped = runs.map((run) =>
     ARABIC.test(run)
-      ? run.split(/[  ]+/).reverse().join(' ')
+      ? run.split(/[ \u00A0]+/).reverse().join('\u00A0')
       : rtl && !HAS_WORD.test(run)
         ? [...run].reverse().join('')
         : run,
