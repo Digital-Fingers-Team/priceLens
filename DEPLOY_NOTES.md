@@ -77,3 +77,17 @@ Migration `20261003100000_v2_business` (additive): enum `QuoteStatus`; tables `a
 
 New feature key `procurement_quotes` (Enterprise, flag on by default). New routes: `/brand/workspaces/{org}/map/violations.csv`, `/authorized-retailers`, `/unauthorized-sellers`, `/reports/{id}/csv|pdf`, `/procurement/workspaces/{org}/quotes/...`, `/partner/search`. New web pages: `/business`, `/business/{org}`, `/developers`. No new jobs and no new environment variables. Enterprise is not self-serve: give a user the plan from /admin to try it.
 
+## Release checklist (v2.0.0)
+
+Done by Claude in the repo: migrations, code, tests (lint, typecheck, unit, integration, e2e, web tests, both builds), OpenAPI, docs. **Production steps run by the owner** (Claude's tools are blocked from deploying and from reading or running things inside the production containers):
+
+1. `./scripts/deploy-api.sh` then `./scripts/deploy-web.sh` (a backup `~/backups/*-pre-phase8.dump` was taken before Phase 8).
+2. Run the jobs once so the pages have data: `run-fx-refresh`, `run-import-finder`, `run-trend-radar` (admin routes `POST /api/v1/admin/trade/fx/refresh`, `/admin/trade/import-opportunities/rebuild`, `/admin/trade/trend-radar/build`). They also run on their own schedules (FX 07:20 and 13:20 UTC, import finder 04:10, trend radar Saturday 04:40).
+3. Enter data only the owner can source: store fees in `/admin/fee-tables`; installment terms, bank offers, coupons and warranty rules in `/admin/buyer-offers`; review the placeholder customs rates in `/admin/landed-cost`.
+4. Credentials (see the table at the top): Telegram bot token and webhook secret (then `POST /api/v1/admin/telegram/webhook` once), SMTP, Paymob when the business is registered, optional `ANTHROPIC_API_KEY`.
+5. Give a test account the Enterprise plan from `/admin` and try `/business`: set a MAP, tick an authorized store, generate a report, price a quote, create an API key and call `/api/v1/partner/whoami`.
+
+## Smoke test
+
+Not run: it needs the deployed site. After step 1, check: home, search, a product page, `/pricing`, a test-mode checkout (admin-only `mock_checkout`), one alert end to end, `/seller` dashboard, `/importers`, `/business`, `/developers`, and an API key request (`GET /api/v1/partner/whoami` returns 200 with the key). Record the results here.
+
