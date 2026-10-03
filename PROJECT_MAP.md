@@ -33,7 +33,7 @@ flowchart LR
 | `docker-compose.yml` | Dev infra (Postgres, Redis), compose project `pricelens-dev`, 127.0.0.1 only |
 | `docker-compose.server.yml` | What actually runs in prod on this server |
 | `docker-compose.prod.yml` | Generic prod variant (not used here) |
-| `prompts/`, `audit/` | Overhaul phase prompts and their audit reports |
+| `audit/` | Reports of the overhaul phases; code comments cite their item ids (for example "audit 11", "B-08") |
 
 ## API modules (`apps/api/src`)
 
