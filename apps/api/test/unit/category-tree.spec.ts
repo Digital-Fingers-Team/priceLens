@@ -72,6 +72,15 @@ describe('category tree', () => {
     }
   });
 
+  it('never sweeps phone-accessories, which only receives what other sweeps find', () => {
+    // A "case" sweep would bring in every cheap cover there is. Its terms
+    // must not contain "phone": site search matches a query inside a stored
+    // term, and every case would match "phone".
+    const category = categoryTree.find((c) => c.slug === 'phone-accessories');
+    expect([category?.parentSlug, category?.rolloutWave, category?.minPriceEgp]).toEqual(['electronics', -1, 0]);
+    expect(category?.searchTerms.filter((term) => /phone|mobile/i.test(term))).toEqual([]);
+  });
+
   it('retires the home-appliances catch-all (wave -1), whose products move to the specific leaves', () => {
     // Review finding C1: sweeping it would keep creating fridges and washers
     // that the new leaves also hold, and matching never compares across categories.
@@ -80,7 +89,7 @@ describe('category tree', () => {
   });
 
   it('puts every new leaf in wave 1 or later, with no floor override', () => {
-    const fresh = leaves.filter((l) => !ORIGINAL_LEAVES.includes(l.slug));
+    const fresh = leaves.filter((l) => !ORIGINAL_LEAVES.includes(l.slug) && l.slug !== 'phone-accessories');
     expect(fresh.filter((l) => (l.rolloutWave ?? 0) < 1).map((l) => l.slug)).toEqual([]);
     expect(fresh.filter((l) => l.minPriceEgp != null).map((l) => l.slug)).toEqual([]);
   });

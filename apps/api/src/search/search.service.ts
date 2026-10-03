@@ -289,7 +289,17 @@ export class SearchService {
     }
     if (sortBy === 'relevance') {
       const direction = sortDir === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
-      return Prisma.sql`MAX(${relevanceSql}) ${direction}, MIN(sl.price_usd) ASC NULLS LAST, cp.updated_at DESC`;
+      // Within a relevance tier, look-alikes stay together: products sharing
+      // a title stem (the same case in another colour, another store's copy
+      // the matcher has not merged yet) are ordered as one family, placed by
+      // its cheapest member. Ordered by price alone they were scattered
+      // between unrelated products.
+      const tier = Prisma.sql`MAX(${relevanceSql})`;
+      const stem = SearchService.titleStemSql();
+      return Prisma.sql`${tier} ${direction},
+        MIN(MIN(sl.price_usd)) OVER (PARTITION BY ${tier}, ${stem}) ASC NULLS LAST,
+        ${stem},
+        MIN(sl.price_usd) ASC NULLS LAST, cp.updated_at DESC`;
     }
 
     const column = {
@@ -301,6 +311,24 @@ export class SearchService {
 
     const direction = sortDir === 'desc' ? Prisma.sql`DESC` : Prisma.sql`ASC`;
     return Prisma.sql`${column} ${direction} NULLS LAST, cp.updated_at DESC`;
+  }
+
+  /** Colour words, which tell look-alikes apart but not products (D-6). */
+  private static readonly COLOUR_WORDS = [
+    'black', 'white', 'blue', 'navy', 'gray', 'grey', 'red', 'green', 'gold', 'silver', 'purple', 'pink',
+    'rose', 'yellow', 'orange', 'brown', 'beige', 'titanium', 'graphite', 'midnight', 'starlight', 'sierra',
+    'transparent', 'clear',
+  ];
+
+  /**
+   * The start of a product's title with colour words removed: products that
+   * share it are look-alikes ("clear magsafe-compatible tpu case and camera
+   * lens ... - pink" / "... - silver"). Forty characters is about the product
+   * type and the first model words.
+   */
+  static titleStemSql(): Prisma.Sql {
+    const colours = `\\m(${SearchService.COLOUR_WORDS.join('|')})\\M`;
+    return Prisma.sql`left(btrim(regexp_replace(regexp_replace(cp.search_title, ${colours}, '', 'g'), '[^[:alnum:]]+', ' ', 'g')), 40)`;
   }
 
   /**

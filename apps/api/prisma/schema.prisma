@@ -467,6 +467,8 @@ model ProductMerge {
   mergedProductId       String    @map("merged_product_id")
   keptTitle             String    @map("kept_title")
   mergedTitle           String    @map("merged_title")
+  /// The merged product's slug: its old URL redirects to the kept product.
+  mergedSlug            String?   @map("merged_slug")
   /// The deleted product row, to recreate it on undo.
   mergedSnapshot        Json      @map("merged_snapshot")
   movedListingIds       String[]  @map("moved_listing_ids")
@@ -485,6 +487,7 @@ model ProductMerge {
 
   @@index([aiVerdict, undoneAt, createdAt])
   @@index([keptProductId])
+  @@index([mergedSlug])
   @@map("product_merges")
 }
 

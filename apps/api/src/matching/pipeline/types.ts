@@ -76,6 +76,13 @@ export interface CandidateHint {
 export interface CandidateSource<C extends CatalogCandidate = CatalogCandidate> {
   findByIdentifier(identifiers: ListingIdentifiers): Promise<C | null>;
   findInCategory(categoryId: string, near: CandidateHint): Promise<C[]>;
+  /**
+   * Products in ANY category whose normalized title is exactly this one.
+   * Categories come from the sweep that found a listing, so the same product
+   * found by two sweeps used to be created once per category (a phone case
+   * under both Headphones and Smart Watches).
+   */
+  findByExactTitle?(normalizedTitle: string): Promise<C[]>;
 }
 
 /**

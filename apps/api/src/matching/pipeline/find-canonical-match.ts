@@ -26,12 +26,21 @@ export async function findCanonicalMatch<C extends CatalogCandidate>(
     return identifierMatch;
   }
 
+  // Step 7a: the same normalized title in any category, no conflict.
+  if (ports.candidates.findByExactTitle) {
+    const anywhere = await ports.candidates.findByExactTitle(input.normalized.normalized);
+    const exactAnywhere = findExactTitleMatch(input, anywhere, tools);
+    if (exactAnywhere) {
+      return exactAnywhere;
+    }
+  }
+
   const candidates = await ports.candidates.findInCategory(categoryId, {
     normalizedTitle: input.normalized.normalized,
     model: listingKeys(input).model,
   });
 
-  // Step 7: same normalized title, no conflict.
+  // Step 7b: same normalized title within the category, no conflict.
   const exact = findExactTitleMatch(input, candidates, tools);
   if (exact) {
     return exact;

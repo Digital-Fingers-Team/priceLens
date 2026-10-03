@@ -68,6 +68,13 @@ export const categoryTree: CategoryDefinition[] = [
   // Matching never compares across categories, so sweeping both would
   // duplicate every appliance. Kept so its unmoved products stay browsable.
   { ...original('home-appliances', 'Home Appliances', 'أجهزة منزلية', ['appliance', 'home appliance', 'home appliances', 'أجهزة منزلية']), rolloutWave: -1 },
+  // Phone and tablet cases, screen protectors and spare screens. Never swept
+  // (wave -1: a "case" sweep would bring in every cheap cover there is); the
+  // ones other sweeps find are filed here whichever sweep found them
+  // (ListingProcessor.homeCategory), so each is created once. No term
+  // contains "phone" or "mobile": site search matches a query inside stored
+  // terms, and "phone" would then match every case.
+  { ...original('phone-accessories', 'Phone Accessories', 'إكسسوارات موبايل', ['screen protector', 'tempered glass', 'جراب', 'اسكرينة']), rolloutWave: -1 },
 
   // ─── Large appliances ─────────────────────────────────────────────────
   group('large-appliances', 'Large Appliances', 'أجهزة منزلية كبيرة'),

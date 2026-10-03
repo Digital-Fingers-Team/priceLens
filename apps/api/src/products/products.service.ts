@@ -187,7 +187,7 @@ export class ProductsService {
   private async resolveMergedProductId(slug: string): Promise<string | null> {
     const [merge] = await this.prisma.$queryRaw<Array<{ keptProductId: string }>>(Prisma.sql`
       SELECT kept_product_id AS "keptProductId" FROM product_merges
-      WHERE merged_snapshot->>'slug' = ${slug} AND undone_at IS NULL
+      WHERE merged_slug = ${slug} AND undone_at IS NULL
       ORDER BY created_at DESC
       LIMIT 1
     `);

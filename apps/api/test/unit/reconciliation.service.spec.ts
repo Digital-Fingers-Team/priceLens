@@ -190,5 +190,32 @@ describe('ReconciliationService', () => {
 
       expect(update.mock.calls[0][0].data.attributes).toEqual({ color: 'blue', ram: '8GB' });
     });
+
+    it('files a phone case merged across two sweeps\' categories under Phone Accessories', async () => {
+      const update = jest.fn();
+      const tx = {
+        canonicalProduct: { update },
+        category: { findUnique: jest.fn().mockResolvedValue({ id: 'phone-accessories-id' }) },
+      } as any;
+      const title = 'Clear MagSafe-Compatible TPU Case for Samsung Galaxy A05S - Pink';
+      const keep = canonical({ id: 'keep', title, categoryId: 'headphones-id' });
+      const merge = canonical({ id: 'merge', title, categoryId: 'smart-watches-id' });
+
+      await (service as any).backfillKeeper(tx, keep, merge);
+
+      expect(update.mock.calls[0][0].data.category).toEqual({ connect: { id: 'phone-accessories-id' } });
+    });
+
+    it('leaves the category alone when both products share it', async () => {
+      const update = jest.fn();
+      const findUnique = jest.fn();
+      const tx = { canonicalProduct: { update }, category: { findUnique } } as any;
+      const title = 'Clear Case for Samsung Galaxy A05S';
+
+      await (service as any).backfillKeeper(tx, canonical({ title }), canonical({ title }));
+
+      expect(findUnique).not.toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
+    });
   });
 });

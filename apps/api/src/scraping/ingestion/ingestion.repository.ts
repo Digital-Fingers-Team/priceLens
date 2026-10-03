@@ -24,6 +24,7 @@ const toJson = (value: unknown): Prisma.InputJsonValue => value as Prisma.InputJ
 @Injectable()
 export class IngestionRepository {
   private readonly categoryMedians = new Map<string, { median: number | null; at: number }>();
+  private readonly categoriesBySlug = new Map<string, Category>();
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -182,7 +183,41 @@ export class IngestionRepository {
       return this.prisma.canonicalProduct.findFirst({ where: { OR: clauses } });
     },
     findInCategory: (categoryId: string, near: CandidateHint) => this.findCandidatesInCategory(categoryId, near),
+    findByExactTitle: (normalizedTitle: string) =>
+      this.prisma.canonicalProduct.findMany({
+        where: { normalizedTitle },
+        orderBy: { id: 'asc' },
+        take: CANDIDATE_POOL_SIZE,
+      }),
   };
+
+  /**
+   * The product a store listing is already attached to, when it is accepted.
+   * Matching is not re-run for it: a listing seen again by another category's
+   * sweep used to be matched only within that category, miss its own product,
+   * found a duplicate and move there, leaving the old product empty.
+   */
+  async currentProductOf(platformId: string, externalId: string): Promise<CanonicalProduct | null> {
+    const row = await this.prisma.sourceListing.findUnique({
+      where: { platformId_externalId: { platformId, externalId } },
+      select: { matchStatus: true, canonicalProduct: true },
+    });
+    if (!row?.canonicalProduct) return null;
+    return ACCEPTED_STATUSES.includes(row.matchStatus) ? row.canonicalProduct : null;
+  }
+
+  async moveProductToCategory(productId: string, categoryId: string): Promise<void> {
+    await this.prisma.canonicalProduct.update({ where: { id: productId }, data: { categoryId } });
+  }
+
+  /** A category by slug, cached once found (categories are seeded, not edited). */
+  async categoryBySlug(slug: string): Promise<Category | null> {
+    const cached = this.categoriesBySlug.get(slug);
+    if (cached) return cached;
+    const category = await this.prisma.category.findUnique({ where: { slug } });
+    if (category) this.categoriesBySlug.set(slug, category);
+    return category;
+  }
 
   /**
    * The category's products nearest a listing: the CANDIDATE_POOL_SIZE most

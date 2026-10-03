@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module';
+import { CatalogCleanupService } from './catalog-cleanup.service';
 import { FuzzyMatcherService } from './fuzzy-matcher.service';
 import { FxRatesService } from './fx-rates.service';
 import { NormalizerService } from './normalizer.service';
@@ -12,6 +13,7 @@ const SERVICES = [
   FuzzyMatcherService,
   SemanticService,
   ReconciliationService,
+  CatalogCleanupService,
   FxRatesService,
   TitleTranslationService,
 ];

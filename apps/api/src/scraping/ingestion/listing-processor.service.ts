@@ -13,6 +13,7 @@ import {
   NormalizedListing,
   SameProductJudge,
   checkCategorySanity,
+  checkConflicts,
   checkMarketOutlier,
   detectJunkListing,
   findCanonicalMatch,
@@ -22,6 +23,7 @@ import {
   normalizeListing,
   toBasePrices,
 } from '../../matching/pipeline';
+import { PHONE_ACCESSORIES_SLUG, isPhoneAccessory } from '../../matching/text/phone-accessory';
 import type { RetailerListing } from '../interfaces/retailer-listing.interface';
 import { KeyedMutex } from '../../common/keyed-mutex';
 import { IngestionRepository } from './ingestion.repository';
@@ -53,8 +55,8 @@ export class ListingProcessor {
   private readonly logger = new Logger(ListingProcessor.name);
   private readonly tools: MatchingTools;
   /**
-   * Serializes matching + persisting per product family (category, brand,
-   * model). Two jobs that scrape the same new product at once would
+   * Serializes matching + persisting per product family (brand, model or
+   * title; not category, since step 7a looks across categories). Two jobs that scrape the same new product at once would
    * otherwise both find no match and both create it (audit 02, L-19).
    */
   private readonly familyLock = new KeyedMutex();
@@ -129,11 +131,36 @@ export class ListingProcessor {
       }
     }
 
+    const home = await this.homeCategory(category, listing.title);
     const keys = listingKeys(input);
-    const family = [category.id, keys.brand ?? '', keys.model ?? input.normalized.normalized].join('|');
+    const family = [keys.brand ?? '', keys.model ?? input.normalized.normalized].join('|');
     return this.familyLock.run(family, () =>
-      this.matchAndPersist(platform, category, listing, sourceSlug, input, price, advertisedPrice, belowFloor),
+      this.matchAndPersist(platform, home, listing, sourceSlug, input, price, advertisedPrice, belowFloor),
     );
+  }
+
+  /**
+   * The category a listing's product belongs in. Normally the one whose sweep
+   * found it; a phone case or screen protector goes to Phone Accessories
+   * whichever sweep found it (headphone and smart-watch searches return them
+   * by the thousand), so every copy of it meets in one place. The sanity and
+   * price-floor checks above still use the sweep's category.
+   */
+  private async homeCategory(sweepCategory: Category, title: string): Promise<Category> {
+    if (sweepCategory.slug === PHONE_ACCESSORIES_SLUG || !isPhoneAccessory(title)) return sweepCategory;
+    return (await this.repository.categoryBySlug(PHONE_ACCESSORIES_SLUG)) ?? sweepCategory;
+  }
+
+  /**
+   * The product this listing is already attached to, when it still passes
+   * the step 8 guards (a store can reuse an id for something else). A listing
+   * seen again is not re-matched: matching it afresh in another sweep's
+   * category used to miss its product and found a duplicate.
+   */
+  private async currentProduct(platform: Platform, listing: RetailerListing, input: NormalizedListing<RetailerListing>) {
+    const current = await this.repository.currentProductOf(platform.id, listing.externalId);
+    if (!current || checkConflicts(input, current, this.tools).conflict !== null) return null;
+    return current;
   }
 
   private dropBelowFloor(platform: Platform, category: Category): null {
@@ -156,12 +183,17 @@ export class ListingProcessor {
     // Steps 6-9: the product it belongs to, if any. A below-floor listing
     // does not get the (paid) LLM judge: most are accessories and cheap
     // look-alikes, and only a clear match is worth keeping.
-    const match = await findCanonicalMatch(
-      input,
-      category.id,
-      { candidates: this.repository.candidates, judge: belowFloor ? NO_JUDGE : this.semantic },
-      this.tools,
-    );
+    const match =
+      (await this.currentProduct(platform, listing, input)) ??
+      (await findCanonicalMatch(
+        input,
+        category.id,
+        { candidates: this.repository.candidates, judge: belowFloor ? NO_JUDGE : this.semantic },
+        this.tools,
+      ));
+    if (match && match.categoryId !== category.id && category.slug === PHONE_ACCESSORIES_SLUG) {
+      await this.repository.moveProductToCategory(match.id, category.id);
+    }
     if (!match && belowFloor) {
       return this.dropBelowFloor(platform, category);
     }

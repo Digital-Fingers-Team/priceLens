@@ -7,6 +7,7 @@ import { PrismaService } from '../database/prisma.service';
 import { FuzzyMatcherService } from './fuzzy-matcher.service';
 import { NormalizerService } from './normalizer.service';
 import { SemanticService } from './semantic.service';
+import { PHONE_ACCESSORIES_SLUG, isPhoneAccessory } from './text/phone-accessory';
 import { capacityGb, checkConflicts, normalizeListing } from './pipeline';
 import type { MatchingTools } from './pipeline';
 
@@ -25,8 +26,12 @@ export interface ReconciliationOptions {
   maxPairs?: number;
 }
 
-/** Who approved a merge: the AI judge, or the code rules while the judge was unavailable. */
-export type MergeDecision = 'ai' | 'rules';
+/**
+ * Who approved a merge: the AI judge, the code rules while the judge was
+ * unavailable (reviewed by the judge later), or the catalog cleanup
+ * (CatalogCleanupService: identical titles and emptied duplicates; not reviewed).
+ */
+export type MergeDecision = 'ai' | 'rules' | 'cleanup';
 
 export interface ProposedMerge {
   keepId: string;
@@ -182,7 +187,7 @@ export class ReconciliationService {
   async reviewUnreviewedMerges(limit = 200): Promise<{ approved: number; undone: number }> {
     const result = { approved: 0, undone: 0 };
     const pending = await this.prisma.productMerge.findMany({
-      where: { aiVerdict: null, undoneAt: null },
+      where: { decidedBy: 'rules', aiVerdict: null, undoneAt: null },
       orderBy: { createdAt: 'asc' },
       take: limit,
     });
@@ -207,7 +212,8 @@ export class ReconciliationService {
 
   /**
    * For each canonical product, find its `neighborsPerProduct` nearest
-   * same-category neighbours by title-trigram similarity (pg_trgm, already
+   * neighbours in any category (a product's category is the sweep that found
+   * it, so one case lived under both Headphones and Smart Watches) by title-trigram similarity (pg_trgm, already
    * GIN-indexed on `normalized_title`), then keep the pairs within the
    * similarity threshold. `a_id < b_id` collapses the two directions of each
    * pair into one row.
@@ -246,15 +252,14 @@ export class ReconciliationService {
           SELECT LEAST(a.id, nn.id) AS a_id, GREATEST(a.id, nn.id) AS b_id,
                  nn.sim AS similarity
           FROM (
-            SELECT id, category_id, normalized_title FROM canonical_products
+            SELECT id, normalized_title FROM canonical_products
             ORDER BY created_at DESC
             LIMIT ${anchors}
           ) a
           JOIN LATERAL (
             SELECT b.id, similarity(a.normalized_title, b.normalized_title) AS sim
             FROM canonical_products b
-            WHERE b.category_id = a.category_id
-              AND b.id <> a.id
+            WHERE b.id <> a.id
             ORDER BY a.normalized_title <-> b.normalized_title
             LIMIT ${neighborsPerProduct}
           ) nn ON true
@@ -274,7 +279,7 @@ export class ReconciliationService {
   }
 
   /**
-   * Candidate pairs sharing the same category + brand + extracted model,
+   * Candidate pairs sharing the same brand + extracted model (any category),
    * regardless of title trigram similarity. This is the signal that actually
    * identifies a cross-store duplicate: two stores rewrite the title around the
    * model code so completely that trigram similarity misses them, but the
@@ -289,7 +294,7 @@ export class ReconciliationService {
    */
   private async findModelAgreementPairs(maxPairs: number): Promise<CandidatePair[]> {
     const products = await this.prisma.canonicalProduct.findMany({
-      select: { id: true, title: true, brand: true, categoryId: true },
+      select: { id: true, title: true, brand: true },
     });
 
     const groups = new Map<string, string[]>();
@@ -298,8 +303,11 @@ export class ReconciliationService {
       const brand = (product.brand ?? extracted.brand)?.trim().toLowerCase();
       const model = extracted.model?.trim().toLowerCase();
       if (!brand || !model) continue;
+      // An accessory's model is the phone it fits: every case for the A05s
+      // would pair with every other one and with the phone itself.
+      if (this.normalizer.isAccessory(product.title)) continue;
 
-      const key = `${product.categoryId}|${brand}|${model}`;
+      const key = `${brand}|${model}`;
       const bucket = groups.get(key);
       if (bucket) {
         bucket.push(product.id);
@@ -344,7 +352,7 @@ export class ReconciliationService {
    * column. Any of these means "not provably the same product" -- skip
    * before spending an LLM call. Color is never a conflict (D-6).
    */
-  private hasHardConflict(a: CanonicalRow, b: CanonicalRow): boolean {
+  hasHardConflict(a: CanonicalRow, b: CanonicalRow): boolean {
     const input = normalizeListing(
       {
         title: a.title,
@@ -412,7 +420,7 @@ export class ReconciliationService {
    * Before deleting, any identifier / image the loser has but the keeper lacks is
    * copied onto the keeper so a unique GTIN/UPC/EAN/MPN isn't lost with the row.
    */
-  private async mergeCanonicals(keep: CanonicalRow, merge: CanonicalRow, decidedBy: MergeDecision): Promise<void> {
+  async mergeCanonicals(keep: CanonicalRow, merge: CanonicalRow, decidedBy: MergeDecision): Promise<void> {
     const keepId = keep.id;
     const mergeId = merge.id;
     await this.prisma.$transaction(async (tx) => {
@@ -477,6 +485,7 @@ export class ReconciliationService {
           mergedProductId: mergeId,
           keptTitle: keep.title,
           mergedTitle: merge.title,
+          mergedSlug: merge.slug,
           mergedSnapshot: JSON.parse(JSON.stringify(merge)) as Prisma.InputJsonValue,
           movedListingIds,
           movedAlertIds,
@@ -557,7 +566,8 @@ export class ReconciliationService {
   /**
    * Copy identifiers, image, and brand/model/sku the loser has but the keeper is
    * missing onto the keeper. Also merges the loser's `attributes` keys that the
-   * keeper doesn't already define. No-op if the keeper is already fully populated.
+   * keeper doesn't already define, and files a phone accessory under Phone
+   * Accessories. No-op if the keeper is already fully populated.
    */
   private async backfillKeeper(
     tx: Prisma.TransactionClient,
@@ -573,6 +583,12 @@ export class ReconciliationService {
       if (!keep[key] && merge[key]) {
         (data as Record<string, unknown>)[key] = merge[key];
       }
+    }
+
+    // Products from two sweeps' categories: a phone accessory lives in Phone Accessories.
+    if (keep.categoryId !== merge.categoryId && isPhoneAccessory(keep.title)) {
+      const home = await tx.category.findUnique({ where: { slug: PHONE_ACCESSORIES_SLUG }, select: { id: true } });
+      if (home && home.id !== keep.categoryId) data.category = { connect: { id: home.id } };
     }
 
     const keepAttrs = (keep.attributes ?? {}) as Record<string, unknown>;

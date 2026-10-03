@@ -451,6 +451,29 @@ describe('matching pipeline', () => {
       expect(fake.calls).toBe(0);
     });
 
+    it('finds the same title in another category before loading its own', async () => {
+      // A case found by the Headphones sweep, seen again by the Smart Watches sweep.
+      const elsewhere = candidate('Clear MagSafe-Compatible TPU Case for Samsung Galaxy A05S - Pink');
+      const src = { ...source(null, []), findByExactTitle: async () => [elsewhere] };
+      expect(
+        await findCanonicalMatch(
+          input('Clear MagSafe-Compatible TPU Case for Samsung Galaxy A05S - Pink'),
+          'smart-watches',
+          { candidates: src, judge: judge([]) },
+          tools,
+        ),
+      ).toBe(elsewhere);
+      expect(src.categoryLoads).toBe(0);
+    });
+
+    it('ignores a same-title product in another category that the guards reject', async () => {
+      const other = { ...candidate('Galaxy A57 256GB'), model: 'galaxy a56' };
+      const src = { ...source(null, []), findByExactTitle: async () => [other] };
+      expect(
+        await findCanonicalMatch(input('Galaxy A57 256GB'), 'cat', { candidates: src, judge: judge([]) }, tools),
+      ).toBeNull();
+    });
+
     it('otherwise ranks and lets the judge decide', async () => {
       const oppo = candidate('OPPO A6 Smartphone, 256 GB, Sapphire Blue, Dual SIM, 8 GB RAM');
       const fake = judge([true]);
