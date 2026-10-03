@@ -231,7 +231,7 @@ export const DEFAULT_PLAN_BLUEPRINTS: PlanBlueprint[] = [
     tier: PlanTier.PLUS,
     name: 'PriceLens Plus',
     description: 'Know when to buy. Unlimited tracking, every alert type, and full buying intelligence.',
-    priceMinor: 12_900, // 129.00 EGP
+    priceMinor: 9_900, // 99.00 EGP: under the 100 mark, below one delivery fee
     currency: 'EGP',
     intervalDays: 30,
     sortOrder: 1,
@@ -254,7 +254,7 @@ export const DEFAULT_PLAN_BLUEPRINTS: PlanBlueprint[] = [
     tier: PlanTier.SELLER,
     name: 'Seller',
     description: 'Watch your competitors, hold your price position, and price with your margin in view.',
-    priceMinor: 99_900, // 999.00 EGP
+    priceMinor: 79_900, // 799.00 EGP
     currency: 'EGP',
     intervalDays: 30,
     sortOrder: 2,
@@ -276,8 +276,8 @@ export const DEFAULT_PLAN_BLUEPRINTS: PlanBlueprint[] = [
     key: 'seller_plus_monthly',
     tier: PlanTier.SELLER,
     name: 'Seller Plus',
-    description: 'For serious sellers: more SKUs, auto-repricing where a platform allows it, import opportunities and trend radar.',
-    priceMinor: 249_900, // 2,499.00 EGP — placeholder, set from the admin panel
+    description: 'For serious sellers: more SKUs, import opportunities, trend radar and FX impact on your margin.',
+    priceMinor: 179_900, // 1,799.00 EGP
     currency: 'EGP',
     intervalDays: 30,
     sortOrder: 3,

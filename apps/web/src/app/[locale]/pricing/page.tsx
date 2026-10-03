@@ -21,27 +21,75 @@ type Fmt = ReturnType<typeof useI18n>;
 /** Where "Contact sales" goes (owner decision D-26). */
 const SALES_EMAIL = 'Baraasaad006@gmail.com';
 
-/** Plain-language summary of a plan's limits, driven by the API's values. */
+/**
+ * Plain-language summary of a plan, driven by the API's values. Each paid tier lists only what it
+ * adds, led by an "everything in <lower plan>" line, so the ladder between plans reads at a glance.
+ */
 function planHighlights(plan: Plan, { t, tf, tp, fmt }: Fmt): string[] {
   const { limits } = plan;
   const h: Dictionary['pricing']['highlights'] = t.pricing.highlights;
-  const lines = [
-    limits.trackedProducts === null ? h.unlimitedProducts : tp(h.products, limits.trackedProducts),
-    limits.activeAlerts === null ? h.unlimitedAlerts : tp(h.alerts, limits.activeAlerts),
-    limits.priceHistoryDays === null ? h.fullHistory : tf(h.historyDays, { days: limits.priceHistoryDays }),
-    tp(h.alertTypes, limits.alertTypes.length),
-  ];
+  const has = (feature: string) => limits.features.includes(feature as (typeof limits.features)[number]);
+  const lines: string[] = [];
 
-  if (limits.features.includes('buy_verdict')) lines.push(h.buyVerdict);
-  if (limits.features.includes('fake_sale_detection')) lines.push(h.fakeDiscount);
-  if (limits.features.includes('advanced_deal_score')) lines.push(h.advancedScore);
-  if (limits.features.includes('restock_alerts')) lines.push(h.restock);
-  if (limits.notificationChannels.includes('TELEGRAM')) lines.push(h.telegram);
-  if (limits.features.includes('competitor_monitoring')) lines.push(h.competitors);
-  if (limits.features.includes('margin_pricing')) lines.push(h.margin);
+  const tierBelow = has('api_access') ? h.inheritsSellerPlus : has('import_finder') ? h.inheritsSeller : has('seller_workspace') ? h.inheritsPlus : has('buy_verdict') ? h.inheritsFree : null;
+  if (tierBelow) lines.push(tierBelow);
+
+  // Limits: the free tier's are the headline; Plus raises them; the seller tiers re-state only what changes.
+  if (!has('seller_workspace')) {
+    lines.push(
+      limits.trackedProducts === null ? h.unlimitedProducts : tp(h.products, limits.trackedProducts),
+      limits.activeAlerts === null ? h.unlimitedAlerts : tp(h.alerts, limits.activeAlerts),
+      limits.priceHistoryDays === null ? h.fullHistory : tf(h.historyDays, { days: limits.priceHistoryDays }),
+      tp(h.alertTypes, limits.alertTypes.length),
+    );
+  }
+
+  const add = (feature: string, line: string) => {
+    if (has(feature)) lines.push(line);
+  };
+
+  if (has('buy_verdict') && !has('seller_workspace')) {
+    add('buy_verdict', h.buyVerdict);
+    add('fake_sale_detection', h.fakeDiscount);
+    add('advanced_deal_score', h.advancedScore);
+    add('restock_alerts', h.restock);
+    if (limits.notificationChannels.includes('TELEGRAM')) lines.push(h.telegram);
+    add('landed_cost_detail', h.landedCost);
+    add('installment_comparison', h.installments);
+    add('card_offers', h.cardOffers);
+    add('verified_coupons', h.coupons);
+    add('cart_watch', h.cartWatch);
+    add('image_search', h.imageSearch);
+    add('advisor', h.advisor);
+    add('ad_free', h.adFree);
+  }
+
+  if (has('seller_workspace') && !has('import_finder')) {
+    add('competitor_monitoring', h.competitors);
+    add('competitor_alerts', h.competitorAlerts);
+    add('profit_calculator', h.profit);
+    add('best_platform', h.bestPlatform);
+    add('margin_pricing', h.margin);
+    add('repricer_suggest', h.repricer);
+    add('rank_tracking', h.rankTracking);
+  }
+
+  if (has('import_finder') && !has('api_access')) {
+    add('import_finder', h.importFinder);
+    add('trend_radar', h.trendRadar);
+    add('fx_tracking', h.fxTracking);
+  }
+
+  if (has('api_access')) {
+    add('map_monitoring', h.map);
+    add('distribution_monitoring', h.distribution);
+    add('launch_detection', h.launches);
+    add('market_reports', h.reports);
+    add('procurement_quotes', h.quotes);
+    lines.push(tf(h.api, { calls: fmt.number(limits.apiCallsPerDay) }));
+  }
+
   if (limits.monitoredSkus) lines.push(tf(h.skus, { count: fmt.number(limits.monitoredSkus) }));
-  if (limits.features.includes('map_monitoring')) lines.push(h.map);
-  if (limits.features.includes('api_access')) lines.push(tf(h.api, { calls: fmt.number(limits.apiCallsPerDay) }));
   if (limits.seats > 1) lines.push(tf(h.seats, { seats: limits.seats }));
   return lines;
 }
