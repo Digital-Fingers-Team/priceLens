@@ -18,8 +18,8 @@ import { formatSignedPercent } from '@/lib/utils/format';
 import { safeExternalHref } from '@/lib/utils/safe-href';
 import type { CompetitorEvent, CompetitorEventType } from '@/types/seller.types';
 
-const EVENT_META: Record<CompetitorEventType, { icon: typeof TrendingDown; tone: string }> = {
-  PRICE_DROP: { icon: ArrowDownRight, tone: 'text-success' },
+const EVENT_META: Record<CompetitorEventType, { icon: typeof TrendingDown; tone: string; savings?: boolean }> = {
+  PRICE_DROP: { icon: ArrowDownRight, tone: 'bg-accent text-accent-fg', savings: true },
   PRICE_INCREASE: { icon: ArrowUpRight, tone: 'text-warning' },
   UNDERCUT: { icon: TrendingDown, tone: 'text-danger' },
   OUT_OF_STOCK: { icon: PackageX, tone: 'text-muted' },
@@ -121,7 +121,13 @@ function EventRow({ event, onAcknowledge }: { event: CompetitorEvent; onAcknowle
 
   return (
     <li className={cn('flex items-start gap-3 p-4', unread && 'bg-brand-soft/30')}>
-      <Icon className={cn('mt-1 h-4 w-4 shrink-0', meta.tone)} aria-hidden />
+      {meta.savings ? (
+        <span className={cn('flex h-6 w-6 shrink-0 items-center justify-center rounded-full', meta.tone)}>
+          <Icon className="h-4 w-4" aria-hidden />
+        </span>
+      ) : (
+        <Icon className={cn('mt-1 h-4 w-4 shrink-0', meta.tone)} aria-hidden />
+      )}
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-semibold text-fg">{t.seller.events[event.type]}</span>
@@ -137,7 +143,7 @@ function EventRow({ event, onAcknowledge }: { event: CompetitorEvent; onAcknowle
             {fmt.currency(event.previousPrice)} <span aria-hidden className="flip-rtl inline-block">→</span>{' '}
             <span className="font-semibold text-fg">{fmt.currency(event.newPrice)}</span>
             {event.changePct != null && (
-              <span dir="ltr" className={cn('ms-2', event.changePct < 0 ? 'text-success' : 'text-warning')}>
+              <span dir="ltr" className={cn('ms-2', event.changePct < 0 ? 'rounded-sm bg-accent px-1 font-semibold text-accent-fg' : 'text-warning')}>
                 {formatSignedPercent(event.changePct)}
               </span>
             )}

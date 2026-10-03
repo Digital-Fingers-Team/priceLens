@@ -38,7 +38,7 @@ export function AlertsSection() {
         <h2 id="alerts-heading" className="label-mono text-muted">
           {t.watchlist.alertsHeading}
         </h2>
-        {triggered.length > 0 && <Badge variant="brand">{tp(t.watchlist.triggered, triggered.length)}</Badge>}
+        {triggered.length > 0 && <Badge variant="savings">{tp(t.watchlist.triggered, triggered.length)}</Badge>}
       </div>
       <ul className="divide-y divide-border rounded border border-border bg-surface">
         {ordered.map((alert) => {
@@ -52,7 +52,7 @@ export function AlertsSection() {
                 </Link>
                 <p className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
                   {isTriggered && alert.triggeredPrice != null ? (
-                    <span className="text-sm font-semibold tabular-nums text-brand-text">
+                    <span className="rounded-sm bg-accent px-2 py-1 text-sm font-semibold tabular-nums text-accent-fg">
                       {tf(t.watchlist.hit, { price: fmt.currency(Number(alert.triggeredPrice)) })}
                     </span>
                   ) : (

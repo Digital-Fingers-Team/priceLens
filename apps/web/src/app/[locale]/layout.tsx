@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { IBM_Plex_Mono, IBM_Plex_Sans, IBM_Plex_Sans_Arabic } from 'next/font/google';
+import { IBM_Plex_Mono, IBM_Plex_Sans_Arabic, Space_Grotesk } from 'next/font/google';
 import { Suspense } from 'react';
 import { Providers } from '@/components/layout/providers';
 import { PageTracker } from '@/components/analytics/page-tracker';
@@ -12,10 +12,11 @@ import { baseMetadata } from '@/lib/seo';
 import { THEME_SCRIPT } from '@/lib/theme';
 import designTokens from '../../../design-tokens';
 
-// IBM Plex: Sans (variable, Latin), Sans Arabic, Mono (audit 07, UI-05).
+// Space Grotesk for Latin text, numbers and prices; IBM Plex Sans Arabic for
+// Arabic script; IBM Plex Mono for labels (audit 07, UI-05).
 // Arabic and Mono are not preloaded: the browser fetches them when a glyph
 // needs them (unicode-range), so English pages don't pay for Arabic.
-const plexSans = IBM_Plex_Sans({ weight: 'variable', subsets: ['latin'], variable: '--font-plex-sans', display: 'swap' });
+const grotesk = Space_Grotesk({ weight: ['400', '500', '600'], subsets: ['latin'], variable: '--font-grotesk', display: 'swap' });
 const plexArabic = IBM_Plex_Sans_Arabic({
   weight: ['400', '500', '600'],
   subsets: ['arabic'],
@@ -72,7 +73,7 @@ export default async function LocaleLayout({
     <html
       lang={locale}
       dir={localeDir(locale)}
-      className={`${plexSans.variable} ${plexArabic.variable} ${plexMono.variable}`}
+      className={`${grotesk.variable} ${plexArabic.variable} ${plexMono.variable}`}
       // The theme script sets data-theme before React hydrates.
       suppressHydrationWarning
     >

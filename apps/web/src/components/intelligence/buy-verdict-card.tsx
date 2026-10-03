@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils/cn';
 import type { BuyVerdict, CurrentMarket, HistoryStats } from '@/types/intelligence.types';
 
 const TONE: Record<BuyVerdict['verdict'], { text: string; border: string }> = {
-  GOOD_TIME_TO_BUY: { text: 'text-success', border: 'border-s-success' },
+  GOOD_TIME_TO_BUY: { text: 'rounded-sm bg-accent px-2 py-1 text-accent-fg', border: 'border-s-accent' },
   FAIR_PRICE: { text: 'text-info', border: 'border-s-info' },
   WAIT: { text: 'text-warning', border: 'border-s-warning' },
   INSUFFICIENT_DATA: { text: 'text-muted', border: 'border-s-border-strong' },

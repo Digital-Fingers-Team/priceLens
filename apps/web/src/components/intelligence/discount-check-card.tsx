@@ -18,7 +18,7 @@ export function DiscountCheckCard({ check, currency }: { check: DiscountCheck; c
   const variants = {
     SUSPICIOUS: { Icon: AlertTriangle, tone: 'border-warning/40 bg-warning-soft', icon: 'text-warning', title: t.intel.discountSuspicious },
     UNVERIFIABLE: { Icon: HelpCircle, tone: 'border-border bg-surface', icon: 'text-muted', title: t.intel.discountUnverified },
-    GENUINE: { Icon: BadgeCheck, tone: 'border-success/40 bg-success-soft', icon: 'text-success', title: t.intel.discountGenuine },
+    GENUINE: { Icon: BadgeCheck, tone: 'border-border bg-surface', icon: 'h-7 w-7 rounded-full bg-accent p-1 text-accent-fg', title: t.intel.discountGenuine },
   } as const;
   const { Icon, tone, icon, title } = variants[check.verdict as keyof typeof variants] ?? variants.UNVERIFIABLE;
 

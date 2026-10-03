@@ -14,18 +14,21 @@
 
   body {
     @apply bg-bg font-sans text-sm text-fg;
+    /* Aligned digits everywhere: prices line up in lists and tables. */
+    font-variant-numeric: tabular-nums;
   }
 
   :root {
-    --font-sans: var(--font-plex-sans), var(--font-plex-arabic);
+    --font-sans: var(--font-grotesk), var(--font-plex-arabic);
     --font-mono: var(--font-plex-mono);
   }
 
-  /* Arabic: Plex Sans Arabic first (it carries matching Latin), taller lines
+  /* Arabic: Space Grotesk still leads, so Latin letters and digits stay in it;
+     Arabic script falls through to Plex Sans Arabic. Taller lines
      for the marks above and below, and never letter-spacing, which breaks
      the joins between letters. */
   :lang(ar) {
-    --font-sans: var(--font-plex-arabic), var(--font-plex-sans);
+    --font-sans: var(--font-grotesk), var(--font-plex-arabic);
     --font-mono: var(--font-plex-mono), var(--font-plex-arabic);
     letter-spacing: 0 !important;
   }

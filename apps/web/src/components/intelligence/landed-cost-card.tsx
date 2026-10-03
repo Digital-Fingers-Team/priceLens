@@ -67,7 +67,7 @@ export function LandedCostCard({ productId }: { productId: string }) {
                   </dl>
                 )}
                 {local && (
-                  <p className={cheaperLocally ? 'text-xs text-warning' : 'text-xs text-success'}>
+                  <p className={cheaperLocally ? 'w-fit rounded-sm bg-accent px-2 py-1 text-xs font-medium text-accent-fg' : 'text-xs text-success'}>
                     {cheaperLocally
                       ? tf(t.landed.localCheaper, { store: local.store, price: fmt.currency(local.price, data.currency) })
                       : tf(t.landed.importCheaper, { store: local.store, price: fmt.currency(local.price, data.currency) })}
