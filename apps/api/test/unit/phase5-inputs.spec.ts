@@ -2,6 +2,7 @@ import { LlmService, parseJson } from '../../src/llm/llm.service';
 import { LlmHttpError } from '../../src/llm/llm-provider';
 import { validateRecognition } from '../../src/image-search/image-search.service';
 import { AdvisorService, validatePicks, validateRewrite } from '../../src/advisor/advisor.service';
+import axios from 'axios';
 import { TelegramBotService, VERIFY_KEY } from '../../src/telegram-bot/telegram-bot.service';
 
 const provider = (id: string, answer: () => Promise<string | null>, configured = true) => ({ id, isConfigured: () => configured, complete: jest.fn(answer) });
@@ -122,7 +123,7 @@ describe('Telegram bot', () => {
     const extras = { forProduct: jest.fn(async () => ({ installments: { access: 'locked', count: 2 } })) };
     const config = { get: jest.fn((key: string, d: unknown) => (key === 'app.frontendUrl' ? 'https://pricelens.work.gd' : d)) };
     const service = new TelegramBotService(prisma as never, { client: redis } as never, entitlements as never, search as never, extras as never, {} as never, config as never);
-    return { service, store, search };
+    return { service, store, search: { search: search.search } };
   }
   const say = (text: string, extra: Record<string, unknown> = {}) => ({ message: { chat: { id: 42 }, text, ...extra } });
 
@@ -135,8 +136,63 @@ describe('Telegram bot', () => {
   it('answers a product name with prices and a link', async () => {
     const reply = await bot().service.respond('42', say('iphone 15'));
     expect(reply).toContain('41,499 ج.م');
-    expect(reply).toContain('https://pricelens.work.gd/products/iphone-15');
+    expect(reply).toContain('<b>iPhone 15</b>');
     expect(reply).toContain('2 خطة تقسيط');
+
+    const card = await bot().service.card('iphone 15');
+    expect(card.buttons?.[0]?.[0]).toMatchObject({ url: 'https://pricelens.work.gd/products/iphone-15' });
+    expect(card.buttons?.[card.buttons.length - 1]?.[0]?.callback_data).toMatch(/^r:[0-9a-f]{12}$/);
+  });
+
+  it('escapes HTML in titles so a product name cannot break the message', async () => {
+    const { service, search } = bot();
+    search.search.mockResolvedValueOnce({ hits: [{ id: 'p1', slug: 's', title: 'TV <55"> & stand', titleAr: null, minPriceUsd: 9000, listingCount: 1 }] });
+    const card = await service.card('tv');
+    expect(card.text).toContain('TV &lt;55"&gt; &amp; stand');
+    expect(card.text).not.toContain('<55');
+  });
+
+  it('puts the same fingerprint on two searches that show the same prices', async () => {
+    const { service } = bot();
+    expect((await service.card('iphone')).prices).toBe((await service.card('iphone')).prices);
+  });
+
+  describe('live message', () => {
+    const calls = (post: jest.SpyInstance) => post.mock.calls.map(([url, body]) => [String(url).split('/').pop(), body as Record<string, unknown>] as const);
+    afterEach(() => jest.restoreAllMocks());
+
+    it('shows a searching message first, then edits it into the answer', async () => {
+      const post = jest.spyOn(axios, 'post').mockResolvedValue({ data: { ok: true, result: { message_id: 7 } } });
+      await bot().service.handle(say('iphone 15'));
+      const made = calls(post);
+      expect(made.map(([method]) => method)).toEqual(['sendChatAction', 'sendMessage', 'editMessageText']);
+      expect(made[1][1]).toMatchObject({ parse_mode: 'HTML' });
+      expect(String(made[1][1].text)).toContain('جاري البحث');
+      expect(made[2][1]).toMatchObject({ message_id: 7, parse_mode: 'HTML' });
+      expect(String(made[2][1].text)).toContain('41,499 ج.م');
+    });
+
+    it('refreshes the same message when the button is pressed', async () => {
+      const { service, store } = bot();
+      const post = jest.spyOn(axios, 'post').mockResolvedValue({ data: { ok: true, result: { message_id: 7 } } });
+      const card = await service.card('iphone 15');
+      const callbackData = card.buttons![card.buttons!.length - 1][0].callback_data!;
+      const key = [...store.keys()].find((k) => k.startsWith('tg-q:'));
+      expect(store.get(key!)).toBe('iphone 15');
+      (service as unknown as { cache: { client: { get: (k: string) => Promise<string> } } }).cache.client.get = async () => 'iphone 15';
+      await service.handle({ callback_query: { id: 'cb1', data: callbackData, message: { message_id: 9, chat: { id: 42 } } } });
+      const made = calls(post);
+      expect(made.map(([method]) => method)).toEqual(['answerCallbackQuery', 'editMessageText']);
+      expect(made[1][1]).toMatchObject({ chat_id: '42', message_id: 9 });
+    });
+
+    it('says so when the refresh button is too old', async () => {
+      const { service } = bot();
+      const post = jest.spyOn(axios, 'post').mockResolvedValue({ data: { ok: true } });
+      (service as unknown as { cache: { client: { get: (k: string) => Promise<null> } } }).cache.client.get = async () => null;
+      await service.handle({ callback_query: { id: 'cb1', data: 'r:abcdef123456', message: { message_id: 9, chat: { id: 42 } } } });
+      expect(calls(post).map(([method]) => method)).toEqual(['answerCallbackQuery']);
+    });
   });
 
   it('turns a store link into a search', async () => {

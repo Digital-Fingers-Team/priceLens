@@ -4,12 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { NotificationChannelType } from '@prisma/client';
 import axios, { AxiosInstance } from 'axios';
 import { DeliveryResult, NotificationChannelDriver, OutboundNotification } from './notification-channel.interface';
-
-/** Telegram MarkdownV2 reserves a long list of characters; any unescaped one
- *  makes the whole message fail to parse. Product titles are full of them. */
-function escapeMarkdown(value: string): string {
-  return value.replace(/[_*[\]()~`>#+\-=|{}.!\\]/g, (match) => `\\${match}`);
-}
+import { alertCard } from '../telegram-format';
 
 @Injectable()
 export class TelegramChannel implements NotificationChannelDriver {
@@ -43,17 +38,34 @@ export class TelegramChannel implements NotificationChannelDriver {
   async send(destination: string, notification: OutboundNotification): Promise<DeliveryResult> {
     if (!this.http) return { ok: false, skipped: true, error: 'Telegram bot token not configured' };
 
-    const lines = [`*${escapeMarkdown(notification.title)}*`, '', escapeMarkdown(notification.body)];
-    if (notification.url) {
-      lines.push('', `[Open on PriceLens](${notification.url})`);
-    }
+    const data = notification.data ?? {};
+    const card = alertCard({
+      title: notification.title,
+      body: notification.body,
+      type: typeof data.notificationType === 'string' ? data.notificationType : undefined,
+      alertType: typeof data.alertType === 'string' ? data.alertType : undefined,
+      price: typeof data.price === 'number' ? data.price : null,
+      currency: typeof data.currency === 'string' ? data.currency : undefined,
+      url: notification.url,
+    });
+    const reply_markup = card.buttons.length ? { inline_keyboard: card.buttons } : undefined;
+    const image = typeof data.imageUrl === 'string' && /^https:\/\//.test(data.imageUrl) ? data.imageUrl : null;
 
     try {
+      // A product photo makes the alert recognisable at a glance; a store that
+      // blocks Telegram from fetching it must not cost the alert.
+      if (image && card.text.length <= 1000) {
+        const photo = await this.http
+          .post('/sendPhoto', { chat_id: destination, photo: image, caption: card.text, parse_mode: 'HTML', reply_markup })
+          .catch(() => null);
+        if (photo?.data?.ok) return { ok: true };
+      }
       const response = await this.http.post('/sendMessage', {
         chat_id: destination,
-        text: lines.join('\n'),
-        parse_mode: 'MarkdownV2',
-        disable_web_page_preview: false,
+        text: card.text,
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+        reply_markup,
       });
 
       if (response.data?.ok === false) {

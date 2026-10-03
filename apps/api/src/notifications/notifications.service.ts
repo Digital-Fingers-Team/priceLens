@@ -121,7 +121,7 @@ export class NotificationsService {
       title: input.title,
       body: input.body,
       url,
-      data: input.data,
+      data: { ...(input.data ?? {}), notificationType: input.type },
     };
 
     const result: DispatchResult = { notificationId: notification.id, delivered: [], failed: [], skipped: [] };
@@ -419,7 +419,12 @@ export class NotificationsService {
 
       const outcome = await driver.send(
         destination,
-        { title: delivery.notification.title, body: delivery.notification.body, url: delivery.notification.url },
+        {
+          title: delivery.notification.title,
+          body: delivery.notification.body,
+          url: delivery.notification.url,
+          data: { ...((delivery.notification.data as Record<string, unknown> | null) ?? {}), notificationType: delivery.notification.type },
+        },
         { pushSubscription: delivery.channel?.pushSubscription ?? undefined },
       );
 

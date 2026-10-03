@@ -11,6 +11,7 @@ import {
   SubscriptionStatus,
 } from '@prisma/client';
 import axios from 'axios';
+import { escapeHtml } from '../notifications/telegram-format';
 import { PrismaService } from '../database/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UpgradeRequiredException } from './billing.errors';
@@ -311,13 +312,16 @@ export class ManualPaymentsService {
       const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { email: true, displayName: true } });
       const frontend = this.config.get<string>('app.frontendUrl', 'http://localhost:3000').replace(/\/$/, '');
       const via = payment.method === ManualPaymentMethod.INSTAPAY ? 'InstaPay' : 'Wallet';
+      const who = user?.displayName ?? user?.email ?? userId;
       const text = [
-        `💰 New payment to check: ${formatAmount(payment.amountMinor, payment.currency)}`,
-        `Plan: ${payment.plan.name}`,
-        `From: ${user?.displayName ?? user?.email ?? userId}${payment.payerAccount ? ` (${payment.payerAccount})` : ''}`,
-        `Via: ${via}`,
-        `Reference: ${payment.reference}`,
-        `Order: ${payment.code}`,
+        `💰 <b>دفعة جديدة للمراجعة</b>`,
+        '',
+        `<b>${escapeHtml(formatAmount(payment.amountMinor, payment.currency))}</b>  ·  ${escapeHtml(payment.plan.name)}`,
+        '',
+        `👤 ${escapeHtml(who)}${payment.payerAccount ? ` (${escapeHtml(payment.payerAccount)})` : ''}`,
+        `📲 ${via}`,
+        `🔖 المرجع: <code>${escapeHtml(payment.reference ?? '')}</code>`,
+        `🧾 الطلب: <code>${escapeHtml(payment.code)}</code>`,
       ].join('\n');
       const base = this.config.get<string>('notifications.telegramApiBase', 'https://api.telegram.org');
       await axios.post(
@@ -325,7 +329,9 @@ export class ManualPaymentsService {
         {
           chat_id: chatId,
           text,
-          reply_markup: { inline_keyboard: [[{ text: 'Open to approve', url: `${frontend}/admin/payments` }]] },
+          parse_mode: 'HTML',
+          disable_web_page_preview: true,
+          reply_markup: { inline_keyboard: [[{ text: '✅ افتح للموافقة', url: `${frontend}/admin/payments` }]] },
         },
         { timeout: 10_000 },
       );
