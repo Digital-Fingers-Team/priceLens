@@ -18,7 +18,7 @@ Everything a session needs, in one place. On 2026-10-09 it replaced the old docs
   - 2026-10-03: Ink & Coral rebrand with Space Grotesk, a frontend redesign, the Telegram status board, cross-category duplicate cleanup, a split sitemap and new prices (Plus 99, Seller 799, Seller Plus 1799 EGP).
 - Payments: wallet/InstaPay transfer, then the owner approves it in `/admin/payments` (live since 2026-09-30). Paymob and Stripe are off: the owner has no registered business and won't do the paperwork, so don't suggest gateways that need it.
 - Categories: 22 departments and 161 leaves. All waves are on (`CATEGORY_SWEEP_MAX_WAVE=4`). `OFFER_MAX_AGE_DAYS=14`.
-- Stores: Amazon.eg, Noon, Jumia, 2B, Elaraby, B.TECH, Dream 2000, Tradeline, Compumarts, AliExpress and Alibaba. Carrefour is off: Akamai answers 403 to the cloud IP.
+- Stores: Amazon.eg, Noon, Jumia, 2B, Elaraby, B.TECH, Dream 2000, Tradeline, Compumarts, AliExpress and Alibaba. Carrefour is off: Akamai answers 403 to the cloud IP (rechecked 2026-10-09; the owner dropped it and other blocked stores).
 
 ## Open items
 
@@ -34,8 +34,6 @@ Owner only:
 - **Housekeeping:**
   - Change the admin password; it was pasted in chat.
   - Optionally rotate the alert-bot token, which was also pasted in chat.
-  - Delete the 16 old `~/pricelens/.env.bak*` / `backups/env-before-*` files when rollback is no longer needed.
-  - `podman volume rm pricelens_meili_data`. It has been unused since 2026-09-26 and was due for removal after 2026-10-03.
 - **Gemini quota:** the free tier allows 500 requests a day per Google project per model. More keys only help if each comes from a different Google account.
 - **Data only the owner can source:**
   - Fees for categories outside electronics and appliances (`/admin/fee-tables`).
@@ -44,7 +42,7 @@ Owner only:
   - Real customs rates; 15% and 14% VAT are placeholders (`/admin/landed-cost`).
 
 Engineering:
-- Disk is 82% full (2026-10-09) and the monitor alerts at 85%. Check `podman system df -v` and the Chrome `BrowserMetrics/*.pma` files.
+- Disk is 77% full after the 2026-10-09 cleanup (old build images, Meilisearch, old clones, the pay demo, old `.env` backups). The monitor alerts at 85%. Each `deploy-*.sh` leaves an untagged image of about 2 GB: remove PriceLens ones older than a day with `podman rmi <id>`.
 - Give scheduled jobs their own queue or concurrency so they never wait behind scrapes. Also find what keeps requesting store expansions; they are capped by `STORE_EXPANSION_MAX_WAITING=100`.
 - Matcher: no CPU-model guard (QA-16).
 - Category pages render per request (QA-11) because `?page` is read from `searchParams`.
