@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Nightly Postgres backup for PriceLens (docs/RUNBOOK.md, "Backups").
+# Nightly Postgres backup for PriceLens (CLAUDE.md, "Runbook").
 #
 # pg_dump in custom format (compressed, restorable table by table) taken
 # inside the database container, so no database port or password leaves it.

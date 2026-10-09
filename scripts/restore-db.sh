@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Restore a backup-db.sh dump into a NEW database (docs/RUNBOOK.md).
+# Restore a backup-db.sh dump into a NEW database (CLAUDE.md, "Runbook").
 #
 #   scripts/restore-db.sh <file.dump> <target_db>
 #

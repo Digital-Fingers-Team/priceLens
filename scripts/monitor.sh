@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PriceLens production monitor: checks, then alerts on changes (docs/RUNBOOK.md).
+# PriceLens production monitor: checks, then alerts on changes (CLAUDE.md, "Runbook").
 #
 # Run by pricelens-monitor.timer every 5 minutes. Each check yields OK or a
 # problem line. A problem is sent once when it starts ("FIRING") and once when

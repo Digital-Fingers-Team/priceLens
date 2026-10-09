@@ -1,88 +1,22 @@
 # PriceLens
 
-Price comparison for Egyptian stores. PriceLens collects listings from Amazon, Noon, Jumia, Carrefour, 2B, Elaraby, AliExpress and Alibaba, matches the same product across stores into one canonical product, and shows prices, price history and alerts.
+Price comparison for Egyptian stores, live at https://pricelens.store. PriceLens collects listings from Amazon.eg, Noon, Jumia, B.TECH, 2B, Elaraby and other stores. It matches the same product across stores and shows prices, price history and alerts. It is Arabic-first, with English under `/en`.
 
-- `apps/api`: NestJS API plus background workers (Prisma/PostgreSQL + pgvector, Redis, Bull)
-- `apps/web`: Next.js 14 App Router frontend
-- `packages/contracts`: types shared by both (response envelope, error codes, price responses)
+- `apps/api`: NestJS API and background workers (Prisma/PostgreSQL + pgvector, Redis, Bull)
+- `apps/web`: Next.js 15 App Router frontend
+- `packages/contracts`: types shared by both
 
-[ARCHITECTURE.md](ARCHITECTURE.md) explains how it fits together (system, data flow, the matching pipeline, queues), with decisions recorded in [docs/adr](docs/adr/). [PROJECT_MAP.md](PROJECT_MAP.md) is the file-level map (modules, jobs, ports, environment), and `audit/` holds the state of each overhaul phase.
+Architecture, workflow, deploys, the runbook, decisions and open items are all in [CLAUDE.md](CLAUDE.md).
 
-## What PriceLens does (v2)
+## Quick start
 
-| For | Features |
-|---|---|
-| Everyone | Search, price history, buy/wait verdict, installments, bank and coupon offers, used-market range, unit prices |
-| Buyer Pro | Price alerts (email, Telegram, web push), baskets, image search, advisor, Telegram bot |
-| Sellers | Workspaces, competitor tracking and alerts, profit calculator, best platform, repricer (suggestions), rank tracking, CSV/link import |
-| Seller Plus | FX tracking and impact, import finder, trend radar |
-| Enterprise (business) | MAP monitoring, authorized-seller checks, market reports (PDF/CSV), procurement quotes (PDF/CSV), data API with keys ([/developers](apps/web/src/app/%5Blocale%5D/developers/page.tsx)) |
-
-Every feature sits behind a plan entitlement and a feature flag (`/admin/flags`, or `FEATURE_<KEY>` in `.env`). Anything that needs an external account (Paymob, SMTP, Telegram, an LLM key) stays switched off until its variables are set: see [DEPLOY_NOTES.md](DEPLOY_NOTES.md) for what each one needs and what runs without it.
-
-### Background jobs
-
-All run in the `pricelens-worker` container on the `ingestion` queue; each has a cron variable in `.env.example` and can be run now from the admin API (`/admin/...`). The scheduled ones: price rollup, alert digest, cart watch, used market, seller repricer, rank tracking, FX refresh, import finder, trend radar, MAP sweep, launch detection and weekly reports. Run a job by hand by enqueueing its name (for example `run-weekly-reports`) on the `ingestion` queue.
-
-## Prerequisites
-
-- Node.js 22 (`.nvmrc`; the Docker images use 22)
-- pnpm 11.4.0 (`corepack enable`, or `npx pnpm@11.4.0 …` where corepack is unavailable)
-- Docker with Compose v2, or Podman with its docker shim
-
-## Local development
+Requires Node.js 22, pnpm 11.4.0 (`corepack enable`, or `npx pnpm@11.4.0`) and Docker Compose v2 or Podman.
 
 ```bash
 pnpm install
-pnpm dev:up
+pnpm dev:up    # Postgres + Redis on localhost, migrations, demo seed, API :3001, web :3000
 ```
 
-`pnpm dev:up` (scripts/dev.sh) runs these steps:
+Development uses the committed `.env.development`. Every store connector, scheduled scrape and paid API is turned off there, so development never touches real stores. `.env.example` documents every variable.
 
-1. Starts PostgreSQL and Redis as compose project `pricelens-dev`, on 127.0.0.1 only.
-2. Waits for them to be healthy.
-3. Applies migrations to `pricelens_dev` and `pricelens_test`.
-4. Seeds a 240-product demo catalog if the dev database is empty.
-5. Runs the API on http://localhost:3001 (Swagger at `/docs`) and the web app on http://localhost:3000. Ctrl-C stops both.
-
-It uses the committed `.env.development`: local values, with **every store connector, scheduled scrape and paid API turned off**, so development never hits real stores. Override with `ENV_FILE`, `API_PORT`, `WEB_PORT`, or `SKIP_SEED=1`.
-
-`.env.example` documents every variable the apps read. The API validates its environment at startup and refuses to boot, listing every problem, if something is missing or malformed.
-
-## Tests
-
-| Command | What | Needs |
-|---|---|---|
-| `pnpm --filter @pricelens/api test:unit` | API unit tests | nothing |
-| `pnpm --filter @pricelens/api test:integration` | Raw SQL and auth against a real database | dev stack |
-| `pnpm --filter @pricelens/api test:e2e` | Smoke (health, search, product, auth, error envelope) and the matching characterization suite (snapshot of where ~60 listings land) | dev stack |
-| `pnpm --filter @pricelens/web test` | Component tests (Vitest) | nothing |
-| `pnpm --filter @pricelens/web test:e2e` | Browser smoke tests (Playwright), desktop + mobile | `pnpm dev:up` running |
-
-The characterization suite fails on any change to matching outcomes. When a change is deliberate (phase 02 fixes, threshold tuning), update it with `pnpm --filter @pricelens/api test:e2e -u` and review the snapshot diff like code.
-
-API tests load the committed `.env.test`. They **refuse to run** unless the database is local and its name ends in `_test`, so they can never touch a real database. Run `pnpm test:db:migrate` after adding migrations.
-
-Before pushing: `pnpm lint`, `pnpm typecheck`, `pnpm build`.
-
-## Useful scripts
-
-| Script | Does |
-|---|---|
-| `pnpm docker:up` / `docker:down` / `docker:reset` | Dev infrastructure only (`pricelens-dev`). `reset` deletes the dev volumes. |
-| `pnpm db:migrate` / `db:seed` / `db:studio` | Prisma against the root `.env` |
-| `pnpm --filter @pricelens/api lint:fix` | ESLint with autofix (`lint` only checks) |
-| `apps/api/scripts/ops/` | Manual tools for store logins, CAPTCHAs and broken connectors (see its README) |
-
-The seed refuses `SEED_GENERATE_PRODUCTS=true` and `SEED_RESET=true` when `NODE_ENV=production`.
-
-## Production
-
-The live server runs `docker-compose.server.yml` behind `pricelens-proxy` (nginx, ports 80/443). Deploys go through blue/green scripts:
-
-```bash
-./scripts/deploy-api.sh   # build, migrate, swap; prints the rollback command
-./scripts/deploy-web.sh
-```
-
-The API container applies pending migrations on start (`docker/entrypoint.api.sh`).
+Before pushing: `pnpm lint`, `pnpm typecheck`, `pnpm build`, plus the tests listed in CLAUDE.md.

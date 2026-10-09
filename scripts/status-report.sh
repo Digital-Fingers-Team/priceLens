@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PriceLens live status board for Telegram (docs/RUNBOOK.md).
+# PriceLens live status board for Telegram (CLAUDE.md, "Runbook").
 #
 # One message that is EDITED in place on every run, so the chat keeps a single
 # up-to-date board instead of a stream. Alerts stay in monitor.sh (they must
