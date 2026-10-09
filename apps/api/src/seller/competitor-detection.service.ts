@@ -20,6 +20,7 @@ interface CompetitorObservation {
   canonicalProductId: string;
   platformId: string;
   platformName: string;
+  listingId: string;
   externalUrl: string;
   currentPrice: number;
   previousPrice: number | null;
@@ -27,6 +28,9 @@ interface CompetitorObservation {
   previouslyInStock: boolean | null;
   /** True when this store has no history for the product before today. */
   isNew: boolean;
+  /** The history row that recorded the latest change, and when. */
+  changeId: string | null;
+  changedAt: Date | null;
   /** Typical day-to-day variation, used to judge "unusual". */
   volatility: number | null;
 }
@@ -52,6 +56,13 @@ export class CompetitorDetectionService {
   private static readonly UNUSUAL_SIGMA = 3;
   /** Ignore sub-percent noise; stores round prices constantly. */
   private static readonly MIN_CHANGE_PCT = 1;
+  /**
+   * Only a change this recent is news. Price and stock events are keyed by
+   * the history row of the change, so a sweep that sees it again records
+   * nothing twice. Before 2026-10-09 "previous" was the last different price
+   * however old, so a months-old cut was re-reported every day.
+   */
+  private static readonly CHANGE_LOOKBACK_MS = 48 * 3_600_000;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -62,8 +73,29 @@ export class CompetitorDetectionService {
   }
 
   async detectForAllOrganizations(batchSize = 200): Promise<DetectionResult> {
+    const total: DetectionResult = { productsScanned: 0, eventsRecorded: 0, notificationsSent: 0 };
+    // Every monitored product, a batch at a time (it used to stop at the first 200).
+    let cursor: string | undefined;
+    for (;;) {
+      const batch = await this.detectBatch(batchSize, cursor);
+      total.productsScanned += batch.result.productsScanned;
+      total.eventsRecorded += batch.result.eventsRecorded;
+      total.notificationsSent += batch.result.notificationsSent;
+      if (!batch.lastId) break;
+      cursor = batch.lastId;
+    }
+    if (total.eventsRecorded > 0) {
+      this.logger.log(
+        `Competitor sweep: ${total.productsScanned} product(s), ${total.eventsRecorded} event(s), ${total.notificationsSent} notification(s)`,
+      );
+    }
+    return total;
+  }
+
+  private async detectBatch(batchSize: number, cursor?: string): Promise<{ result: DetectionResult; lastId: string | null }> {
     const products = await this.prisma.sellerProduct.findMany({
-      where: { isActive: true, canonicalProductId: { not: null } },
+      where: { isActive: true, canonicalProductId: { not: null }, ...(cursor ? { id: { gt: cursor } } : {}) },
+      orderBy: { id: 'asc' },
       select: {
         id: true,
         orgId: true,
@@ -75,7 +107,7 @@ export class CompetitorDetectionService {
       take: batchSize,
     });
 
-    if (products.length === 0) return { productsScanned: 0, eventsRecorded: 0, notificationsSent: 0 };
+    if (products.length === 0) return { result: { productsScanned: 0, eventsRecorded: 0, notificationsSent: 0 }, lastId: null };
 
     const canonicalIds = [...new Set(products.map((p) => p.canonicalProductId as string))];
     const observations = await this.observe(canonicalIds);
@@ -93,7 +125,7 @@ export class CompetitorDetectionService {
         if (ourPlatformId && observation.platformId === ourPlatformId) continue;
 
         for (const candidate of this.classify(observation, ourPrice)) {
-          const recorded = await this.record(product.orgId, product.id, observation, candidate);
+          const recorded = await this.record(product.orgId, product.id, ourPrice, observation, candidate);
           if (!recorded) continue;
 
           eventsRecorded += 1;
@@ -102,13 +134,10 @@ export class CompetitorDetectionService {
       }
     }
 
-    if (eventsRecorded > 0) {
-      this.logger.log(
-        `Competitor sweep: ${products.length} product(s), ${eventsRecorded} event(s), ${notificationsSent} notification(s)`,
-      );
-    }
-
-    return { productsScanned: products.length, eventsRecorded, notificationsSent };
+    return {
+      result: { productsScanned: products.length, eventsRecorded, notificationsSent },
+      lastId: products.length === batchSize ? products[products.length - 1].id : null,
+    };
   }
 
   /**
@@ -124,11 +153,14 @@ export class CompetitorDetectionService {
         canonical_product_id: string;
         platform_id: string;
         platform_name: string;
+        listing_id: string;
         external_url: string;
         current_price: Prisma.Decimal;
         in_stock: boolean | null;
         previous_price: Prisma.Decimal | null;
         previous_in_stock: boolean | null;
+        change_id: string | null;
+        changed_at: Date | null;
         first_seen_at: Date;
         stddev: number | null;
         avg_price: number | null;
@@ -152,6 +184,7 @@ export class CompetitorDetectionService {
       )
       SELECT live.canonical_product_id,
              live.platform_id,
+             live.listing_id,
              p.name AS platform_name,
              live.external_url,
              live.current_price,
@@ -159,18 +192,27 @@ export class CompetitorDetectionService {
              live.first_seen_at,
              prev.price_usd AS previous_price,
              prev.in_stock  AS previous_in_stock,
+             latest.id          AS change_id,
+             latest.recorded_at AS changed_at,
              stats.stddev,
              stats.avg_price
       FROM live
       JOIN platforms p ON p.id = live.platform_id
-      -- The last DIFFERENT price this listing had. History is change-only, so
-      -- this is the previous price however long ago it was set.
+      -- History is change-only: the newest row is the latest change, and the
+      -- row before it is what the listing was before that change.
+      LEFT JOIN LATERAL (
+        SELECT ph.id, ph.recorded_at
+        FROM price_history ph
+        WHERE ph.source_listing_id = live.listing_id
+        ORDER BY ph.recorded_at DESC
+        LIMIT 1
+      ) latest ON TRUE
       LEFT JOIN LATERAL (
         SELECT ph.price_usd, ph.in_stock
         FROM price_history ph
         WHERE ph.source_listing_id = live.listing_id
-          AND ph.price_usd <> live.current_price
         ORDER BY ph.recorded_at DESC
+        OFFSET 1
         LIMIT 1
       ) prev ON TRUE
       -- Normal variation for this listing, to judge an unusual move.
@@ -185,21 +227,27 @@ export class CompetitorDetectionService {
 
     const map = new Map<string, CompetitorObservation[]>();
     const newEntrantCutoff = Date.now() - 2 * 86_400_000;
+    const changeCutoff = Date.now() - CompetitorDetectionService.CHANGE_LOOKBACK_MS;
 
     for (const row of rows) {
       const bucket = map.get(row.canonical_product_id) ?? [];
       const avg = row.avg_price ?? 0;
+      const recent = row.changed_at != null && row.changed_at.getTime() >= changeCutoff;
 
       bucket.push({
         canonicalProductId: row.canonical_product_id,
         platformId: row.platform_id,
         platformName: row.platform_name,
+        listingId: row.listing_id,
         externalUrl: row.external_url,
         currentPrice: Number(row.current_price),
-        previousPrice: row.previous_price != null ? Number(row.previous_price) : null,
+        // An old change is not news: without a recent one there is no "before".
+        previousPrice: recent && row.previous_price != null ? Number(row.previous_price) : null,
         inStock: row.in_stock,
-        previouslyInStock: row.previous_in_stock,
+        previouslyInStock: recent ? row.previous_in_stock : null,
         isNew: row.first_seen_at.getTime() >= newEntrantCutoff,
+        changeId: recent ? row.change_id : null,
+        changedAt: recent ? row.changed_at : null,
         volatility: row.stddev != null && avg > 0 ? row.stddev / avg : null,
       });
       map.set(row.canonical_product_id, bucket);
@@ -279,11 +327,11 @@ export class CompetitorDetectionService {
   private async record(
     orgId: string,
     sellerProductId: string,
+    ourPrice: number | null,
     observation: CompetitorObservation,
     candidate: { type: CompetitorEventType; severity: EventSeverity; changePct: number | null },
   ): Promise<boolean> {
-    const day = new Date().toISOString().slice(0, 10);
-    const dedupeKey = `${observation.canonicalProductId}:${observation.platformId}:${candidate.type}:${day}`;
+    const dedupeKey = `${sellerProductId}:${observation.platformId}:${candidate.type}:${this.occurrence(observation, candidate.type)}`;
 
     try {
       await this.prisma.competitorEvent.create({
@@ -296,6 +344,7 @@ export class CompetitorDetectionService {
           severity: candidate.severity,
           previousPrice: this.toDecimal(observation.previousPrice),
           newPrice: this.toDecimal(observation.currentPrice),
+          ourPrice: this.toDecimal(ourPrice),
           changePct: candidate.changePct,
           dedupeKey,
           evidence: {
@@ -320,7 +369,9 @@ export class CompetitorDetectionService {
    *
    * Notifications go to every member, because a price change is workspace
    * news rather than one person's. The rule's cooldown stops a volatile
-   * competitor generating a stream of interruptions.
+   * competitor generating a stream of interruptions. It applies per product
+   * (the notification dedupe window): it used to be per rule, so one
+   * catalogue-wide rule sent a single alert per cooldown for the whole shop.
    */
   private async maybeNotify(
     orgId: string,
@@ -343,11 +394,6 @@ export class CompetitorDetectionService {
     if (!rule) return 0;
 
     if (candidate.changePct != null && Math.abs(candidate.changePct) < rule.thresholdPct) return 0;
-
-    if (rule.lastFiredAt) {
-      const elapsedHours = (Date.now() - rule.lastFiredAt.getTime()) / 3_600_000;
-      if (elapsedHours < rule.cooldownHours) return 0;
-    }
 
     const members = await this.prisma.organizationMember.findMany({
       where: { orgId },
@@ -383,12 +429,13 @@ export class CompetitorDetectionService {
           changePct: candidate.changePct,
           currency: this.currency,
         },
-        dedupeKey: `competitor:${orgId}:${sellerProductId}:${candidate.type}:${new Date().toISOString().slice(0, 10)}`,
+        dedupeKey: `competitor:${orgId}:${sellerProductId}:${candidate.type}`,
         dedupeWindowMinutes: Math.max(rule.cooldownHours * 60, 60),
       });
       if (result.notificationId) sent += 1;
     }
 
+    if (sent === 0) return 0;
     await this.prisma.competitorAlertRule.update({
       where: { id: rule.id },
       data: { lastFiredAt: new Date() },
@@ -419,6 +466,22 @@ export class CompetitorDetectionService {
         return `Unusual price movement on ${productName} at ${observation.platformName}`;
       default:
         return `Competitor change on ${productName}`;
+    }
+  }
+
+  /**
+   * What makes one event of this type distinct: a change is the history row
+   * that recorded it, a newcomer its listing, and undercutting (a state, not
+   * a change) one event per day while it lasts.
+   */
+  private occurrence(observation: CompetitorObservation, type: CompetitorEventType): string {
+    switch (type) {
+      case CompetitorEventType.NEW_ENTRANT:
+        return observation.listingId;
+      case CompetitorEventType.UNDERCUT:
+        return new Date().toISOString().slice(0, 10);
+      default:
+        return observation.changeId ?? new Date().toISOString().slice(0, 10);
     }
   }
 

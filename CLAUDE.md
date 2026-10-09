@@ -14,6 +14,7 @@ Everything a session needs, in one place. On 2026-10-09 it replaced the old docs
 - Live at **https://pricelens.store**, Arabic by default (`/en/...` for English, `/ar/...` 308-redirects). `pricelens.work.gd` and `www` 301 to it; work.gd still proxies `/api/`.
 - Live code: `main` at `d1809c7` (API and worker deployed 2026-10-09). Web from `53318c3` on `pricelens-web-green` (127.0.0.1:3011), deployed 2026-10-09.
 - Latest work:
+  - 2026-10-09: seller tools checked live on prod with a throwaway Seller Plus user (all about 30 endpoints). Fixed: profit and best-platform returned 500 for any product whose category a store has no fee row for (the seeded tables have no platform default), so that store is now left out. Competitor alerts re-reported months-old price and stock changes every day (only a change from the last 48 h counts now, keyed by its history row), scanned only the first 200 seller products, and one shop-wide rule's cooldown silenced every other product (now per product). Rank tracking was fine; it runs daily at 02:30 UTC.
   - 2026-10-09: products wait for the AI judge. A listing whose look-alikes the judge has not ruled on (quota spent) is no longer added as its own product; a later sweep retries it.
   - 2026-10-09: AliExpress photos. Its cards moved the photo to `img.images--item--<hash>`, so 36,646 of 40,493 AliExpress products had none. The connector reads the new markup, and a matched listing now fills a product's missing photo, so old products get theirs as they are re-scraped.
   - 2026-10-09: phone menu redesigned (`components/layout/mobile-menu.tsx`): a full-height sheet with the account card, Watchlist / Deal Hunter / Alerts tiles, a Tools list, and language, theme and sign-out in a bottom bar.
@@ -39,7 +40,7 @@ Owner only:
   - Optionally rotate the alert-bot token, which was also pasted in chat.
 - **Gemini quota:** the free tier allows 500 requests a day per Google project per model. More keys only help if each comes from a different Google account.
 - **Data only the owner can source:**
-  - Fees for categories outside electronics and appliances (`/admin/fee-tables`).
+  - Fees for categories outside electronics and appliances (`/admin/fee-tables`). Only Jumia, Amazon and Noon have any, all per category; the profit tools skip a store without a row for the product's category.
   - Installments for valU, Sympl, Souhoola, B.TECH and HSBC, and confirmation of the CIB/Noon terms (`/admin/buyer-offers`).
   - Coupons and bank offers, only codes someone has actually tried.
   - Real customs rates; 15% and 14% VAT are placeholders (`/admin/landed-cost`).

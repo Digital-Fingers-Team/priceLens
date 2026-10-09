@@ -55,6 +55,17 @@ export class SellerToolsService {
     return forPlatform.find((t) => categorySlug && t.categoryKey === categorySlug) ?? forPlatform.find((t) => t.categoryKey === '') ?? null;
   }
 
+  /**
+   * One fee table per platform that has one for this category. The seeded
+   * tables are per category with no platform default, so a platform without
+   * this category is left out; it used to crash both tools (2026-10-09).
+   */
+  private applicableFees<T extends { platformId: string; categoryKey: string }>(tables: T[], categorySlug: string | null): T[] {
+    return [...new Set(tables.map((t) => t.platformId))]
+      .map((platformId) => this.pickFees(tables, platformId, categorySlug))
+      .filter((table): table is T => table !== null);
+  }
+
   private terms(table: { commissionPct: number; fixedFee: Prisma.Decimal; shippingFee: Prisma.Decimal; returnRatePct: number; vatPct: number }): FeeTerms {
     return {
       commissionPct: table.commissionPct,
@@ -85,9 +96,7 @@ export class SellerToolsService {
     const cost = money(product.cost);
     const tables = await this.prisma.platformFeeTable.findMany({ include: { platform: { select: { id: true, name: true } } } });
     const category = product.canonicalProduct?.category.slug ?? null;
-    const platformIds = [...new Set(tables.map((t) => t.platformId))];
-    const rows = platformIds
-      .map((platformId) => this.pickFees(tables, platformId, category)!)
+    const rows = this.applicableFees(tables, category)
       .map((table) => ({
         platform: table.platform,
         feesUpdatedAt: table.updatedAt.toISOString(),
@@ -116,9 +125,8 @@ export class SellerToolsService {
     const tables = await this.prisma.platformFeeTable.findMany({ include: { platform: { select: { id: true, name: true } } } });
     const category = product.canonicalProduct?.category.slug ?? null;
 
-    const rows = [...new Set(tables.map((t) => t.platformId))].map((platformId) => {
-      const table = this.pickFees(tables, platformId, category)!;
-      const offer = market.find((m) => m.platformId === platformId) ?? null;
+    const rows = this.applicableFees(tables, category).map((table) => {
+      const offer = market.find((m) => m.platformId === table.platformId) ?? null;
       const price = offer?.price ?? own;
       return {
         platform: table.platform,
