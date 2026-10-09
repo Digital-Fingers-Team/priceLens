@@ -82,6 +82,18 @@ export const en = {
     sellers: 'For sellers',
     developers: 'API',
     copyright: '© {year} Pricelens. Prices from the stores, checked continuously.',
+    legal: 'Legal',
+    contact: 'Contact us',
+  },
+  legal: {
+    label: 'Legal pages',
+    docs: { terms: 'Terms of use', privacy: 'Privacy policy', refunds: 'Refunds and cancellation', cookies: 'Cookie policy' },
+    links: { terms: 'terms of use', privacy: 'privacy policy', refunds: 'refund policy' },
+    updated: 'Last updated {date}',
+    questions: 'Questions about this page? Write to us at',
+    agreeSignup: 'I agree to the {terms} and have read the {privacy}.',
+    agreeRequired: 'You need to agree to the terms to create an account.',
+    agreePay: 'By paying you agree to the {terms} and the {refunds}. Plans are not refunded once active; you can cancel any time.',
   },
   theme: {
     toggle: 'Theme: {current}. Switch to {next}',
@@ -113,6 +125,7 @@ export const en = {
     trendingEmpty: 'No products yet. Try a search above.',
   },
   search: {
+    productsHeading: 'Products',
     byImage: 'Search with a photo',
     byImageLocked: 'Search with a photo or a screenshot (Plus)',
     imageNotFound: 'We could not tell what that is. Try a clearer photo, or type its name.',

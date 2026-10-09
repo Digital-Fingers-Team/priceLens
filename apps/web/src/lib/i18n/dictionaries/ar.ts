@@ -107,6 +107,18 @@ export const ar: Dictionary = {
     sellers: 'للبائعين',
     developers: 'واجهة API',
     copyright: '© {year} Pricelens. الأسعار من المتاجر نفسها، وتُراجَع باستمرار.',
+    legal: 'قانوني',
+    contact: 'تواصل معنا',
+  },
+  legal: {
+    label: 'الصفحات القانونية',
+    docs: { terms: 'شروط الاستخدام', privacy: 'سياسة الخصوصية', refunds: 'الاسترداد والإلغاء', cookies: 'ملفات تعريف الارتباط' },
+    links: { terms: 'شروط الاستخدام', privacy: 'سياسة الخصوصية', refunds: 'سياسة الاسترداد' },
+    updated: 'آخر تحديث {date}',
+    questions: 'لديك سؤال عن هذه الصفحة؟ راسلنا على',
+    agreeSignup: 'أوافق على {terms} وقرأت {privacy}.',
+    agreeRequired: 'يجب أن توافق على الشروط لإنشاء حساب.',
+    agreePay: 'بالدفع فإنك توافق على {terms} و{refunds}. لا تُسترد الباقة بعد تفعيلها، ويمكنك الإلغاء في أي وقت.',
   },
   theme: {
     toggle: 'المظهر: {current}. التبديل إلى {next}',
@@ -145,6 +157,7 @@ export const ar: Dictionary = {
     trendingEmpty: 'لا توجد منتجات بعد. جرّب البحث بالأعلى.',
   },
   search: {
+    productsHeading: 'المنتجات',
     byImage: 'ابحث بصورة',
     byImageLocked: 'ابحث بصورة أو لقطة شاشة (Plus)',
     imageNotFound: 'لم نتعرّف على المنتج. جرّب صورة أوضح أو اكتب اسمه.',

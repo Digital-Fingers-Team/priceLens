@@ -1,6 +1,7 @@
 import { categoriesApi } from '@/lib/api/categories.api';
 import { searchApi } from '@/lib/api/search.api';
 import { defaultLocale, localizePath } from '@/lib/i18n/config';
+import { LEGAL_SLUGS } from '@/lib/legal/types';
 import { absoluteUrl } from '@/lib/seo';
 
 /**
@@ -30,6 +31,7 @@ const STATIC_ROUTES: Array<{ path: string; priority: number; changeFrequency: 'd
   { path: '/search', priority: 0.7, changeFrequency: 'daily' },
   { path: '/pricing', priority: 0.4, changeFrequency: 'weekly' },
   { path: '/deal-hunter', priority: 0.4, changeFrequency: 'weekly' },
+  ...LEGAL_SLUGS.map((slug) => ({ path: `/legal/${slug}`, priority: 0.2, changeFrequency: 'weekly' as const })),
 ];
 
 /** 100 is the API's page-size ceiling. */

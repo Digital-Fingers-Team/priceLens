@@ -105,7 +105,7 @@ export default async function CategoryPage({ params, searchParams }: PageProps) 
       {results.hits.length === 0 ? (
         <EmptyState icon={<PackageSearch className="h-5 w-5" />} title={t.seo.categoryEmpty} className="rounded border border-border" />
       ) : (
-        <ProductList products={results.hits} />
+        <ProductList products={results.hits} heading={t.search.productsHeading} />
       )}
 
       <CategoryPagination slug={slug} page={page} totalPages={totalPages} />

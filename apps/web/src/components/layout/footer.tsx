@@ -2,6 +2,7 @@
 import { Wordmark } from '@/components/brand/logo';
 import { Link } from '@/lib/i18n/navigation';
 import { useI18n } from '@/lib/i18n/provider';
+import { LEGAL_SLUGS, SUPPORT_EMAIL } from '@/lib/legal/types';
 
 const linkClass = 'text-sm text-muted transition-colors hover:text-fg';
 
@@ -24,16 +25,26 @@ export function Footer() {
         { href: '/developers', label: t.footer.developers },
       ],
     },
+    {
+      title: t.footer.legal,
+      links: LEGAL_SLUGS.map((slug) => ({ href: `/legal/${slug}`, label: t.legal.docs[slug] })),
+    },
   ];
 
   return (
     <footer className="mt-auto border-t border-border bg-surface">
-      <div className="mx-auto grid max-w-page grid-cols-1 gap-10 px-4 py-12 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
-        <div className="flex flex-col gap-3 sm:col-span-2">
+      <div className="mx-auto grid max-w-page grid-cols-1 gap-10 px-4 py-12 sm:grid-cols-3 sm:px-6 lg:grid-cols-5">
+        <div className="flex flex-col gap-3 sm:col-span-3 lg:col-span-2">
           <Link href="/" aria-label={t.nav.home} className="w-fit text-brand-text">
             <Wordmark className="h-7 w-auto" />
           </Link>
           <p className="max-w-sm text-pretty text-sm text-muted">{t.footer.tagline}</p>
+          <p className="text-sm text-muted">
+            {t.footer.contact}:{' '}
+            <a href={`mailto:${SUPPORT_EMAIL}`} className="text-fg hover:underline" dir="ltr">
+              {SUPPORT_EMAIL}
+            </a>
+          </p>
         </div>
         {columns.map((column) => (
           <nav key={column.title} aria-label={column.title} className="flex flex-col gap-3">

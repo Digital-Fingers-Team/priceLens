@@ -69,7 +69,7 @@ const DEPARTMENT_ICONS: Record<string, LucideIcon> = {
 const VISIBLE = 5;
 
 const linkClass =
-  'rounded-sm py-1 text-sm text-fg transition-colors hover:text-brand-text hover:underline aria-[current=page]:font-medium aria-[current=page]:text-brand-text';
+  'inline-block rounded-sm py-1 text-sm text-fg transition-colors hover:text-brand-text hover:underline aria-[current=page]:font-medium aria-[current=page]:text-brand-text';
 
 function LinkList({ categories, current }: { categories: CategoryLink[]; current?: string }) {
   return (

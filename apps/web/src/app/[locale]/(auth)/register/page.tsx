@@ -3,7 +3,9 @@ import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { Agreement } from '@/components/legal/agreement';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { useRegister } from '@/lib/hooks/use-auth';
 import { Link } from '@/lib/i18n/navigation';
@@ -32,6 +34,9 @@ export default function RegisterPage() {
             .regex(/[a-zA-Z]/, t.auth.passwordLetter)
             .regex(/[0-9]/, t.auth.passwordNumber),
           confirmPassword: z.string(),
+          // Client-side only, like confirmPassword: an account cannot be
+          // made without ticking it.
+          acceptTerms: z.literal(true, { errorMap: () => ({ message: t.legal.agreeRequired }) }),
         })
         .refine((d) => d.password === d.confirmPassword, {
           message: t.auth.passwordMismatch,
@@ -50,8 +55,9 @@ export default function RegisterPage() {
   function onSubmit(data: RegisterForm) {
     // confirmPassword is a client-side-only field; the API rejects unknown
     // properties (forbidNonWhitelisted), so it must not be sent.
-    const { confirmPassword: _confirmPassword, displayName, ...rest } = data;
+    const { confirmPassword: _confirmPassword, acceptTerms: _acceptTerms, displayName, ...rest } = data;
     void _confirmPassword;
+    void _acceptTerms;
     register_({
       ...rest,
       // an untouched optional input yields '', which fails the API's IsString/MaxLength
@@ -106,6 +112,19 @@ export default function RegisterPage() {
           error={errors.confirmPassword?.message}
           {...register('confirmPassword')}
         />
+        <div className="flex flex-col">
+          <Checkbox
+            label={<Agreement template={t.legal.agreeSignup} />}
+            aria-invalid={errors.acceptTerms ? true : undefined}
+            aria-describedby={errors.acceptTerms ? 'accept-terms-error' : undefined}
+            {...register('acceptTerms')}
+          />
+          {errors.acceptTerms && (
+            <p id="accept-terms-error" role="alert" className="text-xs text-danger">
+              {errors.acceptTerms.message}
+            </p>
+          )}
+        </div>
         <Button type="submit" size="lg" loading={isPending} className="w-full">
           {t.auth.createAccount}
         </Button>

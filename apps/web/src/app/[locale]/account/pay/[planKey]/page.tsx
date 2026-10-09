@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Check, CheckCircle2, Clock, Copy, CreditCard, ExternalLink, Landmark, Smartphone, XCircle } from 'lucide-react';
+import { Agreement } from '@/components/legal/agreement';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { buttonClassName } from '@/components/ui/button-styles';
@@ -59,7 +60,10 @@ function PayContent({ planKey }: { planKey: string }) {
     return (
       <Shell>
         {online.length > 0 ? (
-          <OnlinePay planKey={planKey} providers={online} />
+          <>
+            <OnlinePay planKey={planKey} providers={online} />
+            <PaymentTerms />
+          </>
         ) : (
           <ErrorState
             title={t.pricing.checkoutDisabled}
@@ -204,6 +208,16 @@ function ManualPayContent({ planKey, online }: { planKey: string; online: Online
   );
 }
 
+/** What paying commits the buyer to, linked to the terms and refund policy. */
+function PaymentTerms() {
+  const { t } = useI18n();
+  return (
+    <p className="text-xs text-muted">
+      <Agreement template={t.legal.agreePay} />
+    </p>
+  );
+}
+
 function Shell({ children }: { children: React.ReactNode }) {
   return <div className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-10 sm:px-6">{children}</div>;
 }
@@ -222,7 +236,12 @@ function Header({ payment }: { payment: ManualPayment }) {
       <p className="text-2xl font-semibold tabular-nums text-fg">
         {tf(t.pay.amount, { amount: fmt.number(payment.amount), currency: payment.currency, days: payment.intervalDays })}
       </p>
-      {payment.status === 'AWAITING_PAYMENT' && <p className="text-sm text-muted">{t.pay.lede}</p>}
+      {payment.status === 'AWAITING_PAYMENT' && (
+        <>
+          <p className="text-sm text-muted">{t.pay.lede}</p>
+          <PaymentTerms />
+        </>
+      )}
     </header>
   );
 }

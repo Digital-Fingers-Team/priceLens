@@ -17,6 +17,8 @@ interface UpgradePromptProps {
   compact?: boolean;
   /** Defaults to the pricing page. A sign-in prompt passes its own. */
   action?: { href: string; label: string };
+  /** h3 under a section; h2 when it sits straight under the page's h1. */
+  headingLevel?: 'h2' | 'h3';
 }
 
 /**
@@ -27,7 +29,7 @@ interface UpgradePromptProps {
  * instead of a wall. Never used as a security boundary — every gate is
  * enforced server-side as well.
  */
-export function UpgradePrompt({ title, description, className, compact, action }: UpgradePromptProps) {
+export function UpgradePrompt({ title, description, className, compact, action, headingLevel: Heading = 'h3' }: UpgradePromptProps) {
   const { t } = useI18n();
   const target = action ?? { href: '/pricing', label: t.billing.seePlans };
 
@@ -50,7 +52,7 @@ export function UpgradePrompt({ title, description, className, compact, action }
   return (
     <div className={cn('flex flex-col gap-3 rounded border border-brand/30 bg-brand-soft/60 p-4 sm:p-6', className)}>
       <div className="flex flex-col gap-1">
-        <h3 className="text-sm font-semibold text-fg">{title}</h3>
+        <Heading className="text-sm font-semibold text-fg">{title}</Heading>
         {description && <p className="text-sm text-muted">{description}</p>}
       </div>
       <Link href={target.href} className={buttonClassName({ size: 'sm', className: 'self-start' })}>

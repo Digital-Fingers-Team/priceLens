@@ -120,6 +120,7 @@ export default function DealHunterPage() {
             title={t.dealHunter.signInTitle}
             description={t.dealHunter.signInBody}
             action={{ href: '/login?next=%2Fdeal-hunter', label: t.common.signIn }}
+            headingLevel="h2"
           />
         ) : entitlementsLoading ? (
           <Skeleton className="h-24 w-full" />

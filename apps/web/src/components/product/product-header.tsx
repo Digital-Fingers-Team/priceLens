@@ -135,7 +135,7 @@ export function ProductHeader({ product }: { product: CanonicalProduct }) {
                 <p className="text-sm text-muted">
                   {t.product.cheapestAt} <span className="font-medium text-fg">{cheapest.platform.name}</span>
                   {' · '}
-                  <a href="#offers" className="text-brand-text hover:underline">
+                  <a href="#offers" className="text-brand-text underline underline-offset-2 hover:no-underline">
                     {tp(t.product.compareAll, storeCount)}
                   </a>
                 </p>

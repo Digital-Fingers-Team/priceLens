@@ -7,7 +7,8 @@ import { PUBLIC_API_URL } from '@/config/constants';
  * Counts page views and the time each page was visible, for the admin
  * analytics page (owner, 2026-09-29). Anonymous: a random visitor id in
  * localStorage and a session id in sessionStorage; the API stores no IP.
- * Admin pages are not counted (the API drops them too).
+ * Admin pages are not counted (the API drops them too), and nothing is
+ * counted when the browser asks not to be tracked (the cookie policy says so).
  */
 
 const VISITOR_KEY = 'pl_vid';
@@ -47,6 +48,11 @@ function send(path: string, body: unknown): void {
   );
 }
 
+/** Global Privacy Control or Do Not Track is switched on. */
+export function optedOut(nav: Navigator & { globalPrivacyControl?: boolean } = navigator): boolean {
+  return nav.globalPrivacyControl === true || nav.doNotTrack === '1';
+}
+
 /** The result count the search page shows (data-search-total on its heading). */
 function searchTotal(): number | undefined {
   const value = document.querySelector('[data-search-total]')?.getAttribute('data-search-total');
@@ -58,7 +64,7 @@ export function PageTracker() {
   const search = useSearchParams().toString();
 
   useEffect(() => {
-    if (/^\/(?:(?:en|ar)\/)?admin(?:\/|$)/.test(pathname)) return;
+    if (/^\/(?:(?:en|ar)\/)?admin(?:\/|$)/.test(pathname) || optedOut()) return;
 
     const id = uuid();
     send('/analytics/views', {

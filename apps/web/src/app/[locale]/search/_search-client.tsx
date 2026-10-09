@@ -128,7 +128,12 @@ export function SearchPageClient({ initial }: { initial: InitialSearch | null })
                   isFetching && !isLoading && 'pointer-events-none',
                 )}
               >
-                <ProductList products={data?.hits ?? []} isLoading={isLoading} skeletonCount={filters.limit ?? 20} />
+                <ProductList
+                  products={data?.hits ?? []}
+                  isLoading={isLoading}
+                  skeletonCount={filters.limit ?? 20}
+                  heading={t.search.productsHeading}
+                />
               </div>
               {/* Real links, so a page can be opened in a new tab and
                   back/forward walks through the pages. */}
