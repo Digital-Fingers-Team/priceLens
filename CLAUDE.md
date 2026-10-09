@@ -17,7 +17,7 @@ Everything a session needs, in one place. On 2026-10-09 it replaced the old docs
   - 2026-10-09: PageSpeed and SEO. A CDN-resizing image loader, inline CSS, "سعر X في مصر اليوم" titles, the brand in the home title, and the favicon. Also legal pages with consent at sign-up and payment, and a nightly personal-data cleanup job.
   - 2026-10-03: Ink & Coral rebrand with Space Grotesk, a frontend redesign, the Telegram status board, cross-category duplicate cleanup, a split sitemap and new prices (Plus 99, Seller 799, Seller Plus 1799 EGP).
 - Payments: wallet/InstaPay transfer, then the owner approves it in `/admin/payments` (live since 2026-09-30). Paymob and Stripe are off: the owner has no registered business and won't do the paperwork, so don't suggest gateways that need it.
-- Categories: 22 departments and 161 leaves. All waves are on (`CATEGORY_SWEEP_MAX_WAVE=4`). `OFFER_MAX_AGE_DAYS=14`.
+- Categories: 22 departments and 161 leaves. All waves are on (`CATEGORY_SWEEP_MAX_WAVE=4`). `OFFER_MAX_AGE_DAYS=14`. No price floor since 2026-10-09 (`MIN_LISTING_PRICE_EGP=0`; before, it dropped ~39% of scraped listings). The 2.5%-of-median category check still keeps accessories out.
 - Stores: Amazon.eg, Noon, Jumia, 2B, Elaraby, B.TECH, Dream 2000, Tradeline, Compumarts, AliExpress and Alibaba. Carrefour is off: Akamai answers 403 to the cloud IP (rechecked 2026-10-09; the owner dropped it and other blocked stores).
 
 ## Open items
@@ -194,6 +194,7 @@ Engineering:
   - Crons, every search (30 s cooldown per query), page views below the store target, and admin triggers all enqueue jobs on the `ingestion` queue.
   - A job calls `connector.searchListings`, then `ListingProcessor` runs the matching pipeline and writes to Postgres. The tables are `canonical_products`, `source_listings`, `price_history` (one row per *change*, plus the daily rollup `price_daily`) and `match_decisions`.
   - Prices are converted to EGP once, at ingestion. The column is called `priceUsd` for historical reasons; `rawPrice`/`rawCurrency` keep the store's amount.
+- **Sweep size:** a full sweep visits the stores one after another and takes about 2 h for 11 stores (AliExpress ~45 min, Noon ~27, Amazon ~16, small stores ~4). A sweep that starts while one is running is skipped (`sweep_in_flight`).
 - **Queues:** Bull 4 on Redis db 1, with named jobs on `ingestion` (the contract is `workers/ingestion.jobs.ts`) plus `affiliate-conversion`.
   - Every job gets 3 attempts with exponential backoff.
   - On boot the scheduler re-adds the repeatable jobs from config. `LIVE_INGESTION_SCHEDULE_ENABLED=false` disables all of them.
@@ -217,7 +218,7 @@ Engineering:
 - **Categories:**
   - Roots are level 0 and leaves level 1.
   - `rollout_wave`: 0 is always swept, 1-4 are the waves, -1 is retired.
-  - `min_price_egp`: 0 means no floor; NULL means `MIN_LISTING_PRICE_EGP` (5000) applies to new categories.
+  - `min_price_egp`: 0 means no floor; NULL means `MIN_LISTING_PRICE_EGP` applies (prod 0; the code default 5000 is what the tests use).
   - Model-family aliases live in `scraping/ingestion/category-aliases.ts`, never in `search_terms`.
 - **Arabic:**
   - `canonical_products.title_ar` is filled by `TitleTranslationService` (worker job every 15 min, 40 titles per request).

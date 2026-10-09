@@ -9,7 +9,8 @@ import type { CategoryDefinition } from '../types';
  *  - The original eleven electronics leaves are wave 0 (always swept) with
  *    minPriceEgp 0 (no price floor), exactly as they behaved before.
  *  - Every new leaf has a rollout wave >= 1 and no floor override, so the
- *    global MIN_LISTING_PRICE_EGP (5,000) applies. CATEGORY_SWEEP_MAX_WAVE
+ *    global MIN_LISTING_PRICE_EGP applies (code default 5,000; prod runs 0,
+ *    no floor, since 2026-10-09). CATEGORY_SWEEP_MAX_WAVE
  *    decides how many waves are swept.
  *
  * Search terms: English first (the sweep sends the name plus the first

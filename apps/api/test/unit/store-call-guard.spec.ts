@@ -161,6 +161,26 @@ describe('LiveIngestionService sweep with a failing query (B-07)', () => {
     expect(repository.failJob).not.toHaveBeenCalled();
   });
 
+  it('skips a full sweep that starts while the previous one is still running', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    let n = 0;
+    const { service } = setup(async () => {
+      await gate;
+      return [listing(`l${++n}`)];
+    });
+
+    const first = service.runLiveIngestion();
+    const second = await service.runLiveIngestion();
+    expect(second.platforms).toEqual([]);
+    expect(second.skippedPlatforms).toEqual([{ slug: '*', reason: 'sweep_in_flight' }]);
+
+    release();
+    expect((await first).platforms).toHaveLength(1);
+    // The guard is released, so the next tick sweeps again.
+    expect((await service.runLiveIngestion()).platforms).toHaveLength(1);
+  });
+
   it('skips a listing that fails to process and keeps going', async () => {
     const process = jest
       .fn()

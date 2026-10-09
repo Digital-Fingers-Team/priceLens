@@ -56,6 +56,8 @@ export interface IngestionReport {
 @Injectable()
 export class LiveIngestionService {
   private readonly logger = new Logger(LiveIngestionService.name);
+  /** A full sweep is running in this worker (see runLiveIngestion). */
+  private sweepInFlight = false;
 
   constructor(
     private readonly repository: IngestionRepository,
@@ -67,6 +69,26 @@ export class LiveIngestionService {
   ) {}
 
   async runLiveIngestion(options: LiveIngestionOptions = {}): Promise<IngestionReport> {
+    // With more stores a full sweep can outlast its cron interval, and Bull
+    // starts the next occurrence anyway. Two sweeps would scrape every store
+    // twice at once, so the later one is skipped; the category rotation is
+    // persisted, so the next tick carries on. A run for named stores (admin)
+    // is not a full sweep and always runs.
+    if (options.platformSlugs?.length) return this.runSweep(options);
+    if (this.sweepInFlight) {
+      this.logger.warn('Live ingestion sweep is already running -- skipping this occurrence');
+      const now = new Date().toISOString();
+      return { startedAt: now, finishedAt: now, platforms: [], skippedPlatforms: [{ slug: '*', reason: 'sweep_in_flight' }] };
+    }
+    this.sweepInFlight = true;
+    try {
+      return await this.runSweep(options);
+    } finally {
+      this.sweepInFlight = false;
+    }
+  }
+
+  private async runSweep(options: LiveIngestionOptions): Promise<IngestionReport> {
     const startedAt = new Date();
     const requestedPlatforms = this.requestedPlatforms(options);
     const limitPerQuery = this.limitPerQuery(options);
