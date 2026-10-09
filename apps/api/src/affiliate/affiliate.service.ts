@@ -98,6 +98,8 @@ export class AffiliateService {
       tradeline: this.configService.get<string>('retailers.tradelineBaseUrl'),
       compumarts: this.configService.get<string>('retailers.compumartsBaseUrl'),
       raya: this.configService.get<string>('retailers.rayaBaseUrl'),
+      homzmart: this.configService.get<string>('retailers.homzmartBaseUrl'),
+      sigma: this.configService.get<string>('retailers.sigmaBaseUrl'),
       btech: 'https://btech.com',
     };
     return bases[platformSlug];

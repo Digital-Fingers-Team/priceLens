@@ -137,4 +137,22 @@ export const storeDefinitions: StoreDefinition[] = [
     priceModifier: 1.0,
     titleStyle: 'clean',
   },
+  {
+    slug: 'sigma',
+    name: 'Sigma Computer',
+    baseUrl: 'https://www.sigma-computer.com',
+    connectorType: ConnectorType.HTTP_API,
+    rateLimit: 60,
+    priceModifier: 1.0,
+    titleStyle: 'clean',
+  },
+  {
+    slug: 'homzmart',
+    name: 'Homzmart',
+    baseUrl: 'https://homzmart.com',
+    connectorType: ConnectorType.HTTP_API,
+    rateLimit: 60,
+    priceModifier: 1.0,
+    titleStyle: 'clean',
+  },
 ];

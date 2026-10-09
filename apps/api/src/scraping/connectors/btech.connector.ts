@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { RetailerConnector } from '../interfaces/retailer-connector.interface';
 import { RetailerListing } from '../interfaces/retailer-listing.interface';
+import { firstJsonArray, streamedText } from '../utils/next-flight';
 
 /** One search result, as B.TECH's search page embeds it (the fields we read). */
 export interface BtechItem {
@@ -24,52 +25,13 @@ export function btechSearchUrl(query: string): string {
   return `${SITE}/en/s?${new URLSearchParams({ q: query }).toString()}`;
 }
 
-/** The Next.js streamed page data: every `self.__next_f.push([1,"..."])` string, joined. */
-function streamedText(html: string): string {
-  const chunk = /self\.__next_f\.push\(\[1,("(?:[^"\\]|\\.)*")\]\)/g;
-  let text = '';
-  for (let match = chunk.exec(html); match; match = chunk.exec(html)) {
-    try {
-      text += JSON.parse(match[1]) as string;
-    } catch {
-      // A chunk that isn't a plain string literal carries no results.
-    }
-  }
-  return text;
-}
-
 /**
  * The search results embedded in a B.TECH search page. The page is rendered
  * on B.TECH's servers from their discovery API (which does not answer us
  * directly) and ships the result list as React Query state: `"items":[...]`.
  */
 export function parseBtechSearchItems(html: string): BtechItem[] {
-  const text = streamedText(html);
-  const start = text.indexOf('"items":[');
-  if (start < 0) return [];
-  const open = start + '"items":'.length;
-  let depth = 0;
-  let inString = false;
-  for (let i = open; i < text.length; i += 1) {
-    const ch = text[i];
-    if (inString) {
-      if (ch === '\\') i += 1;
-      else if (ch === '"') inString = false;
-    } else if (ch === '"') inString = true;
-    else if (ch === '[' || ch === '{') depth += 1;
-    else if (ch === ']' || ch === '}') {
-      depth -= 1;
-      if (depth === 0) {
-        try {
-          const items = JSON.parse(text.slice(open, i + 1)) as unknown;
-          return Array.isArray(items) ? (items as BtechItem[]) : [];
-        } catch {
-          return [];
-        }
-      }
-    }
-  }
-  return [];
+  return firstJsonArray<BtechItem>(streamedText(html), 'items');
 }
 
 function money(value: number | undefined): number | null {

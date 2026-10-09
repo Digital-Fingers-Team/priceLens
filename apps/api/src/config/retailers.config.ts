@@ -152,4 +152,8 @@ export default registerAs('retailers', () => ({
   rayaEnabled: process.env.RAYA_ENABLED !== 'false',
   rayaBaseUrl: process.env.RAYA_BASE_URL ?? 'https://www.rayashop.com',
   rayaApiUrl: process.env.RAYA_API_URL ?? 'https://api-rayashop.global.ssl.fastly.net',
+  sigmaEnabled: process.env.SIGMA_ENABLED !== 'false',
+  sigmaBaseUrl: process.env.SIGMA_BASE_URL ?? 'https://www.sigma-computer.com',
+  homzmartEnabled: process.env.HOMZMART_ENABLED !== 'false',
+  homzmartBaseUrl: process.env.HOMZMART_BASE_URL ?? 'https://homzmart.com',
 }));

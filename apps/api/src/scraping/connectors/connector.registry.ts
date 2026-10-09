@@ -9,6 +9,8 @@ import { Dream2000Connector } from './dream2000.connector';
 import { TradelineConnector } from './tradeline.connector';
 import { CompumartsConnector } from './compumarts.connector';
 import { RayaConnector } from './raya.connector';
+import { HomzmartConnector } from './homzmart.connector';
+import { SigmaConnector } from './sigma.connector';
 import { ElarabyConnector } from './elaraby.connector';
 import { JumiaConnector } from './jumia.connector';
 import { NoonConnector } from './noon.connector';
@@ -36,6 +38,8 @@ export const CONNECTOR_CLASSES = [
   TradelineConnector,
   CompumartsConnector,
   RayaConnector,
+  HomzmartConnector,
+  SigmaConnector,
 ] as const;
 
 /** Injection token for the list of connector instances, in CONNECTOR_CLASSES order. */
