@@ -84,6 +84,13 @@ export default registerAs('retailers', () => ({
   fxRefreshCron: process.env.FX_REFRESH_CRON ?? '20 7,13 * * *',
   importFinderCron: process.env.IMPORT_FINDER_CRON ?? '10 4 * * *',
   trendRadarCron: process.env.TREND_RADAR_CRON ?? '40 4 * * 6',
+  // Personal-data cleanup (DataRetentionService), as the privacy policy
+  // promises: page views and store clicks after about 13 months, sign-in
+  // sessions 90 days after they ended.
+  dataRetentionCron: process.env.DATA_RETENTION_CRON ?? '50 3 * * *',
+  pageViewRetentionDays: parseInt(process.env.PAGE_VIEW_RETENTION_DAYS ?? '395', 10),
+  affiliateClickRetentionDays: parseInt(process.env.AFFILIATE_CLICK_RETENTION_DAYS ?? '395', 10),
+  sessionRetentionDays: parseInt(process.env.SESSION_RETENTION_DAYS ?? '90', 10),
   storeCoverageSweepBatchSize: parseInt(process.env.STORE_COVERAGE_SWEEP_BATCH_SIZE ?? '100', 10),
   // How long to leave a product alone after the sweep has tried to expand it.
   // Without this, any product that cannot reach the target -- because no other

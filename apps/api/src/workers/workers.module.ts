@@ -7,6 +7,7 @@ import { SellerToolsModule } from '../seller-tools/seller-tools.module';
 import { TradeModule } from '../trade/trade.module';
 import { ConfigService } from '@nestjs/config';
 import { AffiliateModule } from '../affiliate/affiliate.module';
+import { AnalyticsModule } from '../analytics/analytics.module';
 import { AFFILIATE_CONVERSION_QUEUE } from '../affiliate/affiliate.constants';
 import { AffiliateConversionProcessor } from '../affiliate/affiliate-conversion.processor';
 import { AffiliateConversionScheduler } from '../affiliate/affiliate-conversion.scheduler';
@@ -40,6 +41,7 @@ import { WorkerMemoryGuard } from './worker-memory-guard';
     UsedMarketModule,
     SellerToolsModule,
     TradeModule,
+    AnalyticsModule,
   ],
   providers: [
     IngestionProcessor,

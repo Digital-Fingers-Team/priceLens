@@ -22,6 +22,7 @@ import {
   RUN_SELLER_REPRICER_JOB,
   RUN_RANK_TRACKING_JOB,
   RUN_FX_REFRESH_JOB,
+  RUN_DATA_RETENTION_JOB,
   RUN_IMPORT_FINDER_JOB,
   RUN_TREND_RADAR_JOB,
 } from './ingestion.jobs';
@@ -48,6 +49,7 @@ const RANK_TRACKING_JOB_ID = 'scheduled-rank-tracking';
 const FX_REFRESH_JOB_ID = 'scheduled-fx-refresh';
 const IMPORT_FINDER_JOB_ID = 'scheduled-import-finder';
 const TREND_RADAR_JOB_ID = 'scheduled-trend-radar';
+const DATA_RETENTION_JOB_ID = 'scheduled-data-retention';
 
 @Injectable()
 export class IngestionScheduler implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -236,8 +238,16 @@ export class IngestionScheduler implements OnApplicationBootstrap, OnApplication
     const radarCron = this.configService.get<string>('retailers.trendRadarCron', '40 4 * * 6');
     await this.queue.add(RUN_TREND_RADAR_JOB, {}, { jobId: TREND_RADAR_JOB_ID, priority: JOB_PRIORITY.scheduled, repeat: { cron: radarCron } });
 
+    // Old page views, store clicks and ended sessions (the privacy policy's retention).
+    const retentionCron = this.configService.get<string>('retailers.dataRetentionCron', '50 3 * * *');
+    await this.queue.add(
+      RUN_DATA_RETENTION_JOB,
+      {},
+      { jobId: DATA_RETENTION_JOB_ID, priority: JOB_PRIORITY.scheduled, repeat: { cron: retentionCron } },
+    );
+
     this.logger.log(
-      `Scheduled FX (${fxCron}), import finder (${importCron}), trend radar (${radarCron}), repricer (${repricerCron}), rank tracking (${rankCron}), used market (${usedCron}), cart watch (${cartCron}), alert digest (${digestCron}), price rollup (${rollupCron}), notification retry (${retryCron}), subscription maintenance (${maintenanceCron}), ` +
+      `Scheduled data retention (${retentionCron}), FX (${fxCron}), import finder (${importCron}), trend radar (${radarCron}), repricer (${repricerCron}), rank tracking (${rankCron}), used market (${usedCron}), cart watch (${cartCron}), alert digest (${digestCron}), price rollup (${rollupCron}), notification retry (${retryCron}), subscription maintenance (${maintenanceCron}), ` +
         `competitor detection (${detectionCron}), MAP sweep (${mapCron}), ` +
         `launch detection (${launchCron}), weekly reports (${reportsCron}) ` +
         `and Arabic titles (${translationCron})`,

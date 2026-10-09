@@ -37,6 +37,7 @@ import {
   RUN_SELLER_REPRICER_JOB,
   RUN_RANK_TRACKING_JOB,
   RUN_FX_REFRESH_JOB,
+  RUN_DATA_RETENTION_JOB,
   RUN_IMPORT_FINDER_JOB,
   RUN_TREND_RADAR_JOB,
   ReconciliationJobData,
@@ -57,6 +58,7 @@ import { ImportFinderService } from '../trade/import-finder.service';
 import { TrendRadarService } from '../trade/trend-radar.service';
 import { FEATURES } from '../billing/plan-limits';
 import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
+import { DataRetentionService } from '../analytics/data-retention.service';
 
 @Processor(INGESTION_QUEUE)
 export class IngestionProcessor {
@@ -84,6 +86,7 @@ export class IngestionProcessor {
     private readonly importFinder: ImportFinderService,
     private readonly trendRadar: TrendRadarService,
     private readonly flags: FeatureFlagsService,
+    private readonly dataRetention: DataRetentionService,
     @Optional() private readonly titleTranslation?: TitleTranslationService,
   ) {}
 
@@ -195,6 +198,12 @@ export class IngestionProcessor {
   async handleImportFinder() {
     if (!(await this.flags.isEnabled(FEATURES.IMPORT_FINDER))) return { skipped: 'flag off' };
     return this.importFinder.rebuild();
+  }
+
+  /** Deletes page views, store clicks and sessions past their retention period. */
+  @Process(RUN_DATA_RETENTION_JOB)
+  async handleDataRetention() {
+    return this.dataRetention.run();
   }
 
   /** The trend radar for the week that just finished. */

@@ -26,6 +26,7 @@ export const RUN_USED_MARKET_JOB = 'run-used-market';
 export const RUN_SELLER_REPRICER_JOB = 'run-seller-repricer';
 export const RUN_RANK_TRACKING_JOB = 'run-rank-tracking';
 export const RUN_FX_REFRESH_JOB = 'run-fx-refresh';
+export const RUN_DATA_RETENTION_JOB = 'run-data-retention';
 export const RUN_IMPORT_FINDER_JOB = 'run-import-finder';
 export const RUN_TREND_RADAR_JOB = 'run-trend-radar';
 

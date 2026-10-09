@@ -161,9 +161,9 @@ export const legalEn: LegalDocs = {
         body: [
           [
             'account data, watchlist and alerts: while your account is open, then deleted when you ask us to delete it;',
-            'sign-in sessions: they expire after 7 days without use; records of past sessions are kept for security;',
+            'sign-in sessions: they expire after 7 days without use, and the record is deleted 90 days after a session ends;',
             'invoices and payment records: as long as Egyptian tax and accounting law requires;',
-            'page views and store clicks: as long as they are useful for statistics and commission checks, then deleted or reduced to totals.',
+            'page views and store clicks: 13 months, then deleted. A click that earned us a commission is kept as a payment record, but without your account, browser or IP hash.',
           ],
         ],
       },
