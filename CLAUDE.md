@@ -17,8 +17,8 @@ Everything a session needs, in one place. On 2026-10-09 it replaced the old docs
   - 2026-10-09: PageSpeed and SEO. A CDN-resizing image loader, inline CSS, "سعر X في مصر اليوم" titles, the brand in the home title, and the favicon. Also legal pages with consent at sign-up and payment, and a nightly personal-data cleanup job.
   - 2026-10-03: Ink & Coral rebrand with Space Grotesk, a frontend redesign, the Telegram status board, cross-category duplicate cleanup, a split sitemap and new prices (Plus 99, Seller 799, Seller Plus 1799 EGP).
 - Payments: wallet/InstaPay transfer, then the owner approves it in `/admin/payments` (live since 2026-09-30). Paymob and Stripe are off: the owner has no registered business and won't do the paperwork, so don't suggest gateways that need it.
-- Categories: 22 departments and 161 leaves. All waves are on (`CATEGORY_SWEEP_MAX_WAVE=4`). `OFFER_MAX_AGE_DAYS=14`. No price floor since 2026-10-09 (`MIN_LISTING_PRICE_EGP=0`; before, it dropped ~39% of scraped listings). The 2.5%-of-median category check still keeps accessories out.
-- Stores: Amazon.eg, Noon, Jumia, 2B, Elaraby, B.TECH, Dream 2000, Tradeline, Compumarts, AliExpress, Alibaba, and since 2026-10-09 Raya (Magento GraphQL on its API host), Sigma Computer (Next.js streamed search data), Homzmart (`__NEXT_DATA__`), Fresh (Magento GraphQL on freshmprod.hypernode.io) and Samsung Egypt (its store-search API). Fresh and Samsung are the makers' own shops, i.e. official prices; Samsung skips grouped models (phones in every storage share one price). Carrefour is off: Akamai answers 403 to the cloud IP (rechecked 2026-10-09; the owner dropped it and other blocked stores).
+- Categories: 23 departments and 176 leaves (Supermarket, 14 leaves, and Diapers & Baby Formula under Baby, added 2026-10-09 at wave 4). All waves are on (`CATEGORY_SWEEP_MAX_WAVE=4`). `OFFER_MAX_AGE_DAYS=14`. No price floor since 2026-10-09 (`MIN_LISTING_PRICE_EGP=0`; before, it dropped ~39% of scraped listings). The 2.5%-of-median category check still keeps accessories out.
+- Stores: Amazon.eg, Noon, Jumia, 2B, Elaraby, B.TECH, Dream 2000, Tradeline, Compumarts, AliExpress, Alibaba, and since 2026-10-09 Raya (Magento GraphQL on its API host), Sigma Computer (Next.js streamed search data), Homzmart (`__NEXT_DATA__`), Fresh (Magento GraphQL on freshmprod.hypernode.io) and Samsung Egypt (its store-search API). Fresh and Samsung are the makers' own shops, i.e. official prices; Samsung skips grouped models (phones in every storage share one price). Grocery chains (kind GROCERY): Gourmet (Magento, SKUs are barcodes, so GTIN matches; the size is added from the URL key when the name lacks it) and Spinneys (Magento GraphQL over GET). A connector can set its own `probeQuery` (grocers use "milk,water"). Carrefour is off: Akamai answers 403 to the cloud IP (rechecked 2026-10-09; the owner dropped it and other blocked stores).
 
 ## Open items
 
@@ -57,7 +57,7 @@ Engineering:
   - Select: no readable catalogue.
   - Behind a Cloudflare challenge that never clears, even in the worker browser (2026-10-09): El Badr, El Nekhely, Egyptlaptop, Cairo Sales, Home Centre. Kimo (429) and Hankerz, Hyper One, Seif (no answer) were also dropped as blocked.
   - IKEA: readable (`sik.search.blue.cdtapps.com`) but skipped 2026-10-09: it sells only its own products, so nothing to compare, the same reason single-brand clothing stores were dropped.
-  - Grocery and pharmacy stores.
+  - Grocery: Seoudi (Magento behind a Nuxt shop, API host not found yet), Metro (custom), Breadfast/Rabbit/Talabat/Instashop (app only). Pharmacy: El Ezaby (WordPress, no product API found), Chefaa (custom); no pharmacy department yet.
   - Mock checkout: the payment step was never completed end to end.
 
 ## Where things are and how to work

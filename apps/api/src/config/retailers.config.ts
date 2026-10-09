@@ -162,4 +162,8 @@ export default registerAs('retailers', () => ({
   samsungEnabled: process.env.SAMSUNG_ENABLED !== 'false',
   samsungBaseUrl: process.env.SAMSUNG_BASE_URL ?? 'https://www.samsung.com',
   samsungApiUrl: process.env.SAMSUNG_API_URL ?? 'https://sribsrch.ecom.samsung.com/estoresearch-api/v1/scom/search',
+  gourmetEnabled: process.env.GOURMET_ENABLED !== 'false',
+  gourmetBaseUrl: process.env.GOURMET_BASE_URL ?? 'https://gourmetegypt.com',
+  spinneysEnabled: process.env.SPINNEYS_ENABLED !== 'false',
+  spinneysBaseUrl: process.env.SPINNEYS_BASE_URL ?? 'https://www.spinneys-egypt.com',
 }));

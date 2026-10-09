@@ -173,4 +173,22 @@ export const storeDefinitions: StoreDefinition[] = [
     priceModifier: 1.0,
     titleStyle: 'clean',
   },
+  {
+    slug: 'gourmet',
+    name: 'Gourmet',
+    baseUrl: 'https://gourmetegypt.com',
+    connectorType: ConnectorType.HTTP_API,
+    rateLimit: 60,
+    priceModifier: 1.0,
+    titleStyle: 'clean',
+  },
+  {
+    slug: 'spinneys',
+    name: 'Spinneys',
+    baseUrl: 'https://www.spinneys-egypt.com',
+    connectorType: ConnectorType.HTTP_API,
+    rateLimit: 60,
+    priceModifier: 1.0,
+    titleStyle: 'clean',
+  },
 ];

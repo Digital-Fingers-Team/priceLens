@@ -281,4 +281,27 @@ export const categoryTree: CategoryDefinition[] = [
   group('travel', 'Luggage & Travel', 'شنط وسفر'),
   leaf('travel', 3, 'luggage', 'Luggage Sets', 'شنط سفر', ['luggage set', 'suitcase', 'trolley bag', 'hard shell luggage', 'شنطة سفر']),
   leaf('travel', 4, 'backpacks', 'Premium Backpacks', 'شنط ظهر', ['laptop backpack', 'travel backpack', 'camera backpack', 'شنطة ظهر']),
+
+  // ─── Supermarket (2026-10-09, with the price floor at 0) ─────────────
+  // For the grocery chains (Gourmet, Spinneys) and the groceries Amazon,
+  // Noon and Jumia sell. Names are what the sweep sends to the stores, so
+  // they say what they hold ("Instant & Ground Coffee", not "Coffee", which
+  // finds coffee machines). Sizes and pack counts tell products apart: the
+  // quantity guard and the judge's rules keep 200 ml and 1 L apart.
+  group('groceries', 'Supermarket', 'سوبر ماركت'),
+  leaf('groceries', 4, 'milk-dairy', 'Milk & Yogurt', 'حليب وزبادي', ['milk', 'long life milk', 'yogurt', 'حليب', 'لبن', 'زبادي']),
+  leaf('groceries', 4, 'cheese-butter', 'Cheese & Butter', 'جبن وزبدة', ['cheese', 'butter', 'cream cheese', 'جبنة', 'زبدة']),
+  leaf('groceries', 4, 'coffee', 'Instant & Ground Coffee', 'قهوة', ['instant coffee', 'ground coffee', 'coffee beans', 'نسكافيه', 'قهوة', 'بن']),
+  leaf('groceries', 4, 'tea', 'Tea', 'شاي', ['tea bags', 'loose tea', 'green tea', 'شاي']),
+  leaf('groceries', 4, 'cooking-oil', 'Cooking Oil', 'زيت طعام', ['sunflower oil', 'olive oil', 'corn oil', 'زيت عباد الشمس', 'زيت زيتون']),
+  leaf('groceries', 4, 'rice-pasta', 'Rice & Pasta', 'أرز ومكرونة', ['rice', 'pasta', 'spaghetti', 'أرز', 'رز', 'مكرونة']),
+  leaf('groceries', 4, 'sugar-flour', 'Sugar & Flour', 'سكر ودقيق', ['sugar', 'flour', 'brown sugar', 'سكر', 'دقيق']),
+  leaf('groceries', 4, 'canned-food', 'Canned Food', 'معلبات', ['canned tuna', 'canned beans', 'tomato paste', 'تونة', 'فول معلب', 'صلصة']),
+  leaf('groceries', 4, 'snacks-chocolate', 'Chocolate & Snacks', 'شوكولاتة وسناكس', ['chocolate', 'potato chips', 'biscuits', 'شوكولاتة', 'شيبسي', 'بسكويت']),
+  leaf('groceries', 4, 'soft-drinks-juice', 'Soft Drinks & Juice', 'مشروبات وعصائر', ['soft drink', 'cola', 'fruit juice', 'عصير', 'مياه غازية', 'بيبسي']),
+  leaf('groceries', 4, 'bottled-water', 'Bottled Water', 'مياه معدنية', ['mineral water', 'bottled water', 'sparkling water', 'مياه معدنية']),
+  leaf('groceries', 4, 'laundry-cleaning', 'Laundry & Cleaning', 'منظفات', ['laundry detergent', 'dishwashing liquid', 'fabric softener', 'مسحوق غسيل', 'منظف', 'سائل غسيل أطباق']),
+  leaf('groceries', 4, 'toiletries', 'Shampoo, Soap & Toothpaste', 'شامبو وصابون ومعجون أسنان', ['shampoo', 'toothpaste', 'deodorant', 'شامبو', 'صابون', 'معجون أسنان']),
+  leaf('groceries', 4, 'tissues-paper', 'Tissues & Toilet Paper', 'مناديل', ['tissues', 'toilet paper', 'kitchen towels', 'مناديل', 'مناديل حمام']),
+  leaf('baby', 4, 'diapers-formula', 'Diapers & Baby Formula', 'حفاضات ولبن أطفال', ['baby diapers', 'baby formula', 'baby wipes', 'حفاضات', 'بامبرز', 'لبن أطفال']),
 ];

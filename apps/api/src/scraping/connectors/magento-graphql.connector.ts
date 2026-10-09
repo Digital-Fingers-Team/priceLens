@@ -75,6 +75,10 @@ export abstract class MagentoGraphqlConnector implements RetailerConnector {
   protected abstract get baseUrl(): string;
   /** Magento store-view code, used both as the `Store` header and the URL path prefix. */
   protected readonly storeCode: string = 'en';
+  /** Ask with GET (query in the URL): Spinneys answers a POST with a server error. */
+  protected readonly useGet: boolean = false;
+  /** The SKU is the product's barcode (Gourmet): it then matches other stores by GTIN. */
+  protected readonly skuIsBarcode: boolean = false;
   /** Where product pages live, when the GraphQL API is on another host (Raya, Fresh). */
   protected get siteUrl(): string {
     return this.baseUrl;
@@ -162,20 +166,23 @@ export abstract class MagentoGraphqlConnector implements RetailerConnector {
 
   private async fetchProductsOverHttp(search: string, pageSize: number): Promise<MagentoProductItem[]> {
     const endpoint = `${this.baseUrl.replace(/\/$/, '')}/graphql`;
-    const response = await axios.post<MagentoSearchResponse>(
-      endpoint,
-      { query: SEARCH_QUERY, variables: { search, pageSize } },
-      {
-        timeout: 30000,
-        headers: {
-          'Content-Type': 'application/json',
-          Store: this.storeCode,
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
-            '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        },
+    const options = {
+      timeout: 30000,
+      headers: {
+        'Content-Type': 'application/json',
+        Store: this.storeCode,
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+          '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
       },
-    );
+    };
+    const variables = { search, pageSize };
+    const response = this.useGet
+      ? await axios.get<MagentoSearchResponse>(endpoint, {
+          ...options,
+          params: { query: SEARCH_QUERY, variables: JSON.stringify(variables) },
+        })
+      : await axios.post<MagentoSearchResponse>(endpoint, { query: SEARCH_QUERY, variables }, options);
 
     if (response.data?.errors?.length) {
       throw new Error(response.data.errors.map((err) => err.message).join('; '));
@@ -184,8 +191,14 @@ export abstract class MagentoGraphqlConnector implements RetailerConnector {
     return response.data?.data?.products?.items ?? [];
   }
 
+  /** The listing title; a store whose names leave out what tells products apart overrides it (Gourmet). */
+  protected listingTitle(item: { name: string; urlKey?: string }): string {
+    return item.name;
+  }
+
   private mapItem(item: MagentoProductItem): RetailerListing | null {
-    const title = item.name?.trim();
+    const name = item.name?.trim();
+    const title = name ? this.listingTitle({ name, urlKey: item.url_key }) : undefined;
     const sku = item.sku?.trim();
     if (!title || !sku) return null;
 
@@ -208,7 +221,9 @@ export abstract class MagentoGraphqlConnector implements RetailerConnector {
       rating:
         item.rating_summary && item.rating_summary > 0 ? (item.rating_summary / 100) * 5 : null,
       reviewCount: item.review_count && item.review_count > 0 ? item.review_count : null,
-      identifiers: { gtin: null, upc: null, ean: null, mpn: sku },
+      identifiers: this.skuIsBarcode && /^\d{8,14}$/.test(sku)
+        ? { gtin: sku, upc: null, ean: sku, mpn: null }
+        : { gtin: null, upc: null, ean: null, mpn: sku },
       raw: item as unknown as Record<string, unknown>,
     };
   }

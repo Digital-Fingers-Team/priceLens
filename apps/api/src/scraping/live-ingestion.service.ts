@@ -164,8 +164,7 @@ export class LiveIngestionService {
    * count one failure; a paused store rethrows.
    */
   private async probeStore(connector: RetailerConnector): Promise<boolean> {
-    const probes = this.configService
-      .get<string>('retailers.storeProbeQuery', 'samsung,tv')
+    const probes = (connector.probeQuery ?? this.configService.get<string>('retailers.storeProbeQuery', 'samsung,tv'))
       .split(',')
       .map((word) => word.trim())
       .filter(Boolean);

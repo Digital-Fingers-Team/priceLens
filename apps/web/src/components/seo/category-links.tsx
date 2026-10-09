@@ -17,6 +17,7 @@ import {
   Package,
   Refrigerator,
   Router,
+  ShoppingBasket,
   Smartphone,
   Sofa,
   Sparkles,
@@ -63,6 +64,7 @@ const DEPARTMENT_ICONS: Record<string, LucideIcon> = {
   'watches-jewelry': Watch,
   travel: Luggage,
   beauty: Sparkles,
+  groceries: ShoppingBasket,
 };
 
 /** Categories a tile shows before folding the rest under "+N more". */
