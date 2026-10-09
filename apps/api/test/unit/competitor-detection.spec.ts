@@ -39,9 +39,10 @@ function setup(rows: unknown[], productCount = 1) {
     },
     $queryRaw: jest.fn().mockResolvedValue(rows),
     competitorEvent: {
-      create: jest.fn(({ data }: { data: { type: string; dedupeKey: string } }) => {
+      createMany: jest.fn(({ data }: { data: { type: string; dedupeKey: string } }) => {
+        if (created.some((e) => e.dedupeKey === data.dedupeKey)) return Promise.resolve({ count: 0 });
         created.push(data);
-        return Promise.resolve(data);
+        return Promise.resolve({ count: 1 });
       }),
     },
     competitorAlertRule: { findFirst: jest.fn().mockResolvedValue(null) },
@@ -57,6 +58,14 @@ describe('CompetitorDetectionService', () => {
     await service.detectForAllOrganizations();
     const drop = created.find((e) => e.type === 'PRICE_DROP');
     expect(drop?.dedupeKey).toBe('sp-0000:jumia:PRICE_DROP:ph-1');
+  });
+
+  it('a second sweep records nothing new', async () => {
+    const { service, created } = setup([row()]);
+    const first = await service.detectForAllOrganizations();
+    const second = await service.detectForAllOrganizations();
+    expect(first.eventsRecorded).toBe(created.length);
+    expect(second.eventsRecorded).toBe(0);
   });
 
   it('does not re-report a change from weeks ago', async () => {

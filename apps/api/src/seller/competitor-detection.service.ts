@@ -334,7 +334,11 @@ export class CompetitorDetectionService {
     const dedupeKey = `${sellerProductId}:${observation.platformId}:${candidate.type}:${this.occurrence(observation, candidate.type)}`;
 
     try {
-      await this.prisma.competitorEvent.create({
+      // skipDuplicates: an event already recorded is the dedupe key doing its
+      // job. A rejected insert (P2002) was caught but still logged as a
+      // Prisma error on every sweep.
+      const { count } = await this.prisma.competitorEvent.createMany({
+        skipDuplicates: true,
         data: {
           orgId,
           sellerProductId,
@@ -355,10 +359,8 @@ export class CompetitorDetectionService {
           } as Prisma.InputJsonValue,
         },
       });
-      return true;
+      return count > 0;
     } catch (error) {
-      // P2002 is the dedupe constraint doing its job, not a failure.
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return false;
       this.logger.error(`Could not record competitor event: ${(error as Error).message}`);
       return false;
     }
