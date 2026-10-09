@@ -59,6 +59,9 @@ const nextConfig = {
     // instead of writing every product page ever visited to the container's
     // disk: 16,000+ products x 2 languages, visited by crawlers, is gigabytes.
     isrFlushToDisk: false,
+    // Put the CSS (about 8 KB compressed) in the page instead of two
+    // render-blocking stylesheet requests (PageSpeed, 2026-10-09).
+    inlineCss: true,
   },
   poweredByHeader: false,
   async headers() {
@@ -80,8 +83,10 @@ const nextConfig = {
   images: {
     // The optimizer (/_next/image) decodes remote images with sharp/libheif;
     // Next 14 has an unpatched RCE there via AVIF (GHSA-2xp9-vwfh-vxw4, S-03).
-    // Images load straight from the retailer CDNs until the Next 15 upgrade.
-    unoptimized: true,
+    // Images load straight from the retailer CDNs, and this loader asks the
+    // CDNs that can resize for the size the page needs (PageSpeed, 2026-10-09).
+    loader: 'custom',
+    loaderFile: './src/lib/image-loader.ts',
     remotePatterns: [
       {
         protocol: 'https',

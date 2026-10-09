@@ -27,7 +27,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const locale = await resolveLocale(params);
   const { t, href } = getI18n(locale);
   return {
-    title: t.home.metaTitle,
+    // The layout template does not apply to its own segment's page, so the
+    // brand is added here: Google showed the title without it.
+    title: { absolute: `${t.meta.siteName} | ${t.home.metaTitle}` },
     description: t.home.metaDescription,
     alternates: localizedAlternates(locale, '/'),
     openGraph: { title: t.meta.siteName, description: t.home.metaDescription, url: absoluteUrl(href('/')) },

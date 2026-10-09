@@ -10,20 +10,20 @@ const p = (forms: PluralForms) => forms;
 export const en = {
   meta: {
     siteName: 'Pricelens',
-    siteTitle: 'Pricelens',
+    siteTitle: 'Pricelens | Compare prices in Egypt',
     description:
-      'Pricelens compares live product prices, retailer listings, and price history so shoppers can find the best deal fast.',
-    shortDescription: 'Compare live product prices, retailer listings, and price history in one place.',
+      'Compare mobile, appliance and electronics prices in Egypt across Amazon, Noon, Jumia, B.TECH and more: the cheapest price today and the price history.',
+    shortDescription: 'The cheapest price in Egypt today: compare Amazon, Noon, Jumia and B.TECH in one place.',
   },
   seo: {
     searchTitle: 'All products',
     searchDescription: 'Every product we track, compared across Amazon, Noon, Jumia and more, with the best-covered first.',
-    searchResultsTitle: '“{q}”: compare prices',
+    searchResultsTitle: '“{q}” price in Egypt: compare prices',
     pricingDescription: 'Pricelens plans: free price comparison, price alerts and full price history, and tools for sellers.',
     dealHunterDescription: 'Describe the product, budget and specs you want, and Deal Hunter ranks the best offers we track.',
-    categoryTitle: '{name}: compare prices',
-    categoryPagedTitle: '{name}: compare prices, page {page}',
-    categoryDescription: 'Compare {name} prices across Amazon, Noon, Jumia and more: the lowest price, every store and the price history.',
+    categoryTitle: '{name} prices in Egypt today',
+    categoryPagedTitle: '{name} prices in Egypt today, page {page}',
+    categoryDescription: 'Compare {name} prices in Egypt across Amazon, Noon, Jumia, B.TECH and more: the cheapest price today, every store and the price history.',
     categoryLede: p({ one: '{count} product, compared across stores.', other: '{count} products, compared across stores.' }),
     categoryEmpty: 'No product in this category has a current price right now.',
     breadcrumbs: 'Breadcrumb',
@@ -102,8 +102,8 @@ export const en = {
     dark: 'dark',
   },
   home: {
-    metaTitle: 'Find the best price',
-    metaDescription: 'Search and compare live product prices across Amazon, Noon, Jumia, and more. One search, every price.',
+    metaTitle: 'Compare prices in Egypt: the cheapest price today',
+    metaDescription: 'Pricelens: compare mobile, laptop and appliance prices in Egypt across Amazon, Noon, Jumia, B.TECH and more, updated every day. One search, every price.',
     eyebrow: 'Price comparison',
     headline: 'One search.',
     headlineAccent: 'Every price.',
@@ -253,7 +253,7 @@ export const en = {
     browseAll: 'Browse all products',
     notFoundTitle: 'Product not found',
     notFoundBody: 'The requested product could not be found on Pricelens.',
-    metaTitle: '{title} price comparison',
+    metaTitle: '{title} price in Egypt today',
     metaCompare: p({
       one: 'Compare live prices for {title} across {count} listing.',
       other: 'Compare live prices for {title} across {count} listings.',

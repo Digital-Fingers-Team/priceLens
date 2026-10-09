@@ -26,6 +26,7 @@ export function websiteJsonLd({ name, homePath, searchPath }: { name: string; ho
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     name,
+    alternateName: ['PriceLens', 'برايس لينس', 'pricelens.store'],
     url: absoluteUrl(homePath),
     potentialAction: {
       '@type': 'SearchAction',

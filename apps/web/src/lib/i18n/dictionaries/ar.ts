@@ -8,19 +8,19 @@ import type { Dictionary } from './index';
 export const ar: Dictionary = {
   meta: {
     siteName: 'Pricelens',
-    siteTitle: 'Pricelens | قارن الأسعار',
-    description: 'يقارن Pricelens أسعار المنتجات الحية وعروض المتاجر وتاريخ الأسعار لتجد أفضل صفقة بسرعة.',
-    shortDescription: 'قارن أسعار المنتجات وعروض المتاجر وتاريخ الأسعار في مكان واحد.',
+    siteTitle: 'Pricelens | مقارنة أسعار في مصر',
+    description: 'قارن أسعار الموبايلات والأجهزة الكهربائية والإلكترونيات في مصر بين أمازون ونون وجوميا وبي تك وغيرها، واعرف أرخص سعر اليوم وتاريخ السعر.',
+    shortDescription: 'أرخص سعر في مصر اليوم: قارن أسعار أمازون ونون وجوميا وبي تك في مكان واحد.',
   },
   seo: {
     searchTitle: 'كل المنتجات',
     searchDescription: 'كل المنتجات التي نتابعها، مقارنة بين أمازون ونون وجوميا وغيرها، والأكثر تغطية أولًا.',
-    searchResultsTitle: '«{q}»: قارن الأسعار',
+    searchResultsTitle: 'سعر «{q}» في مصر: قارن الأسعار',
     pricingDescription: 'خطط Pricelens: مقارنة أسعار مجانية، وتنبيهات بالأسعار وتاريخها الكامل، وأدوات للبائعين.',
     dealHunterDescription: 'صف المنتج والميزانية والمواصفات التي تريدها، ويرتب لك صائد الصفقات أفضل العروض التي نتابعها.',
-    categoryTitle: '{name}: قارن الأسعار',
-    categoryPagedTitle: '{name}: قارن الأسعار، صفحة {page}',
-    categoryDescription: 'قارن أسعار {name} بين أمازون ونون وجوميا وغيرها: أقل سعر، وكل المتاجر، وتاريخ الأسعار.',
+    categoryTitle: 'أسعار {name} في مصر اليوم',
+    categoryPagedTitle: 'أسعار {name} في مصر اليوم، صفحة {page}',
+    categoryDescription: 'قارن أسعار {name} في مصر بين أمازون ونون وجوميا وبي تك وغيرها: أرخص سعر اليوم، وكل المتاجر، وتاريخ الأسعار.',
     categoryLede: {
       zero: 'لا منتجات بعد.',
       one: 'منتج واحد، مقارن بين المتاجر.',
@@ -127,8 +127,8 @@ export const ar: Dictionary = {
     dark: 'داكن',
   },
   home: {
-    metaTitle: 'اعثر على أفضل سعر',
-    metaDescription: 'ابحث وقارن أسعار المنتجات الحية في أمازون ونون وجوميا وغيرها. بحث واحد، كل الأسعار.',
+    metaTitle: 'مقارنة أسعار في مصر: أرخص سعر اليوم',
+    metaDescription: 'Pricelens: قارن أسعار الموبايلات واللابتوبات والأجهزة في مصر بين أمازون ونون وجوميا وبي تك وغيرها، بأسعار محدثة كل يوم. بحث واحد، كل الأسعار.',
     eyebrow: 'مقارنة الأسعار',
     headline: 'بحث واحد.',
     headlineAccent: 'كل الأسعار.',
@@ -341,7 +341,7 @@ export const ar: Dictionary = {
     browseAll: 'تصفّح كل المنتجات',
     notFoundTitle: 'المنتج غير موجود',
     notFoundBody: 'لم نعثر على المنتج المطلوب في Pricelens.',
-    metaTitle: 'مقارنة أسعار {title}',
+    metaTitle: 'سعر {title} في مصر اليوم',
     metaCompare: {
       zero: 'قارن أسعار {title}.',
       one: 'قارن أسعار {title} في عرض واحد.',
@@ -350,7 +350,7 @@ export const ar: Dictionary = {
       many: 'قارن أسعار {title} في {count} عرضًا.',
       other: 'قارن أسعار {title} في {count} عرض.',
     },
-    metaFrom: 'يبدأ من {price}.',
+    metaFrom: 'أرخص سعر الآن {price}.',
     metaBrand: 'الماركة: {brand}.',
   },
   chart: {
