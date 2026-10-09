@@ -60,6 +60,9 @@ import { FEATURES } from '../billing/plan-limits';
 import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
 import { DataRetentionService } from '../analytics/data-retention.service';
 
+/** Store expansions allowed to wait for a scrape slot; more would starve the scheduled jobs. */
+export const MAX_PARKED_EXPANSIONS = 4;
+
 @Processor(INGESTION_QUEUE)
 export class IngestionProcessor {
   private readonly logger = new Logger(IngestionProcessor.name);
@@ -272,6 +275,14 @@ export class IngestionProcessor {
   @Process(RUN_STORE_EXPANSION_JOB)
   async handleRunStoreExpansion(job: Job<StoreExpansionJobData>) {
     const { productId, targetStores } = job.data;
+    // An expansion waiting for a scrape slot still holds one of Bull's worker
+    // loops (one per handler, 23 in all). On 2026-10-09, 21 expansions sat
+    // parked in them, and the hourly reconciliation, price alerts and title
+    // translation waited behind them for hours. Expansions are best-effort:
+    // a skipped product is queued again the next time a page shows it.
+    if (this.scrapeSlots.stats.waiting >= MAX_PARKED_EXPANSIONS) {
+      return { skipped: 'scrape slots busy' };
+    }
     this.logger.log(`Starting store expansion for product ${productId} (job ${job.id})`);
     await this.scrape(job, () => this.storeCoverageService.expandProductStores(productId, targetStores));
     this.logger.log(`Finished store expansion for product ${productId} (job ${job.id})`);

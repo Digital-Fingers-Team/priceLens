@@ -43,7 +43,7 @@ Owner only:
 
 Engineering:
 - Disk is 77% full after the 2026-10-09 cleanup (old build images, Meilisearch, old clones, the pay demo, old `.env` backups). The monitor alerts at 85%. Each `deploy-*.sh` leaves an untagged image of about 2 GB: remove PriceLens ones older than a day with `podman rmi <id>`.
-- Give scheduled jobs their own queue or concurrency so they never wait behind scrapes. Also find what keeps requesting store expansions; they are capped by `STORE_EXPANSION_MAX_WAITING=100`.
+- Scheduled jobs vs scrapes: Bull has one worker loop per handler (23). A scrape waiting for one of the 2 scrape slots still holds a loop; on 2026-10-09, 21 parked store expansions starved reconciliation, price alerts and title translation for hours. Since then an expansion is skipped (re-queued on the next page view) once `MAX_PARKED_EXPANSIONS` (4) jobs wait for a slot. Still open: what keeps requesting expansions (capped by `STORE_EXPANSION_MAX_WAITING=100`).
 - Matcher: no CPU-model guard (QA-16).
 - Non-devices in the original device leaves: since 2026-10-09 step 5 also rejects, under 15% of the median, titles naming a landline, holder, mount, remote, mouse pad, planner, fan/cooler, thermal paste, backlight, battery or replacement part (`NOT_THE_DEVICE`). New listings only: the ones already stored stay until a cleanup (dry run first). AliExpress still sends a long tail of unrelated junk for category words.
 - Category pages render per request (QA-11) because `?page` is read from `searchParams`.
