@@ -48,6 +48,41 @@ describe('ReconciliationService', () => {
     );
   });
 
+  describe('reconcile budget', () => {
+    it('counts only new judge questions, so rejected pairs cannot crowd out a real duplicate', async () => {
+      // Prod, 2026-10-09: the same first 1,000 brand+model pairs (other
+      // storage sizes, already-answered pairs) filled every hourly run, and
+      // every color of the Honor X9d 12/256 stayed its own product.
+      const day = (n: number) => new Date(Date.UTC(2026, 8, n));
+      const rows = [
+        ...['64GB', '128GB', '512GB'].map((storage, i) =>
+          canonical({ id: `new-${i}`, title: `Honor X9d 5G 8GB RAM ${storage}`, brand: 'Honor', createdAt: day(28 - i) }),
+        ),
+        canonical({ id: 'red', title: 'Honor X9d 5G - 12GB RAM - 256GB - Reddish Brown', brand: 'Honor', createdAt: day(25) }),
+        canonical({ id: 'black', title: 'Honor X9d 5G - 12GB RAM - 256GB - Midnight Black', brand: 'Honor', createdAt: day(25) }),
+      ];
+      const prisma = {
+        canonicalProduct: {
+          findMany: jest.fn(async (args: AnyRec) =>
+            args.where ? rows.filter((row) => args.where.id.in.includes(row.id)) : rows,
+          ),
+        },
+        // The look-alike title query is skipped (it needs Postgres).
+        $transaction: jest.fn(async () => {
+          throw new Error('no database');
+        }),
+      };
+      const judge = { judgeSameProduct: jest.fn(async () => true), storedVerdict: jest.fn(async () => null) };
+      const config = { get: (_k: string, d?: unknown) => d } as unknown as ConfigService;
+      const reconciler = new ReconciliationService(config, prisma as any, judge as any, new FuzzyMatcherService(), new NormalizerService());
+
+      const report = await reconciler.reconcile({ dryRun: true, maxPairs: 1 });
+
+      expect(judge.judgeSameProduct).toHaveBeenCalledTimes(1);
+      expect(report.merges).toEqual([expect.objectContaining({ keepId: expect.any(String), mergeTitle: expect.stringContaining('Honor X9d 5G - 12GB RAM - 256GB') })]);
+    });
+  });
+
   describe('hasHardConflict', () => {
     const conflict = (a: AnyRec, b: AnyRec) => (service as any).hasHardConflict(a, b);
 

@@ -19,6 +19,21 @@ interface CandidatePair {
 
 type CanonicalRow = Prisma.CanonicalProductGetPayload<Record<string, never>>;
 
+/** Brand+model pairs gathered per judge question allowed: most are rejected by the guards for free. */
+const MODEL_PAIRS_PER_BUDGET = 20;
+/** Products read per query when loading a run's pairs. */
+const LOAD_BATCH = 1000;
+
+/** a[0], b[0], a[1], b[1], ... then the rest of the longer list. */
+function interleave<T>(a: T[], b: T[]): T[] {
+  const out: T[] = [];
+  for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
+    if (i < a.length) out.push(a[i]);
+    if (i < b.length) out.push(b[i]);
+  }
+  return out;
+}
+
 export interface ReconciliationOptions {
   /** When true, only log proposed merges without touching the database. */
   dryRun?: boolean;
@@ -102,30 +117,43 @@ export class ReconciliationService {
     // falls below the threshold (a real case: "OPPO A6 Smartphone, 256 GB,
     // Sapphire Blue, ... 8 GB RAM" vs "Oppo A6 - 8GB RAM - 256GB - Sapphire
     // Blue" scored only 0.52 — below 0.82 — even though every structured
-    // attribute agrees). Model-agreement pairs go first so they aren't crowded
-    // out of the maxPairs budget by high-trigram-but-different variants.
-    const modelPairs = await this.findModelAgreementPairs(maxPairs);
+    // attribute agrees). The two sources take turns, newest products first.
+    //
+    // maxPairs bounds the pairs the judge is newly asked about, not the pairs
+    // looked at: pairs the guards reject and pairs the judge already answered
+    // cost no model call. Counting them is what stalled this job (2026-10-09):
+    // the same first 1,000 brand+model pairs, nearly all rejected or already
+    // answered, filled every run, so newer duplicates (every color of the
+    // Honor X9d 12/256 as its own product) were never reached.
+    const modelPairs = await this.findModelAgreementPairs(maxPairs * MODEL_PAIRS_PER_BUDGET);
     const trigramPairs = await this.findCandidatePairs(threshold, maxPairs, neighborsPerProduct);
-    const pairs = this.dedupePairs([...modelPairs, ...trigramPairs]).slice(0, maxPairs);
+    const pairs = this.dedupePairs(interleave(trigramPairs, modelPairs));
     this.logger.log(
       `Reconciliation start (dryRun=${dryRun}): ${pairs.length} candidate pair(s) ` +
-        `(${modelPairs.length} by model agreement, ${trigramPairs.length} by trigram >= ${threshold})`,
+        `(${modelPairs.length} by model agreement, ${trigramPairs.length} by trigram >= ${threshold}), ` +
+        `up to ${maxPairs} new judge question(s)`,
     );
 
     const merges: ProposedMerge[] = [];
     // A canonical that's already been merged away this run must not be touched again.
     const consumed = new Set<string>();
+    const rows = await this.loadProducts(pairs);
+    let asked = 0;
+    let examined = 0;
 
     for (const pair of pairs) {
+      if (asked >= maxPairs) break;
       if (consumed.has(pair.a_id) || consumed.has(pair.b_id)) continue;
 
-      const [a, b] = await Promise.all([
-        this.prisma.canonicalProduct.findUnique({ where: { id: pair.a_id } }),
-        this.prisma.canonicalProduct.findUnique({ where: { id: pair.b_id } }),
-      ]);
+      const a = rows.get(pair.a_id);
+      const b = rows.get(pair.b_id);
       if (!a || !b) continue;
+      examined += 1;
 
       if (this.hasHardConflict(a, b)) continue;
+      // The judge is not asked about phone accessories (SemanticService).
+      if (isPhoneAccessory(a.title) || isPhoneAccessory(b.title)) continue;
+      if ((await this.semantic.storedVerdict(a.title, b.title)) === null) asked += 1;
 
       // The code rules' verdict: the model extracted fresh from each title
       // agrees (recomputed rather than read from the `model` column, which
@@ -176,7 +204,7 @@ export class ReconciliationService {
       `Reconciliation done (dryRun=${dryRun}): ${merges.length} ${dryRun ? 'proposed' : 'executed'} merge(s)` +
         (review ? `; reviewed ${review.approved + review.undone} earlier merge(s), undid ${review.undone}` : ''),
     );
-    return { dryRun, pairsExamined: pairs.length, merges, review };
+    return { dryRun, pairsExamined: examined, merges, review };
   }
 
   /**
@@ -293,8 +321,10 @@ export class ReconciliationService {
    * mismatches, and only the genuinely-identical pairs survive to be merged.
    */
   private async findModelAgreementPairs(maxPairs: number): Promise<CandidatePair[]> {
+    // Newest first, so new duplicates are reached before old, settled groups.
     const products = await this.prisma.canonicalProduct.findMany({
       select: { id: true, title: true, brand: true },
+      orderBy: { createdAt: 'desc' },
     });
 
     const groups = new Map<string, string[]>();
@@ -330,6 +360,17 @@ export class ReconciliationService {
       }
     }
     return pairs;
+  }
+
+  /** The products in `pairs`, by id, read in batches instead of two queries per pair. */
+  private async loadProducts(pairs: CandidatePair[]): Promise<Map<string, CanonicalRow>> {
+    const ids = Array.from(new Set(pairs.flatMap((pair) => [pair.a_id, pair.b_id])));
+    const rows = new Map<string, CanonicalRow>();
+    for (let start = 0; start < ids.length; start += LOAD_BATCH) {
+      const batch = await this.prisma.canonicalProduct.findMany({ where: { id: { in: ids.slice(start, start + LOAD_BATCH) } } });
+      for (const row of batch) rows.set(row.id, row);
+    }
+    return rows;
   }
 
   /** Collapse duplicate (a_id, b_id) pairs, keeping the first (higher-priority) occurrence. */

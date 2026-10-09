@@ -200,3 +200,26 @@ describe('SemanticService when Gemini is busy', () => {
     expect(semantic.isAvailable()).toBe(true);
   });
 });
+
+describe('SemanticService and phone accessories', () => {
+  const realFetch = global.fetch;
+  afterEach(() => {
+    global.fetch = realFetch;
+  });
+
+  it('does not spend a call on phone cases (37% of judgements on 2026-10-09)', async () => {
+    global.fetch = jest.fn(async () => answer(200, true)) as never;
+    const semantic = service();
+
+    expect(await semantic.judgeMany('Phone Case For HUAWEI NOVA 3I HONOR X9D', ['Leopard Print Phone Case For HONOR X9D'])).toEqual([null]);
+    expect(await semantic.judgeSameProduct('Flip Case For Honor X9D 5G', 'Honor X9D Transparent Case')).toBeNull();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('still judges the phones themselves', async () => {
+    global.fetch = jest.fn(async () => answer(200, true)) as never;
+    const semantic = service();
+
+    expect(await semantic.judgeSameProduct('Honor X9d 5G 12GB RAM 256GB Black', 'Honor X9d 5G 12GB 256GB Midnight Black')).toBe(true);
+  });
+});

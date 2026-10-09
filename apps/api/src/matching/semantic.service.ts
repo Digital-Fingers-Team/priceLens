@@ -3,6 +3,7 @@ import { createHash } from 'crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../database/prisma.service';
+import { isPhoneAccessory } from './text/phone-accessory';
 
 /** After a failed call, skip the provider this long instead of retrying per pair. */
 const PAUSE_AFTER_FAILURE_MS = 5 * 60 * 1000;
@@ -93,6 +94,7 @@ export class SemanticService {
   }
 
   async judgeSameProduct(titleA: string, titleB: string): Promise<boolean | null> {
+    if (isPhoneAccessory(titleA) || isPhoneAccessory(titleB)) return null;
     if (this.slots.length === 0) {
       if (!this.warnedUnconfigured) {
         // Logged once per process: this fires for every candidate pair.
@@ -124,6 +126,10 @@ export class SemanticService {
    * the order of `others`, null where there is none.
    */
   async judgeMany(anchor: string, others: string[]): Promise<Array<boolean | null>> {
+    // Phone cases and screen protectors are not worth the free quota: on
+    // 2026-10-09 they were 37% of all judgements (mostly AliExpress cases
+    // compared with each other). Unasked, a case founds its own product.
+    if (isPhoneAccessory(anchor)) return others.map(() => null);
     const verdicts: Array<boolean | null> = others.map(() => null);
     if (this.slots.length === 0) return verdicts;
 
@@ -351,6 +357,14 @@ Respond with ONLY this JSON object and nothing else: {"ar": [${titles.length} Ar
     } catch {
       return null;
     }
+  }
+
+  /** The judge's stored answer for a pair, or null when it was never asked. No model call. */
+  async storedVerdict(titleA: string, titleB: string): Promise<boolean | null> {
+    const stored = await this.prisma.matchJudgement
+      .findUnique({ where: { pairKey: this.pairKey(titleA, titleB) }, select: { same: true } })
+      .catch(() => null);
+    return stored ? stored.same : null;
   }
 
   /** Order-independent: (a, b) and (b, a) are one pair. */
