@@ -109,7 +109,7 @@ export const legalEn: LegalDocs = {
       {
         heading: 'Summary',
         body: [
-          'We collect what we need to run Pricelens: your account details, what you choose to track, and how you pay. Page-view statistics are anonymous. We do not sell your data, show third-party ads, or use advertising trackers.',
+          'We collect what we need to run Pricelens: your account details, what you choose to track, and how you pay. Page-view statistics are anonymous. We do not sell your data. Pages show ads from Google AdSense, and Google may use cookies to choose them (see below).',
           `Pricelens is the controller of this data, under Egypt’s Personal Data Protection Law (Law 151 of 2020). Contact: ${SUPPORT_EMAIL}.`,
         ],
       },
@@ -150,6 +150,7 @@ export const legalEn: LegalDocs = {
             'Paymob and, where offered, Stripe, to take card, wallet and Fawry payments;',
             'Telegram, if you connect alerts there;',
             'AI providers (Google Gemini, Anthropic Claude, and OpenRouter as a router) for image search, Deal Hunter, the Advisor and product matching. They receive the text or photo of the request, not your account details;',
+            'Google AdSense, which shows the ads on our pages. Google and its partners may use cookies and your IP address to show ads based on your visits to this and other sites. You can turn personalised ads off at https://adssettings.google.com, and read how Google uses this data at https://policies.google.com/technologies/partner-sites;',
             'authorities, when Egyptian law requires it.',
           ],
           'Some of these providers process data outside Egypt. We use them under their data protection terms and send them only what the task needs.',
@@ -241,12 +242,12 @@ export const legalEn: LegalDocs = {
 
   cookies: {
     title: 'Cookie policy',
-    description: 'The cookies and browser storage Pricelens uses: sign-in and security only, plus anonymous statistics. No advertising cookies.',
+    description: 'The cookies and browser storage Pricelens uses: sign-in and security, anonymous statistics, and Google’s advertising cookies.',
     sections: [
       {
         heading: 'In short',
         body: [
-          'Pricelens uses cookies only to keep you signed in and to protect your account. We do not use advertising or third-party tracking cookies, so there is nothing to opt into. A few settings and an anonymous statistics ID are kept in your browser’s local storage.',
+          'Pricelens’s own cookies only keep you signed in and protect your account. Our pages also show ads from Google AdSense, and Google sets its own advertising cookies to choose and measure them. A few settings and an anonymous statistics ID are kept in your browser’s local storage.',
         ],
       },
       {
@@ -274,13 +275,14 @@ export const legalEn: LegalDocs = {
       {
         heading: 'Other sites',
         body: [
+          'Ads are served by Google AdSense. Google and its partners use cookies (such as IDE, __gads and __gpi) to show ads based on your visits to this and other sites, limit how often you see an ad, and count clicks. Visitors in the European Economic Area, the UK and Switzerland are asked for consent first. You can turn personalised ads off at https://adssettings.google.com; details are at https://policies.google.com/technologies/ads.',
           'Product images load from the stores’ image servers. Share buttons are plain links: nothing from Facebook or WhatsApp loads until you press one. When you click through to a store, that store’s cookies and policies apply.',
         ],
       },
       {
         heading: 'Your choices',
         body: [
-          'You can block or delete cookies and site data in your browser settings. Blocking the three cookies above means you cannot sign in; everything else on Pricelens keeps working.',
+          'You can block or delete cookies and site data in your browser settings. Blocking the three cookies above means you cannot sign in; blocking Google’s cookies only makes the ads less personal. Everything else on Pricelens keeps working.',
         ],
       },
     ],

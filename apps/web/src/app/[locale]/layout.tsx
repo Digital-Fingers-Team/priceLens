@@ -12,6 +12,8 @@ import { baseMetadata } from '@/lib/seo';
 import { THEME_SCRIPT } from '@/lib/theme';
 import designTokens from '../../../design-tokens';
 
+const ADSENSE_CLIENT = 'ca-pub-1638860547540041';
+
 // Space Grotesk for Latin text, numbers and prices; IBM Plex Sans Arabic for
 // Arabic script; IBM Plex Mono for labels (audit 07, UI-05).
 // Arabic and Mono are not preloaded: the browser fetches them when a glyph
@@ -85,6 +87,13 @@ export default async function LocaleLayout({
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        {/* Google AdSense (auto ads). Server-rendered so Google's site check
+            finds it; the CSP hosts are in next.config.js, ads.txt in public/. */}
+        <script
+          async
+          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}`}
+          crossOrigin="anonymous"
+        />
       </head>
       <body className="flex min-h-dvh flex-col">
         <I18nProvider locale={locale} dict={t}>

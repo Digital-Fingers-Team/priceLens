@@ -7,8 +7,35 @@ const path = require('path');
  * RSC payload scripts, and removing it needs per-request nonces (middleware),
  * planned with the Next 15 upgrade. Everything else is locked down:
  * no framing (clickjacking), no plugins, no foreign form targets, and fetches
- * only to this site and the API.
+ * only to this site and the API, plus the Google AdSense hosts (ADSENSE_*).
  */
+// Google AdSense (2026-10-09): the loader, ad frames, and its fraud and
+// consent checks. https://support.google.com/adsense/answer/9946543
+const ADSENSE_SCRIPT = [
+  'https://pagead2.googlesyndication.com',
+  'https://partner.googleadservices.com',
+  'https://tpc.googlesyndication.com',
+  'https://www.googletagservices.com',
+  'https://fundingchoicesmessages.google.com',
+  'https://*.adtrafficquality.google',
+];
+const ADSENSE_FRAME = [
+  'https://googleads.g.doubleclick.net',
+  'https://tpc.googlesyndication.com',
+  'https://*.googlesyndication.com',
+  'https://www.google.com',
+  'https://fundingchoicesmessages.google.com',
+  'https://*.adtrafficquality.google',
+];
+const ADSENSE_CONNECT = [
+  'https://pagead2.googlesyndication.com',
+  'https://*.googlesyndication.com',
+  'https://*.doubleclick.net',
+  'https://*.google.com',
+  'https://fundingchoicesmessages.google.com',
+  'https://*.adtrafficquality.google',
+];
+
 function securityHeaders() {
   const isDev = process.env.NODE_ENV !== 'production';
   const apiOrigin = (() => {
@@ -20,14 +47,14 @@ function securityHeaders() {
   })();
   const csp = [
     "default-src 'self'",
-    `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
+    `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} ${ADSENSE_SCRIPT.join(' ')}`,
     "style-src 'self' 'unsafe-inline'",
     // Product images load straight from the retailer CDNs (S-03).
     "img-src 'self' https: data: blob:",
     "font-src 'self' data:",
-    `connect-src 'self'${apiOrigin ? ' ' + apiOrigin : ''}${isDev ? ' ws:' : ''}`,
+    `connect-src 'self'${apiOrigin ? ' ' + apiOrigin : ''}${isDev ? ' ws:' : ''} ${ADSENSE_CONNECT.join(' ')}`,
     "frame-ancestors 'none'",
-    "frame-src 'none'",
+    `frame-src ${ADSENSE_FRAME.join(' ')}`,
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
