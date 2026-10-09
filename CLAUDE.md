@@ -12,7 +12,7 @@ Everything a session needs, in one place. On 2026-10-09 it replaced the old docs
 ## Status (updated 2026-10-09)
 
 - Live at **https://pricelens.store**, Arabic by default (`/en/...` for English, `/ar/...` 308-redirects). `pricelens.work.gd` and `www` 301 to it; work.gd still proxies `/api/`.
-- Live code: web from `main` at `53318c3` on `pricelens-web-green` (127.0.0.1:3011), deployed 2026-10-09.
+- Live code: `main` at `a528cfc` (API and worker deployed 2026-10-09). Web from `53318c3` on `pricelens-web-green` (127.0.0.1:3011), deployed 2026-10-09.
 - Latest work:
   - 2026-10-09: AliExpress photos. Its cards moved the photo to `img.images--item--<hash>`, so 36,646 of 40,493 AliExpress products had none. The connector reads the new markup, and a matched listing now fills a product's missing photo, so old products get theirs as they are re-scraped.
   - 2026-10-09: phone menu redesigned (`components/layout/mobile-menu.tsx`): a full-height sheet with the account card, Watchlist / Deal Hunter / Alerts tiles, a Tools list, and language, theme and sign-out in a bottom bar.
