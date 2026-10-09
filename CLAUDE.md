@@ -45,6 +45,7 @@ Engineering:
 - Disk is 77% full after the 2026-10-09 cleanup (old build images, Meilisearch, old clones, the pay demo, old `.env` backups). The monitor alerts at 85%. Each `deploy-*.sh` leaves an untagged image of about 2 GB: remove PriceLens ones older than a day with `podman rmi <id>`.
 - Give scheduled jobs their own queue or concurrency so they never wait behind scrapes. Also find what keeps requesting store expansions; they are capped by `STORE_EXPANSION_MAX_WAITING=100`.
 - Matcher: no CPU-model guard (QA-16).
+- Non-devices land in the original device leaves (they never had a price floor): landlines, car phone holders, paper notebooks, TV remotes and mouse pads under Smartphones, Laptops and TVs (seen 2026-10-09). The accessory detector and the 2.5%-of-median check miss them. Fix in the category-sanity step, then run `recategorize-products`, with a characterization run.
 - Category pages render per request (QA-11) because `?page` is read from `searchParams`.
 - On phones a sort change sometimes does nothing (QA-18). Next aborts the RSC request; it predates the overhaul, and CI retries it.
 - Some API error texts and the Deal Hunter reasons are English in the Arabic UI.
