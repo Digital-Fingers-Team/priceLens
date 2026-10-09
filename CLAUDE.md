@@ -31,7 +31,6 @@ Owner only:
   - `TELEGRAM_BOT_TOKEN` and `TELEGRAM_WEBHOOK_SECRET`. These are for the user bot; the alert bot @Pricelens1_bot already works. After setting them, run `deploy-api.sh --no-build`, then `POST /api/v1/admin/telegram/webhook` once as admin.
   - `SMTP_*` and `EMAIL_FROM`. Until then email alerts are SKIPPED and invites show a link to copy.
   - `ANTHROPIC_API_KEY` (optional).
-- **CI required on `main`.** This is a repo setting and needs a GitHub admin; the server's `gh` account `Nad1j` can only pull.
 - **Housekeeping:**
   - Change the admin password; it was pasted in chat.
   - Optionally rotate the alert-bot token, which was also pasted in chat.
@@ -129,7 +128,7 @@ Engineering:
 - Matching:
   - The characterization suite (`test/e2e/matching-characterization.e2e-spec.ts`) snapshots where about 60 listings land. A deliberate change runs `-u`, and the snapshot diff gets reviewed like code.
   - The golden set (`test/golden/`) holds CI to precision 1.0.
-- CI (`.github/workflows/ci.yml`) runs gitleaks, `pnpm audit` (high), and all of the above.
+- CI (`.github/workflows/ci.yml`) runs gitleaks, `pnpm audit` (high), and all of the above. Its checks are required on `main`; the push account bypasses them, so run the gates yourself before pushing.
 - If you change the Docker or deploy path, prove it with a check image (`localhost/pricelens_api:<tag>-check`) and then delete it.
 
 ## Deploy and roll back
