@@ -18,7 +18,7 @@ Everything a session needs, in one place. On 2026-10-09 it replaced the old docs
   - 2026-10-03: Ink & Coral rebrand with Space Grotesk, a frontend redesign, the Telegram status board, cross-category duplicate cleanup, a split sitemap and new prices (Plus 99, Seller 799, Seller Plus 1799 EGP).
 - Payments: wallet/InstaPay transfer, then the owner approves it in `/admin/payments` (live since 2026-09-30). Paymob and Stripe are off: the owner has no registered business and won't do the paperwork, so don't suggest gateways that need it.
 - Categories: 22 departments and 161 leaves. All waves are on (`CATEGORY_SWEEP_MAX_WAVE=4`). `OFFER_MAX_AGE_DAYS=14`. No price floor since 2026-10-09 (`MIN_LISTING_PRICE_EGP=0`; before, it dropped ~39% of scraped listings). The 2.5%-of-median category check still keeps accessories out.
-- Stores: Amazon.eg, Noon, Jumia, 2B, Elaraby, B.TECH, Dream 2000, Tradeline, Compumarts, AliExpress and Alibaba. Carrefour is off: Akamai answers 403 to the cloud IP (rechecked 2026-10-09; the owner dropped it and other blocked stores).
+- Stores: Amazon.eg, Noon, Jumia, 2B, Elaraby, B.TECH, Dream 2000, Tradeline, Compumarts, AliExpress, Alibaba, and since 2026-10-09 Raya (Magento GraphQL on its API host), Sigma Computer (Next.js streamed search data) and Homzmart (`__NEXT_DATA__`). Carrefour is off: Akamai answers 403 to the cloud IP (rechecked 2026-10-09; the owner dropped it and other blocked stores).
 
 ## Open items
 
@@ -54,7 +54,8 @@ Engineering:
   - MAP email digest.
   - Review summaries: no review source.
   - Repricer auto mode: no official seller API.
-  - Raya and Select: no readable catalogue.
+  - Select: no readable catalogue.
+  - IKEA: readable (`sik.search.blue.cdtapps.com`) but skipped 2026-10-09: it sells only its own products, so nothing to compare, the same reason single-brand clothing stores were dropped.
   - Grocery and pharmacy stores.
   - Mock checkout: the payment step was never completed end to end.
 

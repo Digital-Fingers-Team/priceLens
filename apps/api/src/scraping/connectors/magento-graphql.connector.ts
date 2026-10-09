@@ -75,12 +75,10 @@ export abstract class MagentoGraphqlConnector implements RetailerConnector {
   protected abstract get baseUrl(): string;
   /** Magento store-view code, used both as the `Store` header and the URL path prefix. */
   protected readonly storeCode: string = 'en';
-  /** Where product pages live, when the GraphQL API is on another host (Raya). */
+  /** Where product pages live, when the GraphQL API is on another host (Raya, Fresh). */
   protected get siteUrl(): string {
     return this.baseUrl;
   }
-  /** Whether product URLs end in url_suffix (".html"); Raya's storefront drops it. */
-  protected readonly useUrlSuffix: boolean = true;
 
   constructor(
     protected readonly configService: ConfigService,
@@ -216,9 +214,15 @@ export abstract class MagentoGraphqlConnector implements RetailerConnector {
   }
 
   private buildProductUrl(item: MagentoProductItem): string {
-    const base = this.siteUrl.replace(/\/$/, '');
-    if (!item.url_key) return base;
-    const suffix = this.useUrlSuffix ? (item.url_suffix ?? '') : '';
-    return `${base}/${this.storeCode}/${item.url_key}${suffix}`;
+    const site = this.siteUrl.replace(/\/$/, '');
+    return item.url_key ? this.productUrl(site, item.url_key, item.url_suffix ?? '') : site;
+  }
+
+  /**
+   * A product page: Magento's own storefront serves /<store>/<url_key><suffix>.
+   * Stores with a headless storefront on another host override it.
+   */
+  protected productUrl(site: string, urlKey: string, suffix: string): string {
+    return `${site}/${this.storeCode}/${urlKey}${suffix}`;
   }
 }

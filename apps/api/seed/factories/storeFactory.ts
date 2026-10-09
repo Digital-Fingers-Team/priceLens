@@ -155,4 +155,22 @@ export const storeDefinitions: StoreDefinition[] = [
     priceModifier: 1.0,
     titleStyle: 'clean',
   },
+  {
+    slug: 'fresh',
+    name: 'Fresh',
+    baseUrl: 'https://fresh.com.eg',
+    connectorType: ConnectorType.HTTP_API,
+    rateLimit: 60,
+    priceModifier: 1.0,
+    titleStyle: 'clean',
+  },
+  {
+    slug: 'samsung',
+    name: 'Samsung Egypt',
+    baseUrl: 'https://www.samsung.com',
+    connectorType: ConnectorType.HTTP_API,
+    rateLimit: 60,
+    priceModifier: 1.0,
+    titleStyle: 'clean',
+  },
 ];

@@ -12,7 +12,6 @@ import { MagentoGraphqlConnector } from './magento-graphql.connector';
 export class RayaConnector extends MagentoGraphqlConnector {
   readonly slug = 'raya';
   protected readonly defaultCurrency = 'EGP';
-  protected readonly useUrlSuffix = false;
 
   constructor(configService: ConfigService) {
     super(configService);
@@ -28,5 +27,9 @@ export class RayaConnector extends MagentoGraphqlConnector {
 
   protected get siteUrl(): string {
     return this.configService.get<string>('retailers.rayaBaseUrl', 'https://www.rayashop.com');
+  }
+
+  protected productUrl(site: string, urlKey: string): string {
+    return `${site}/${this.storeCode}/${urlKey}`;
   }
 }

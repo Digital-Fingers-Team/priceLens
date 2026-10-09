@@ -156,4 +156,10 @@ export default registerAs('retailers', () => ({
   sigmaBaseUrl: process.env.SIGMA_BASE_URL ?? 'https://www.sigma-computer.com',
   homzmartEnabled: process.env.HOMZMART_ENABLED !== 'false',
   homzmartBaseUrl: process.env.HOMZMART_BASE_URL ?? 'https://homzmart.com',
+  freshEnabled: process.env.FRESH_ENABLED !== 'false',
+  freshBaseUrl: process.env.FRESH_BASE_URL ?? 'https://fresh.com.eg',
+  freshApiUrl: process.env.FRESH_API_URL ?? 'https://freshmprod.hypernode.io',
+  samsungEnabled: process.env.SAMSUNG_ENABLED !== 'false',
+  samsungBaseUrl: process.env.SAMSUNG_BASE_URL ?? 'https://www.samsung.com',
+  samsungApiUrl: process.env.SAMSUNG_API_URL ?? 'https://sribsrch.ecom.samsung.com/estoresearch-api/v1/scom/search',
 }));

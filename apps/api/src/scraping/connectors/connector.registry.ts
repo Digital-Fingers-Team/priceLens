@@ -9,6 +9,8 @@ import { Dream2000Connector } from './dream2000.connector';
 import { TradelineConnector } from './tradeline.connector';
 import { CompumartsConnector } from './compumarts.connector';
 import { RayaConnector } from './raya.connector';
+import { SamsungConnector } from './samsung.connector';
+import { FreshConnector } from './fresh.connector';
 import { HomzmartConnector } from './homzmart.connector';
 import { SigmaConnector } from './sigma.connector';
 import { ElarabyConnector } from './elaraby.connector';
@@ -38,6 +40,8 @@ export const CONNECTOR_CLASSES = [
   TradelineConnector,
   CompumartsConnector,
   RayaConnector,
+  SamsungConnector,
+  FreshConnector,
   HomzmartConnector,
   SigmaConnector,
 ] as const;
