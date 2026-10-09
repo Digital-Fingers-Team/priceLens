@@ -210,6 +210,14 @@ export class IngestionRepository {
     await this.prisma.canonicalProduct.update({ where: { id: productId }, data: { categoryId } });
   }
 
+  /** Gives a product the listing's photo when it has none yet (a no-op otherwise). */
+  async fillMissingProductImage(productId: string, imageUrl: string): Promise<void> {
+    await this.prisma.canonicalProduct.updateMany({
+      where: { id: productId, imageUrl: null },
+      data: { imageUrl, thumbnailUrl: imageUrl },
+    });
+  }
+
   /** A category by slug, cached once found (categories are seeded, not edited). */
   async categoryBySlug(slug: string): Promise<Category | null> {
     const cached = this.categoriesBySlug.get(slug);

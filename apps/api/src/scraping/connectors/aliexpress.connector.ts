@@ -69,7 +69,15 @@ export class AliExpressConnector implements RetailerConnector {
           seen.add(href);
 
           const titleEl = anchor.querySelector('h3');
-          const img = anchor.querySelector('img.product-img');
+          // Since about 2026-10 most cards show a photo carousel of
+          // img.images--item--<hash> (the first is the main photo); only a
+          // few still use img.product-img. Badge images carry width/height.
+          const img =
+            anchor.querySelector('img.product-img') ??
+            anchor.querySelector('img[class*="images--item"]') ??
+            Array.from(anchor.querySelectorAll('img')).find(
+              (el) => /\/kf\//.test(el.getAttribute('src') ?? '') && !el.hasAttribute('width'),
+            );
           const priceEl = Array.from(anchor.querySelectorAll<HTMLElement>('[aria-label]')).find((el) =>
             /^[A-Za-z]{2,4}[\d,]+(\.\d+)?$/.test(el.getAttribute('aria-label') ?? ''),
           );

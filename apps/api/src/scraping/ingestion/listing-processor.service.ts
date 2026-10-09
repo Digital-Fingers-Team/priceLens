@@ -243,6 +243,12 @@ export class ListingProcessor {
       lastScrapedAt: new Date(),
     });
 
+    // A product founded by a listing without a photo picks one up from the
+    // next listing that has it (AliExpress cards lost theirs for a while).
+    if (match && !match.imageUrl && listing.imageUrl) {
+      await this.repository.fillMissingProductImage(product.id, listing.imageUrl);
+    }
+
     const priceHistoryCreated = await this.appendPriceHistory(sourceListing.id, product.id, listing, price);
 
     await this.repository.recordMatchDecision({
