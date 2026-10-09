@@ -28,6 +28,9 @@ if [ "${PROCESS_ROLE:-all}" != "api" ]; then
       echo "ENABLE_NOVNC=true but VNC_PASSWORD is not set — refusing to start an unauthenticated remote desktop. Set VNC_PASSWORD and restart." >&2
       exit 1
     fi
+    # x11vnc exits at once if the display is not up yet (2026-10-09: noVNC
+    # loaded but said "Failed to connect to server"), so wait for Xvfb's socket.
+    for _ in 1 2 3 4 5 6 7 8 9 10; do [ -e /tmp/.X11-unix/X99 ] && break; sleep 0.5; done
     x11vnc -display :99 -forever -shared -rfbport 5900 -passwd "$VNC_PASSWORD" -quiet >/tmp/x11vnc.log 2>&1 &
     websockify --web=/usr/share/novnc/ "${NOVNC_PORT:-6080}" localhost:5900 >/tmp/novnc.log 2>&1 &
   fi

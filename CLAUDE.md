@@ -170,11 +170,11 @@ Engineering:
 - **A store goes stale** (`refreshed24h` is 0 in `/health/ops`):
   1. Read `podman logs --since 1h pricelens-worker 2>&1 | grep -i <store>`.
   2. A failing store is paused 30 min by its circuit breaker. 18% of scrapes fail fast at bot walls; that is normal.
-  3. For a CAPTCHA (Alibaba asks now and then):
-     1. Set `ENABLE_NOVNC=true` and run `deploy-api.sh --no-build`.
-     2. Open a tunnel with `ssh -N -L 16081:127.0.0.1:6081 pricelens`, then go to http://localhost:16081/vnc.html. The password is `VNC_PASSWORD` in `.env`.
-     3. Run the login script in `apps/api/scripts/ops/login-store.ts` (`pnpm login:alibaba|noon|amazon`).
-     4. Turn noVNC off again.
+  3. For a CAPTCHA (Alibaba asks now and then; last solved 2026-10-09):
+     1. Set `ENABLE_NOVNC=true` and the store's flag (`ALIBABA_ENABLED=false`) in `.env`, then `deploy-api.sh --no-build`. The worker's own browser holds the profile while the store is on.
+     2. Start the window in the worker; the steps are at the top of `apps/api/scripts/ops/login-store.ts` (Chromium, clears stale profile locks, `LOGIN_MINUTES`, default 30).
+     3. Tunnel with `ssh -f -N -L 16081:127.0.0.1:6081 pricelens` (detached; a tunnel run as a background Claude command dies), then open http://localhost:16081/vnc.html. The password is `VNC_PASSWORD` in `.env`. Claude's own `curl` goes through a proxy: test with `--noproxy '*'`.
+     4. Solve it, close the window (or wait), then turn the store back on and noVNC off, and `deploy-api.sh --no-build`.
      - Browser profiles live on the `pricelens_browser_profiles` volume.
   4. "Missing X server": recreate the worker. Selector changes: fix the connector in `scraping/connectors/`.
 - **Ops scripts** (`apps/api/scripts/ops/`, dry run by default, `--apply` writes a rollback file, `--rollback <file>`):
