@@ -1,5 +1,6 @@
 import {
   breakEvenPrice,
+  commissionFor,
   computeProfit,
   listingKey,
   parseProductsCsv,
@@ -11,6 +12,45 @@ import {
 const fees = { commissionPct: 10, fixedFee: 15, shippingFee: 35, returnRatePct: 2, vatPct: 14 };
 
 describe('seller math', () => {
+  describe('tiered and minimum commission', () => {
+    const flat = { commissionPct: 0, fixedFee: 0, shippingFee: 0, returnRatePct: 0, vatPct: 0 };
+    // Noon headphones: 15% of the part up to 1,000 EGP, 8% of the rest.
+    const portion = { ...flat, commissionPct: 15, tierUpTo: 1000, commissionPctAbove: 8 };
+    // Noon groceries: 15% of the whole price up to 250 EGP, 9% of the whole price above.
+    const whole = { ...portion, tierUpTo: 250, commissionPctAbove: 9, tierWholePrice: true };
+
+    it('charges each rate on its portion of the price', () => {
+      expect(commissionFor(800, portion)).toBeCloseTo(120);
+      expect(commissionFor(1500, portion)).toBeCloseTo(150 + 40);
+    });
+
+    it('charges the bracket rate on the whole price', () => {
+      expect(commissionFor(200, whole)).toBeCloseTo(30);
+      expect(commissionFor(300, whole)).toBeCloseTo(27);
+    });
+
+    it('never charges less than the minimum', () => {
+      expect(commissionFor(50, { ...flat, commissionPct: 11.4, minCommission: 10 })).toBe(10);
+      expect(commissionFor(500, { ...flat, commissionPct: 11.4, minCommission: 10 })).toBeCloseTo(57);
+    });
+
+    it('break-even nets zero under tiers and minimums', () => {
+      for (const fees of [
+        { ...portion, fixedFee: 15, vatPct: 14 },
+        { ...whole, vatPct: 14 },
+        // Amazon groceries: the rate rises above the tier.
+        { ...whole, commissionPct: 4, commissionPctAbove: 10, vatPct: 14 },
+        { ...flat, commissionPct: 11.4, minCommission: 10, fixedFee: 15 },
+      ]) {
+        for (const cost of [20, 150, 185, 200, 240, 900, 5000]) {
+          const price = breakEvenPrice(cost, fees)!;
+          expect(computeProfit(price, cost, fees).netProfit).toBeGreaterThanOrEqual(0);
+          expect(computeProfit(price - 0.05, cost, fees).netProfit).toBeLessThan(0);
+        }
+      }
+    });
+  });
+
   describe('computeProfit', () => {
     it('subtracts every fee, VAT inside the price, and the cost', () => {
       const p = computeProfit(1140, 700, fees);

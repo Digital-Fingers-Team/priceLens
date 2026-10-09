@@ -1832,6 +1832,16 @@ model PlatformFeeTable {
   shippingFee   Decimal  @default(0) @map("shipping_fee") @db.Decimal(12, 2)
   returnRatePct Float    @default(0) @map("return_rate_pct")
   vatPct        Float    @default(14) @map("vat_pct")
+  /// Tiered commission: commissionPct up to this price, commissionPctAbove
+  /// beyond it. Null for a flat rate.
+  tierUpTo           Decimal? @map("tier_up_to") @db.Decimal(12, 2)
+  commissionPctAbove Float?   @map("commission_pct_above")
+  /// True: the price falls in one bracket and its rate applies to the whole
+  /// price (Noon groceries). False: each rate applies to its portion of the
+  /// price (Noon and Amazon accessories, headphones, jewelry).
+  tierWholePrice     Boolean  @default(false) @map("tier_whole_price")
+  /// The smallest commission charged per item (Jumia 10 EGP, Amazon 5 EGP).
+  minCommission      Decimal  @default(0) @map("min_commission") @db.Decimal(12, 2)
   notes         String?  @db.VarChar(500)
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")

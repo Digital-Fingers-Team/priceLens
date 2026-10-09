@@ -25,6 +25,10 @@ interface FeeTable {
   shippingFee: number;
   returnRatePct: number;
   vatPct: number;
+  tierUpTo: number | null;
+  commissionPctAbove: number | null;
+  tierWholePrice: boolean;
+  minCommission: number;
   notes: string | null;
   updatedAt: string;
 }
@@ -35,9 +39,15 @@ const FIELDS = [
   ['shippingFee', 'Shipping (EGP)'],
   ['returnRatePct', 'Returns %'],
   ['vatPct', 'VAT %'],
+  ['minCommission', 'Minimum commission (EGP)'],
+  ['tierUpTo', 'Tier up to (EGP, blank = flat)'],
+  ['commissionPctAbove', 'Commission % above tier'],
 ] as const;
 
-type Draft = Record<(typeof FIELDS)[number][0], string> & { notes: string };
+type Draft = Record<(typeof FIELDS)[number][0], string> & { notes: string; tierWholePrice: boolean };
+
+/** Blank means "no tier". */
+const optionalNumber = (value: string) => (value.trim() === '' ? null : Number(value));
 
 const KEY = ['admin', 'fee-tables'];
 
@@ -47,6 +57,10 @@ const toDraft = (row: FeeTable): Draft => ({
   shippingFee: String(row.shippingFee),
   returnRatePct: String(row.returnRatePct),
   vatPct: String(row.vatPct),
+  minCommission: String(row.minCommission),
+  tierUpTo: row.tierUpTo === null ? '' : String(row.tierUpTo),
+  commissionPctAbove: row.commissionPctAbove === null ? '' : String(row.commissionPctAbove),
+  tierWholePrice: row.tierWholePrice,
   notes: row.notes ?? '',
 });
 
@@ -127,11 +141,15 @@ function FeeCard({ row, saving, onSave, onDelete }: { row: FeeTable; saving: boo
         </div>
       </CardHeader>
       <CardBody className="flex flex-col gap-3">
-        <div className="grid gap-3 sm:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-4">
           {FIELDS.map(([key, label]) => (
             <Input key={key} label={label} inputMode="decimal" dir="ltr" value={draft[key]} onChange={(e) => setDraft({ ...draft, [key]: e.target.value })} />
           ))}
         </div>
+        <label className="flex items-center gap-2 text-sm text-fg">
+          <input type="checkbox" checked={draft.tierWholePrice} onChange={(e) => setDraft({ ...draft, tierWholePrice: e.target.checked })} />
+          Above the tier, the rate applies to the whole price (not only the part above it)
+        </label>
         <Input label="Source / notes" value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} />
         <div className="flex gap-2">
           <Button
@@ -145,6 +163,10 @@ function FeeCard({ row, saving, onSave, onDelete }: { row: FeeTable; saving: boo
                 shippingFee: Number(draft.shippingFee) || 0,
                 returnRatePct: Number(draft.returnRatePct) || 0,
                 vatPct: Number(draft.vatPct) || 0,
+                minCommission: Number(draft.minCommission) || 0,
+                tierUpTo: optionalNumber(draft.tierUpTo),
+                commissionPctAbove: optionalNumber(draft.commissionPctAbove),
+                tierWholePrice: draft.tierWholePrice,
                 notes: draft.notes.trim() || undefined,
               })
             }

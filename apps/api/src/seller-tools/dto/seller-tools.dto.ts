@@ -1,4 +1,4 @@
-import { IsEnum, IsNumber, IsOptional, IsString, IsUUID, IsUrl, Length, Max, MaxLength, Min, ValidateIf } from 'class-validator';
+import { IsBoolean, IsEnum, IsNumber, IsOptional, IsString, IsUUID, IsUrl, Length, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 import { Type } from 'class-transformer';
 import { RepricerStrategy } from '@prisma/client';
 
@@ -119,6 +119,28 @@ export class UpsertFeeTableDto {
   @Min(0)
   @Max(100)
   vatPct?: number;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsNumber()
+  @Min(0.01)
+  tierUpTo?: number | null;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  commissionPctAbove?: number | null;
+
+  @IsOptional()
+  @IsBoolean()
+  tierWholePrice?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  minCommission?: number;
 
   @IsOptional()
   @IsString()

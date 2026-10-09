@@ -66,13 +66,27 @@ export class SellerToolsService {
       .filter((table): table is T => table !== null);
   }
 
-  private terms(table: { commissionPct: number; fixedFee: Prisma.Decimal; shippingFee: Prisma.Decimal; returnRatePct: number; vatPct: number }): FeeTerms {
+  private terms(table: {
+    commissionPct: number;
+    fixedFee: Prisma.Decimal;
+    shippingFee: Prisma.Decimal;
+    returnRatePct: number;
+    vatPct: number;
+    tierUpTo: Prisma.Decimal | null;
+    commissionPctAbove: number | null;
+    tierWholePrice: boolean;
+    minCommission: Prisma.Decimal;
+  }): FeeTerms {
     return {
       commissionPct: table.commissionPct,
       fixedFee: Number(table.fixedFee),
       shippingFee: Number(table.shippingFee),
       returnRatePct: table.returnRatePct,
       vatPct: table.vatPct,
+      tierUpTo: money(table.tierUpTo),
+      commissionPctAbove: table.commissionPctAbove,
+      tierWholePrice: table.tierWholePrice,
+      minCommission: Number(table.minCommission),
     };
   }
 
@@ -464,7 +478,17 @@ export class SellerToolsService {
   listFeeTables() {
     return this.prisma.platformFeeTable
       .findMany({ include: { platform: { select: { id: true, name: true, slug: true } } }, orderBy: [{ platformId: 'asc' }, { categoryKey: 'asc' }] })
-      .then((rows) => rows.map((r) => ({ ...r, fixedFee: Number(r.fixedFee), shippingFee: Number(r.shippingFee) })));
+      .then((rows) => rows.map((r) => ({ ...r, ...this.feeNumbers(r) })));
+  }
+
+  /** Decimal money columns as numbers for the JSON response. */
+  private feeNumbers(row: { fixedFee: Prisma.Decimal; shippingFee: Prisma.Decimal; tierUpTo: Prisma.Decimal | null; minCommission: Prisma.Decimal }) {
+    return {
+      fixedFee: Number(row.fixedFee),
+      shippingFee: Number(row.shippingFee),
+      tierUpTo: money(row.tierUpTo),
+      minCommission: Number(row.minCommission),
+    };
   }
 
   async upsertFeeTable(input: {
@@ -475,6 +499,10 @@ export class SellerToolsService {
     shippingFee?: number;
     returnRatePct?: number;
     vatPct?: number;
+    tierUpTo?: number | null;
+    commissionPctAbove?: number | null;
+    tierWholePrice?: boolean;
+    minCommission?: number;
     notes?: string | null;
   }) {
     const platform = await this.prisma.platform.findUnique({ where: { id: input.platformId }, select: { id: true } });
@@ -486,6 +514,11 @@ export class SellerToolsService {
       shippingFee: decimal(input.shippingFee ?? 0)!,
       returnRatePct: input.returnRatePct ?? 0,
       vatPct: input.vatPct ?? 14,
+      // Both tier fields or neither: half a tier is a flat rate.
+      tierUpTo: input.tierUpTo != null && input.commissionPctAbove != null ? decimal(input.tierUpTo) : null,
+      commissionPctAbove: input.tierUpTo != null && input.commissionPctAbove != null ? input.commissionPctAbove : null,
+      tierWholePrice: input.tierWholePrice ?? false,
+      minCommission: decimal(input.minCommission ?? 0)!,
       notes: input.notes ?? null,
     };
     const row = await this.prisma.platformFeeTable.upsert({
@@ -493,7 +526,7 @@ export class SellerToolsService {
       create: { platformId: input.platformId, categoryKey, ...data },
       update: data,
     });
-    return { ...row, fixedFee: Number(row.fixedFee), shippingFee: Number(row.shippingFee) };
+    return { ...row, ...this.feeNumbers(row) };
   }
 
   async deleteFeeTable(id: string) {

@@ -17,6 +17,27 @@ export interface FeeTerms {
   returnRatePct: number;
   /** VAT included in the selling price, %. 0 for a seller not registered for VAT. */
   vatPct: number;
+  /** Tiered commission: commissionPct up to this price, commissionPctAbove beyond it. */
+  tierUpTo?: number | null;
+  commissionPctAbove?: number | null;
+  /** The bracket's rate applies to the whole price, not only the portion above the tier. */
+  tierWholePrice?: boolean;
+  /** The smallest commission charged per item. */
+  minCommission?: number;
+}
+
+const isTiered = (fees: FeeTerms): fees is FeeTerms & { tierUpTo: number; commissionPctAbove: number } =>
+  fees.tierUpTo != null && fees.tierUpTo > 0 && fees.commissionPctAbove != null;
+
+/** The store's commission on one item at this price, tiers and minimum applied. */
+export function commissionFor(price: number, fees: FeeTerms): number {
+  let commission = (price * fees.commissionPct) / 100;
+  if (isTiered(fees) && price > fees.tierUpTo) {
+    commission = fees.tierWholePrice
+      ? (price * fees.commissionPctAbove) / 100
+      : (fees.tierUpTo * fees.commissionPct + (price - fees.tierUpTo) * fees.commissionPctAbove) / 100;
+  }
+  return price > 0 ? Math.max(commission, fees.minCommission ?? 0) : commission;
 }
 
 export interface ProfitBreakdown {
@@ -42,7 +63,7 @@ const round2 = (value: number) => Math.round(value * 100) / 100;
  * price − price / (1 + vat%). It is not a cost on top of the price.
  */
 export function computeProfit(price: number, cost: number | null, fees: FeeTerms): ProfitBreakdown {
-  const commission = (price * fees.commissionPct) / 100;
+  const commission = commissionFor(price, fees);
   const returns = (price * fees.returnRatePct) / 100;
   const vat = fees.vatPct > 0 ? price - price / (1 + fees.vatPct / 100) : 0;
   const before = price - commission - fees.fixedFee - fees.shippingFee - returns - vat;
@@ -65,9 +86,32 @@ export function computeProfit(price: number, cost: number | null, fees: FeeTerms
  * solved from computeProfit. Null when the fees eat the whole price.
  */
 export function breakEvenPrice(cost: number, fees: FeeTerms): number | null {
-  const share = 1 - fees.commissionPct / 100 - fees.returnRatePct / 100 - (fees.vatPct > 0 ? 1 - 1 / (1 + fees.vatPct / 100) : 0);
-  if (share <= 0) return null;
-  return Math.ceil(((cost + fees.fixedFee + fees.shippingFee) / share) * 100) / 100;
+  // The commission is linear (a + b * price) within each regime: the
+  // minimum, the rate below the tier, and the rate above it. Net profit rises
+  // within a regime; at a whole-price tier it jumps, so the price just above
+  // the tier is a candidate too. The lowest candidate that breaks even wins.
+  const regimes: Array<[number, number]> = [[fees.minCommission ?? 0, 0], [0, fees.commissionPct / 100]];
+  if (isTiered(fees)) {
+    regimes.push(
+      fees.tierWholePrice
+        ? [0, fees.commissionPctAbove / 100]
+        : [(fees.tierUpTo * (fees.commissionPct - fees.commissionPctAbove)) / 100, fees.commissionPctAbove / 100],
+    );
+  }
+  const otherShare = fees.returnRatePct / 100 + (fees.vatPct > 0 ? 1 - 1 / (1 + fees.vatPct / 100) : 0);
+  let best: number | null = null;
+  for (const [a, b] of regimes) {
+    const share = 1 - b - otherShare;
+    if (share <= 0) continue;
+    const price = (cost + fees.fixedFee + fees.shippingFee + a) / share;
+    if (price <= 0 || Math.abs(commissionFor(price, fees) - (a + b * price)) > 0.005) continue;
+    if (best === null || price < best) best = price;
+  }
+  if (isTiered(fees) && fees.tierWholePrice) {
+    const edge = fees.tierUpTo + 0.01;
+    if ((best === null || edge < best) && (computeProfit(edge, cost, fees).netProfit ?? -1) >= 0) best = edge;
+  }
+  return best === null ? null : Math.ceil(best * 100) / 100;
 }
 
 export type RepricerStrategy = 'BEAT_LOWEST' | 'MATCH_LOWEST';

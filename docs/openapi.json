@@ -1284,9 +1284,9 @@
             "schema": {
               "type": "string",
               "enum": [
-                "UNDERCUT",
                 "PRICE_INCREASE",
                 "PRICE_DROP",
+                "UNDERCUT",
                 "OUT_OF_STOCK",
                 "BACK_IN_STOCK",
                 "NEW_ENTRANT",
@@ -3557,6 +3557,95 @@
         ]
       }
     },
+    "/api/v1/analytics/views": {
+      "post": {
+        "operationId": "AnalyticsController_recordView",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordPageViewDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Record a page view (web tracker)",
+        "tags": [
+          "analytics"
+        ]
+      }
+    },
+    "/api/v1/analytics/views/{id}/duration": {
+      "post": {
+        "operationId": "AnalyticsController_recordDuration",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordDurationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Record how long a viewed page was visible (web tracker)",
+        "tags": [
+          "analytics"
+        ]
+      }
+    },
+    "/api/v1/analytics/summary": {
+      "get": {
+        "operationId": "AnalyticsController_summary",
+        "parameters": [
+          {
+            "name": "days",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "enum": [
+                1,
+                7,
+                30,
+                90
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Visitors, time on pages, searches, products, accounts and favorites (admin)",
+        "tags": [
+          "analytics"
+        ]
+      }
+    },
     "/api/v1/billing/plans": {
       "get": {
         "operationId": "BillingController_listPlans",
@@ -3835,9 +3924,9 @@
               "type": "string",
               "enum": [
                 "REJECTED",
+                "CANCELLED",
                 "AWAITING_PAYMENT",
                 "SUBMITTED",
-                "CANCELLED",
                 "APPROVED"
               ]
             }
@@ -5029,95 +5118,6 @@
           "health"
         ]
       }
-    },
-    "/api/v1/analytics/views": {
-      "post": {
-        "operationId": "AnalyticsController_recordView",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RecordPageViewDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "204": {
-            "description": ""
-          }
-        },
-        "summary": "Record a page view (web tracker)",
-        "tags": [
-          "analytics"
-        ]
-      }
-    },
-    "/api/v1/analytics/views/{id}/duration": {
-      "post": {
-        "operationId": "AnalyticsController_recordDuration",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RecordDurationDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "204": {
-            "description": ""
-          }
-        },
-        "summary": "Record how long a viewed page was visible (web tracker)",
-        "tags": [
-          "analytics"
-        ]
-      }
-    },
-    "/api/v1/analytics/summary": {
-      "get": {
-        "operationId": "AnalyticsController_summary",
-        "parameters": [
-          {
-            "name": "days",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "number",
-              "enum": [
-                1,
-                7,
-                30,
-                90
-              ]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "Visitors, time on pages, searches, products, accounts and favorites (admin)",
-        "tags": [
-          "analytics"
-        ]
-      }
     }
   },
   "info": {
@@ -5431,8 +5431,8 @@
             "type": "string",
             "enum": [
               "ADMIN",
-              "MEMBER",
-              "OWNER"
+              "OWNER",
+              "MEMBER"
             ]
           }
         },
@@ -5506,9 +5506,9 @@
           "type": {
             "type": "string",
             "enum": [
-              "UNDERCUT",
               "PRICE_INCREASE",
               "PRICE_DROP",
+              "UNDERCUT",
               "OUT_OF_STOCK",
               "BACK_IN_STOCK",
               "NEW_ENTRANT",
@@ -5552,8 +5552,8 @@
             "type": "string",
             "enum": [
               "ADMIN",
-              "MEMBER",
-              "OWNER"
+              "OWNER",
+              "MEMBER"
             ]
           }
         },
@@ -6060,6 +6060,24 @@
             "minimum": 0,
             "maximum": 100
           },
+          "tierUpTo": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0.01
+          },
+          "commissionPctAbove": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 100
+          },
+          "tierWholePrice": {
+            "type": "boolean"
+          },
+          "minCommission": {
+            "type": "number",
+            "minimum": 0
+          },
           "notes": {
             "type": "string",
             "maxLength": 500
@@ -6078,6 +6096,58 @@
             "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
           }
         }
+      },
+      "RecordPageViewDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Made by the browser, so the duration beacon can name the view later.",
+            "format": "uuid"
+          },
+          "visitorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "path": {
+            "type": "string",
+            "description": "Pathname and query string, e.g. \"/en/search?q=iphone\".",
+            "maxLength": 2048
+          },
+          "referrer": {
+            "type": "string",
+            "maxLength": 2048
+          }
+        },
+        "required": [
+          "id",
+          "visitorId",
+          "sessionId",
+          "path"
+        ]
+      },
+      "RecordDurationDto": {
+        "type": "object",
+        "properties": {
+          "durationMs": {
+            "type": "number",
+            "description": "Time the page was visible, in ms. Sent more than once; the largest wins.",
+            "minimum": 0,
+            "maximum": 86400000
+          },
+          "searchTotal": {
+            "type": "number",
+            "description": "The result count a search page showed.",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "durationMs"
+        ]
       },
       "CreateCheckoutDto": {
         "type": "object",
@@ -6503,58 +6573,6 @@
         },
         "required": [
           "name"
-        ]
-      },
-      "RecordPageViewDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "Made by the browser, so the duration beacon can name the view later.",
-            "format": "uuid"
-          },
-          "visitorId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "sessionId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "path": {
-            "type": "string",
-            "description": "Pathname and query string, e.g. \"/en/search?q=iphone\".",
-            "maxLength": 2048
-          },
-          "referrer": {
-            "type": "string",
-            "maxLength": 2048
-          }
-        },
-        "required": [
-          "id",
-          "visitorId",
-          "sessionId",
-          "path"
-        ]
-      },
-      "RecordDurationDto": {
-        "type": "object",
-        "properties": {
-          "durationMs": {
-            "type": "number",
-            "description": "Time the page was visible, in ms. Sent more than once; the largest wins.",
-            "minimum": 0,
-            "maximum": 86400000
-          },
-          "searchTotal": {
-            "type": "number",
-            "description": "The result count a search page showed.",
-            "minimum": 0
-          }
-        },
-        "required": [
-          "durationMs"
         ]
       }
     }
