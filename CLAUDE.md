@@ -14,6 +14,7 @@ Everything a session needs, in one place. On 2026-10-09 it replaced the old docs
 - Live at **https://pricelens.store**, Arabic by default (`/en/...` for English, `/ar/...` 308-redirects). `pricelens.work.gd` and `www` 301 to it; work.gd still proxies `/api/`.
 - Live code: `main` at `550c2a6`. Web on `pricelens-web-green` (127.0.0.1:3011), deployed 2026-10-09.
 - Latest work:
+  - 2026-10-09: phone menu redesigned (`components/layout/mobile-menu.tsx`): a full-height sheet with the account card, Watchlist / Deal Hunter / Alerts tiles, a Tools list, and language, theme and sign-out in a bottom bar.
   - 2026-10-09: PageSpeed and SEO. A CDN-resizing image loader, inline CSS, "سعر X في مصر اليوم" titles, the brand in the home title, and the favicon. Also legal pages with consent at sign-up and payment, and a nightly personal-data cleanup job.
   - 2026-10-03: Ink & Coral rebrand with Space Grotesk, a frontend redesign, the Telegram status board, cross-category duplicate cleanup, a split sitemap and new prices (Plus 99, Seller 799, Seller Plus 1799 EGP).
 - Payments: wallet/InstaPay transfer, then the owner approves it in `/admin/payments` (live since 2026-09-30). Paymob and Stripe are off: the owner has no registered business and won't do the paperwork, so don't suggest gateways that need it.

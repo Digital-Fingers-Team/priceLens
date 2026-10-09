@@ -1,6 +1,6 @@
 'use client';
-import { useState } from 'react';
-import { Heart, User, LogOut, Shield, Menu as MenuIcon, X, Sparkles, Building2, Bell, Tag, ShoppingBasket, MessageCircleQuestion, Ship, Briefcase } from 'lucide-react';
+import { useCallback, useState } from 'react';
+import { Heart, User, LogOut, Shield, Menu as MenuIcon, X, Sparkles, Building2, Bell, ShoppingBasket, MessageCircleQuestion, Ship, Briefcase } from 'lucide-react';
 import { LensMark, Wordmark } from '@/components/brand/logo';
 import { NotificationBell } from '@/components/notifications/notification-bell';
 import { IconButton } from '@/components/ui/button';
@@ -14,9 +14,7 @@ import { useI18n } from '@/lib/i18n/provider';
 import { useFlags } from '@/lib/hooks/use-billing';
 import { LocaleSwitch } from './locale-switch';
 import { ThemeToggle } from './theme-toggle';
-
-// 44 px rows: the phone menu is all touch targets.
-const mobileItem = 'flex min-h-11 w-full items-center gap-3 rounded px-3 text-start text-sm text-fg hover:bg-surface-2';
+import { MobileMenu } from './mobile-menu';
 
 export function Navbar() {
   const pathname = usePathname();
@@ -30,7 +28,7 @@ export function Navbar() {
   // The /search page already renders its own SearchBar plus the query summary
   // and filters — showing this one too would put two search boxes on screen.
   const onSearchPage = pathname.startsWith('/search');
-  const close = () => setMobileOpen(false);
+  const close = useCallback(() => setMobileOpen(false), []);
 
   function handleMobileSearch(q: string) {
     router.push(`/search?q=${encodeURIComponent(q)}`);
@@ -162,57 +160,14 @@ export function Navbar() {
       </div>
 
       {mobileOpen && (
-        <div id="mobile-menu" className="flex max-h-sheet flex-col gap-4 overflow-y-auto overscroll-contain border-t border-border px-4 py-4 lg:hidden">
-          {!onSearchPage && <SearchBar onSearch={handleMobileSearch} className="md:hidden" />}
-
-          <nav aria-label={t.nav.mobile} className="flex flex-col gap-1">
-            {/* Same destinations as the desktop bar (audit 06, U-10). */}
-            {!hasHydrated ? null : isAuthenticated ? (
-              <>
-                {[
-                  ...memberLinks,
-                  { href: '/notifications', label: t.nav.notifications, Icon: Bell },
-                  { href: '/account/billing', label: t.nav.account, Icon: User },
-                  ...(isAdmin ? [{ href: '/admin', label: t.nav.admin, Icon: Shield }] : []),
-                ].map(({ href, label, Icon }) => (
-                  <Link key={href} href={href} onClick={close} className={mobileItem}>
-                    <Icon className="h-4 w-4 text-muted" aria-hidden /> {label}
-                  </Link>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => {
-                    logout();
-                    close();
-                  }}
-                  className={mobileItem}
-                >
-                  <LogOut className="flip-rtl h-4 w-4 text-muted" aria-hidden /> {t.common.signOut}
-                </button>
-              </>
-            ) : (
-              <>
-                <Link href="/pricing" onClick={close} className={mobileItem}>
-                  <Tag className="h-4 w-4 text-muted" aria-hidden /> {t.nav.pricing}
-                </Link>
-                <Link href="/login" onClick={close} className={mobileItem}>
-                  <User className="h-4 w-4 text-muted" aria-hidden /> {t.common.signIn}
-                </Link>
-                <Link
-                  href="/register"
-                  onClick={close}
-                  className={buttonClassName({ variant: 'primary', size: 'lg', className: 'mt-2 w-full' })}
-                >
-                  {t.common.getStarted}
-                </Link>
-              </>
-            )}
-          </nav>
-          <div className="flex items-center justify-between border-t border-border pt-4">
-            <LocaleSwitch className="-ms-3" />
-            <ThemeToggle />
-          </div>
-        </div>
+        <MobileMenu
+          primary={primaryLinks}
+          tools={toolLinks}
+          showSearch={!onSearchPage}
+          onSearch={handleMobileSearch}
+          onClose={close}
+          onLogout={logout}
+        />
       )}
     </header>
   );

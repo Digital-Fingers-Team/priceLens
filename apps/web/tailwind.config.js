@@ -128,6 +128,10 @@ module.exports = {
         // The page area under the 64px header.
         page: 'calc(100dvh - 4rem)',
       },
+      height: {
+        // The phone menu sheet under the 64px header.
+        page: 'calc(100dvh - 4rem)',
+      },
       maxHeight: {
         // Sheets and modals leave the top of the screen visible.
         sheet: '85dvh',
