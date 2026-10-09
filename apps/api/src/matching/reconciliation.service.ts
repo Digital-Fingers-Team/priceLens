@@ -240,9 +240,8 @@ export class ReconciliationService {
 
   /**
    * For each canonical product, find its `neighborsPerProduct` nearest
-   * neighbours in any category (a product's category is the sweep that found
-   * it, so one case lived under both Headphones and Smart Watches) by title-trigram similarity (pg_trgm, already
-   * GIN-indexed on `normalized_title`), then keep the pairs within the
+   * neighbours in its own category by title-trigram similarity (pg_trgm,
+   * GiST-indexed on (`category_id`, `normalized_title`)), then keep the pairs within the
    * similarity threshold. `a_id < b_id` collapses the two directions of each
    * pair into one row.
    *
@@ -269,6 +268,11 @@ export class ReconciliationService {
     // the site behind it, 2026-09-29). New duplicates come from new products;
     // the brand+model pairs still cover the whole catalogue. The time limit
     // is a backstop: a slow run skips this source rather than hold the table.
+    // Neighbours come from the anchor's own category, which the GiST index
+    // (category_id, normalized_title) serves; across all categories it could
+    // not, and the query hit the time limit on every run (2026-10-09), so
+    // this source found nothing. Cross-category duplicates are the catalog
+    // cleanup's job.
     const anchors = this.config.get<number>('search.reconciliationTrigramAnchors', 3000);
     const timeoutMs = this.config.get<number>('search.reconciliationQueryTimeoutMs', 120_000);
     try {
@@ -280,14 +284,14 @@ export class ReconciliationService {
           SELECT LEAST(a.id, nn.id) AS a_id, GREATEST(a.id, nn.id) AS b_id,
                  nn.sim AS similarity
           FROM (
-            SELECT id, normalized_title FROM canonical_products
+            SELECT id, category_id, normalized_title FROM canonical_products
             ORDER BY created_at DESC
             LIMIT ${anchors}
           ) a
           JOIN LATERAL (
             SELECT b.id, similarity(a.normalized_title, b.normalized_title) AS sim
             FROM canonical_products b
-            WHERE b.id <> a.id
+            WHERE b.id <> a.id AND b.category_id = a.category_id
             ORDER BY a.normalized_title <-> b.normalized_title
             LIMIT ${neighborsPerProduct}
           ) nn ON true
@@ -337,7 +341,13 @@ export class ReconciliationService {
       // would pair with every other one and with the phone itself.
       if (this.normalizer.isAccessory(product.title)) continue;
 
-      const key = `${brand}|${model}`;
+      // RAM and storage are part of the key: the guards reject every pair
+      // that differs in them, and big families ("apple|iphone 16", every
+      // size) made so many such pairs that smaller ones never got a turn.
+      // Colors stay in one group (D-6).
+      const ram = capacityGb(extracted.ram) ?? '-';
+      const storage = capacityGb(extracted.storage) ?? '-';
+      const key = `${brand}|${model}|${ram}|${storage}`;
       const bucket = groups.get(key);
       if (bucket) {
         bucket.push(product.id);

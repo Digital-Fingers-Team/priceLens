@@ -217,6 +217,7 @@ Engineering:
   - Candidates are the 200 most similar titles in the category plus the model's products.
   - **Only the AI judge's "yes" merges** (Gemini, 8 titles per request, key and model slots rotated). Barcode and exact-title matches still merge without it. With no AI answer the listing becomes its own product, and the hourly reconciliation retries with the same guards.
   - Precision beats recall: two products shown as one is worse than one product shown twice.
+  - Reconciliation pairs products by brand + model + RAM + storage (colors stay together), and look-alike titles within the same category (the (category, title) GiST index; ~16 s for 3,000 anchors). Before 2026-10-09 the cross-category query always timed out and big families crowded out the rest.
   - Reconciliation (hourly) budgets new judge questions (`RECONCILIATION_MAX_PAIRS`), not pairs looked at; guard-rejected and already-answered pairs are free, newest products first. Before 2026-10-09 the same 1,000 dead pairs filled every run and color duplicates (Honor X9d 12/256) never merged.
   - Phone cases and protectors are never sent to the judge (37% of calls on 2026-10-09); each founds its own product.
 - **Live offer** (`prices/offer-rules.ts`): accepted, price above 0, in stock, and seen within `OFFER_MAX_AGE_DAYS`. Each store keeps only its cheapest offer per title. Products with no offer are left out of search, browse and the sitemap, and their pages are noindex.
