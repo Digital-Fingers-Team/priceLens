@@ -79,6 +79,9 @@ COPY --from=build /repo/apps/web/public apps/web/public
 # Fonts for the share cards (opengraph-image.tsx reads them at runtime).
 COPY --from=build /repo/apps/web/assets apps/web/assets
 COPY --from=build /repo/apps/web/next.config.js apps/web/next.config.js
+# next start checks that images.loaderFile exists, though the loader itself is
+# already compiled into the bundles.
+COPY --from=build /repo/apps/web/src/lib/image-loader.ts apps/web/src/lib/image-loader.ts
 
 RUN NEXT_DIR=$(find /repo/node_modules/.pnpm -maxdepth 3 -type d -path '*/node_modules/next' | head -n 1) && \
     test -n "$NEXT_DIR" && ln -s "$NEXT_DIR" /repo/node_modules/next
