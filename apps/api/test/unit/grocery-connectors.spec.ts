@@ -2,8 +2,11 @@ import axios from 'axios';
 import type { ConfigService } from '@nestjs/config';
 import { GourmetConnector } from '../../src/scraping/connectors/gourmet.connector';
 import { SpinneysConnector } from '../../src/scraping/connectors/spinneys.connector';
+import { SeoudiConnector } from '../../src/scraping/connectors/seoudi.connector';
 
 jest.mock('axios');
+
+beforeEach(() => jest.clearAllMocks());
 
 const config = { get: (_key: string, fallback: unknown) => fallback } as unknown as ConfigService;
 const money = (value: number) => ({ minimum_price: { final_price: { value, currency: 'EGP' } } });
@@ -59,5 +62,25 @@ describe('SpinneysConnector', () => {
 
   it('is probed with grocery words, not "samsung,tv"', () => {
     expect(new SpinneysConnector(config).probeQuery).toBe('milk,water');
+  });
+});
+
+describe('SeoudiConnector', () => {
+  it('asks its API host over GET and links to /en/<url_key>.html on the site, matching by barcode', async () => {
+    // A real mcprod.seoudisupermarket.com answer (2026-10-09).
+    const get = jest.mocked(axios.get).mockResolvedValue(
+      answer([
+        { name: 'Juhayna mix Banana Milk - 200 ml', sku: '6223000350447', url_key: 'juhayna-mix-banana-milk-200-ml', url_suffix: '.html', stock_status: 'IN_STOCK', price_range: money(12.95) },
+      ]),
+    );
+
+    const [listing] = await new SeoudiConnector(config).searchListings('milk', 5);
+
+    expect(get.mock.calls[0][0]).toBe('https://mcprod.seoudisupermarket.com/graphql');
+    expect(listing).toMatchObject({
+      externalUrl: 'https://seoudisupermarket.com/en/juhayna-mix-banana-milk-200-ml.html',
+      priceUsd: 12.95,
+      identifiers: { gtin: '6223000350447' },
+    });
   });
 });

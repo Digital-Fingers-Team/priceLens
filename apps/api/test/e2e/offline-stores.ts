@@ -20,6 +20,7 @@ const SLUG_BY_CLASS: Record<string, string> = {
   TradelineConnector: 'tradeline',
   CompumartsConnector: 'compumarts',
   RayaConnector: 'raya',
+  SeoudiConnector: 'seoudi',
   SpinneysConnector: 'spinneys',
   GourmetConnector: 'gourmet',
   SamsungConnector: 'samsung',

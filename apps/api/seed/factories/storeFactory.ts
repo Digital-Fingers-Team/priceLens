@@ -191,4 +191,13 @@ export const storeDefinitions: StoreDefinition[] = [
     priceModifier: 1.0,
     titleStyle: 'clean',
   },
+  {
+    slug: 'seoudi',
+    name: 'Seoudi',
+    baseUrl: 'https://seoudisupermarket.com',
+    connectorType: ConnectorType.HTTP_API,
+    rateLimit: 60,
+    priceModifier: 1.0,
+    titleStyle: 'clean',
+  },
 ];

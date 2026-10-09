@@ -9,6 +9,7 @@ import { Dream2000Connector } from './dream2000.connector';
 import { TradelineConnector } from './tradeline.connector';
 import { CompumartsConnector } from './compumarts.connector';
 import { RayaConnector } from './raya.connector';
+import { SeoudiConnector } from './seoudi.connector';
 import { SpinneysConnector } from './spinneys.connector';
 import { GourmetConnector } from './gourmet.connector';
 import { SamsungConnector } from './samsung.connector';
@@ -42,6 +43,7 @@ export const CONNECTOR_CLASSES = [
   TradelineConnector,
   CompumartsConnector,
   RayaConnector,
+  SeoudiConnector,
   SpinneysConnector,
   GourmetConnector,
   SamsungConnector,

@@ -166,4 +166,7 @@ export default registerAs('retailers', () => ({
   gourmetBaseUrl: process.env.GOURMET_BASE_URL ?? 'https://gourmetegypt.com',
   spinneysEnabled: process.env.SPINNEYS_ENABLED !== 'false',
   spinneysBaseUrl: process.env.SPINNEYS_BASE_URL ?? 'https://www.spinneys-egypt.com',
+  seoudiEnabled: process.env.SEOUDI_ENABLED !== 'false',
+  seoudiBaseUrl: process.env.SEOUDI_BASE_URL ?? 'https://seoudisupermarket.com',
+  seoudiApiUrl: process.env.SEOUDI_API_URL ?? 'https://mcprod.seoudisupermarket.com',
 }));
