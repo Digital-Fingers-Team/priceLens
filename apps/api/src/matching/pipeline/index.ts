@@ -35,7 +35,7 @@ export { identifierLookupClauses, identifiersConflict } from './steps/06-identif
 export { findExactTitleMatch } from './steps/07-exact-title-match';
 export { checkConflicts } from './steps/08-conflict-guards';
 export type { ConflictGuard, GuardResult } from './steps/08-conflict-guards';
-export { rankCandidates, decideMatch, capacityGb } from './steps/09-rank-and-decide';
+export { rankCandidates, decideMatch, capacityGb, AWAITING_JUDGE } from './steps/09-rank-and-decide';
 export { checkMarketOutlier } from './steps/10-market-outlier';
 export type { PricedOffer } from './steps/10-market-outlier';
 export { findCanonicalMatch } from './find-canonical-match';

@@ -13,6 +13,7 @@ import {
   checkCategorySanity,
   checkConflicts,
   checkMarketOutlier,
+  AWAITING_JUDGE,
   decideMatch,
   detectJunkListing,
   findCanonicalMatch,
@@ -400,16 +401,17 @@ describe('matching pipeline', () => {
       expect(fake.calls).toBe(MAX_JUDGED_CANDIDATES);
     });
 
-    it('never merges while the judge is unavailable, however high the score', async () => {
-      // The listing founds its own product; reconciliation asks the judge later.
+    it('never merges while the judge is unavailable, however high the score: the listing waits', async () => {
+      // Owner decision 2026-10-09: no product is added before the judge rules.
       const top = [{ candidate: c1, score: MODEL_AGREEMENT_SCORE }, { candidate: c2, score: FUZZY_MATCH_THRESHOLD }];
-      expect(await decideMatch('x', top, judge([null]))).toBeNull();
+      expect(await decideMatch('x', top, judge([null]))).toBe(AWAITING_JUDGE);
+      expect(await decideMatch('x', top, judge([false, null]))).toBe(AWAITING_JUDGE);
       expect(await decideMatch('x', top, judge([false, false]))).toBeNull();
     });
 
     it('stops asking after the first unavailable answer', async () => {
       const fake = judge([null, true]);
-      expect(await decideMatch('x', [{ candidate: c1, score: 0.5 }, { candidate: c2, score: 0.4 }], fake)).toBeNull();
+      expect(await decideMatch('x', [{ candidate: c1, score: 0.5 }, { candidate: c2, score: 0.4 }], fake)).toBe(AWAITING_JUDGE);
       expect(fake.calls).toBe(1);
     });
 
@@ -440,7 +442,7 @@ describe('matching pipeline', () => {
       });
 
       it('stops at the first unanswered candidate, as when asking one at a time', async () => {
-        expect(await decideMatch('x', ranked(0.5, 0.4), batchJudge([null, true]))).toBeNull();
+        expect(await decideMatch('x', ranked(0.5, 0.4), batchJudge([null, true]))).toBe(AWAITING_JUDGE);
       });
     });
   });

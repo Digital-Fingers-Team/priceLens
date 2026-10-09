@@ -7,6 +7,7 @@ import { FxRatesService } from '../../matching/fx-rates.service';
 import { NormalizerService } from '../../matching/normalizer.service';
 import { SemanticService } from '../../matching/semantic.service';
 import {
+  AWAITING_JUDGE,
   MATCHED_CONFIDENCE,
   MatchingTools,
   NEW_PRODUCT_CONFIDENCE,
@@ -183,7 +184,7 @@ export class ListingProcessor {
     // Steps 6-9: the product it belongs to, if any. A below-floor listing
     // does not get the (paid) LLM judge: most are accessories and cheap
     // look-alikes, and only a clear match is worth keeping.
-    const match =
+    const found =
       (await this.currentProduct(platform, listing, input)) ??
       (await findCanonicalMatch(
         input,
@@ -191,6 +192,15 @@ export class ListingProcessor {
         { candidates: this.repository.candidates, judge: belowFloor ? NO_JUDGE : this.semantic },
         this.tools,
       ));
+    // No product is added before the AI judge has ruled on its look-alikes
+    // (owner decision, 2026-10-09): while it cannot answer (quota spent), the
+    // listing is not stored and a later sweep tries again. Phone cases and
+    // protectors are never sent to the judge, so they still found their own.
+    if (found === AWAITING_JUDGE && !belowFloor && !isPhoneAccessory(listing.title)) {
+      this.logger.debug(`Holding "${listing.title}" from ${platform.slug} until the AI judge answers`);
+      return null;
+    }
+    const match = found === AWAITING_JUDGE ? null : found;
     if (match && match.categoryId !== category.id && category.slug === PHONE_ACCESSORIES_SLUG) {
       await this.repository.moveProductToCategory(match.id, category.id);
     }

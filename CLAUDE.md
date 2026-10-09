@@ -14,6 +14,7 @@ Everything a session needs, in one place. On 2026-10-09 it replaced the old docs
 - Live at **https://pricelens.store**, Arabic by default (`/en/...` for English, `/ar/...` 308-redirects). `pricelens.work.gd` and `www` 301 to it; work.gd still proxies `/api/`.
 - Live code: `main` at `a528cfc` (API and worker deployed 2026-10-09). Web from `53318c3` on `pricelens-web-green` (127.0.0.1:3011), deployed 2026-10-09.
 - Latest work:
+  - 2026-10-09: products wait for the AI judge. A listing whose look-alikes the judge has not ruled on (quota spent) is no longer added as its own product; a later sweep retries it.
   - 2026-10-09: AliExpress photos. Its cards moved the photo to `img.images--item--<hash>`, so 36,646 of 40,493 AliExpress products had none. The connector reads the new markup, and a matched listing now fills a product's missing photo, so old products get theirs as they are re-scraped.
   - 2026-10-09: phone menu redesigned (`components/layout/mobile-menu.tsx`): a full-height sheet with the account card, Watchlist / Deal Hunter / Alerts tiles, a Tools list, and language, theme and sign-out in a bottom bar.
   - 2026-10-09: PageSpeed and SEO. A CDN-resizing image loader, inline CSS, "سعر X في مصر اليوم" titles, the brand in the home title, and the favicon. Also legal pages with consent at sign-up and payment, and a nightly personal-data cleanup job.
@@ -217,11 +218,12 @@ Engineering:
     9. Rank and decide.
     10. Market outlier.
   - Candidates are the 200 most similar titles in the category plus the model's products.
-  - **Only the AI judge's "yes" merges** (Gemini, 8 titles per request, key and model slots rotated). Barcode and exact-title matches still merge without it. With no AI answer the listing becomes its own product, and the hourly reconciliation retries with the same guards.
+  - **Only the AI judge's "yes" merges** (Gemini, 8 titles per request, key and model slots rotated). Barcode and exact-title matches still merge without it.
+  - **No product is added before the judge rules** (owner decision, 2026-10-09): a listing with look-alike candidates founds a new product only after the judge says "different" to each one. While it cannot answer (quota spent), `decideMatch` returns `AWAITING_JUDGE`, the listing is not stored, and the next sweep that finds it tries again. A listing with no candidates founds its product at once. Before, it founded its own product and the hourly reconciliation merged it later.
   - Precision beats recall: two products shown as one is worse than one product shown twice.
   - Reconciliation pairs products by brand + model + RAM + storage (colors stay together), and look-alike titles within the same category (the (category, title) GiST index; ~16 s for 3,000 anchors). Before 2026-10-09 the cross-category query always timed out and big families crowded out the rest.
   - Reconciliation (hourly) budgets new judge questions (`RECONCILIATION_MAX_PAIRS`), not pairs looked at; guard-rejected and already-answered pairs are free, newest products first. Before 2026-10-09 the same 1,000 dead pairs filled every run and color duplicates (Honor X9d 12/256) never merged.
-  - Phone cases and protectors are never sent to the judge (37% of calls on 2026-10-09); each founds its own product.
+  - Phone cases and protectors are never sent to the judge (37% of calls on 2026-10-09); each founds its own product, the one exception to the hold above.
 - **Live offer** (`prices/offer-rules.ts`): accepted, price above 0, in stock, and seen within `OFFER_MAX_AGE_DAYS`. Each store keeps only its cheapest offer per title. Products with no offer are left out of search, browse and the sitemap, and their pages are noindex.
 - **Categories:**
   - Roots are level 0 and leaves level 1.

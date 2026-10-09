@@ -119,6 +119,15 @@ describe('ingestion concurrency (integration)', () => {
     expect(await prisma.sourceListing.count({ where: { externalId: `${run}-xyz` } })).toBe(0);
   });
 
+  it('holds back a look-alike of a stored product while the AI judge cannot answer', async () => {
+    // Owner decision 2026-10-09: no product is added before the judge rules.
+    const before = await prisma.canonicalProduct.count({ where: { categoryId: category.id } });
+    const lookAlike = listing('held', 'Zentrofon Z900 5G Dual SIM 12GB RAM 256GB Black', 20500);
+    expect(await processor.process(platforms[0], category, lookAlike, platforms[0].slug)).toBeNull();
+    expect(await prisma.sourceListing.count({ where: { externalId: lookAlike.externalId } })).toBe(0);
+    expect(await prisma.canonicalProduct.count({ where: { categoryId: category.id } })).toBe(before);
+  });
+
   describe('dominantLeafCategoryForQuery (free-text fallback)', () => {
     it('returns the leaf most existing products matching every word belong to', async () => {
       // Products titled "Zentrofon Z900 ..." were created in this category above.

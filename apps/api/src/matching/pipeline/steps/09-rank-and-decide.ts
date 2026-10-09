@@ -195,6 +195,9 @@ function dropAmbiguousVariants<C extends CatalogCandidate>(
   return kept;
 }
 
+/** decideMatch's answer when the judge could not rule on a candidate. */
+export const AWAITING_JUDGE = Symbol('awaiting-judge');
+
 /**
  * Step 9b -- decide.
  *
@@ -206,9 +209,11 @@ function dropAmbiguousVariants<C extends CatalogCandidate>(
  *
  * 1. Ask the judge about the top MAX_JUDGED_CANDIDATES in rank order; the
  *    first "same" wins.
- * 2. The judge cannot answer (every slot paused): no match. The listing
- *    founds its own product, and reconciliation asks the judge later.
- * 3. Otherwise no match: the listing founds a new product.
+ * 2. The judge cannot answer (every slot paused) before a "same":
+ *    AWAITING_JUDGE. No product is added until the judge has said "different"
+ *    to every candidate (owner decision, 2026-10-09); the listing is tried
+ *    again when a later sweep finds it.
+ * 3. Otherwise no match (null): the listing founds a new product.
  *
  * Identifier and exact-title matches (steps 6-7) do not come here.
  */
@@ -216,7 +221,7 @@ export async function decideMatch<C extends CatalogCandidate>(
   listingTitle: string,
   ranked: Array<RankedCandidate<C>>,
   judge: SameProductJudge,
-): Promise<C | null> {
+): Promise<C | typeof AWAITING_JUDGE | null> {
   const top = ranked.slice(0, MAX_JUDGED_CANDIDATES);
   // A judge that answers several at once is asked about all of them in one request.
   const batch = judge.judgeMany && top.length > 0
@@ -229,7 +234,7 @@ export async function decideMatch<C extends CatalogCandidate>(
     }
     if (verdict === null) {
       // Every remaining call would fail the same way.
-      return null;
+      return AWAITING_JUDGE;
     }
   }
   return null;

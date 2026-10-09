@@ -7,6 +7,7 @@ import {
   MatchingTools,
   SameProductJudge,
   detectJunkListing,
+  AWAITING_JUDGE,
   findCanonicalMatch,
   normalizeListing,
 } from '../../src/matching/pipeline';
@@ -104,7 +105,10 @@ export async function runGolden(
       identifiers: { gtin: golden.gtin ?? null, upc: null, ean: null, mpn: null },
     };
     const input = normalizeListing(listing, tools);
-    const match = await findCanonicalMatch(input, golden.category, { candidates: catalog, judge }, tools);
+    const found = await findCanonicalMatch(input, golden.category, { candidates: catalog, judge }, tools);
+    // Ingestion holds an unjudged listing back; here it founds its own
+    // product, which is what it becomes if the judge then says "different".
+    const match = found === AWAITING_JUDGE ? null : found;
     if (match) {
       assignments.set(golden.id, match.id);
       continue;
