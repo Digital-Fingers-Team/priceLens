@@ -128,4 +128,13 @@ export const storeDefinitions: StoreDefinition[] = [
     priceModifier: 1.0,
     titleStyle: 'clean',
   },
+  {
+    slug: 'raya',
+    name: 'Raya Shop',
+    baseUrl: 'https://www.rayashop.com',
+    connectorType: ConnectorType.HTTP_API,
+    rateLimit: 60,
+    priceModifier: 1.0,
+    titleStyle: 'clean',
+  },
 ];

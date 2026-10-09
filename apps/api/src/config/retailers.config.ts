@@ -149,4 +149,7 @@ export default registerAs('retailers', () => ({
   compumartsEnabled: process.env.COMPUMARTS_ENABLED !== 'false',
   compumartsBaseUrl: process.env.COMPUMARTS_BASE_URL ?? 'https://compumarts.com',
   btechEnabled: process.env.BTECH_ENABLED !== 'false',
+  rayaEnabled: process.env.RAYA_ENABLED !== 'false',
+  rayaBaseUrl: process.env.RAYA_BASE_URL ?? 'https://www.rayashop.com',
+  rayaApiUrl: process.env.RAYA_API_URL ?? 'https://api-rayashop.global.ssl.fastly.net',
 }));
