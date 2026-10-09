@@ -3,6 +3,7 @@ import {
   DESCRIBES_DEVICE,
   DEVICE_ACCESSORY_PRICE_RATIO,
   DEVICE_CATEGORIES,
+  NOT_THE_DEVICE,
 } from '../thresholds';
 import type { MatchingTools } from '../types';
 
@@ -20,7 +21,8 @@ export interface CategorySanityInput {
  *
  * Returns why the listing is not the kind of product its category holds, or
  * null. Two rules, both measured against the category median:
- *  - in a device category, an accessory title priced under 15% of the median
+ *  - in a device category, an accessory (or other non-device: landline,
+ *    holder, remote) priced under 15% of the median
  *    (both must hold: a real phone "with free cover" says "cover" too);
  *  - in any category, a price under 2.5% of the median.
  */
@@ -34,7 +36,7 @@ export function checkCategorySanity(
   if (
     DEVICE_CATEGORIES.has(categoryName.trim().toLowerCase()) &&
     price < categoryMedian * DEVICE_ACCESSORY_PRICE_RATIO &&
-    normalizer.isAccessory(title) &&
+    (normalizer.isAccessory(title) || NOT_THE_DEVICE.test(title)) &&
     !DESCRIBES_DEVICE.test(title)
   ) {
     return `accessory in the ${categoryName} category`;

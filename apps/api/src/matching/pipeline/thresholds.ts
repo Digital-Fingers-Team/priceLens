@@ -83,6 +83,15 @@ export const DEVICE_CATEGORIES: ReadonlySet<string> = new Set([
  * nearly every case and below nearly every phone.
  */
 export const DEVICE_ACCESSORY_PRICE_RATIO = 0.15;
+/**
+ * Things that are not the device but come back from a store search for it,
+ * and that the accessory words miss (prod, 2026-10-09: landlines and car
+ * holders as Smartphones, a paper planner as a Laptop, a remote as a TV).
+ * Used only with the same price rule as accessories, so a real device that
+ * mentions one ("with wall mount") is never caught.
+ */
+export const NOT_THE_DEVICE =
+  /\b(landlines?|telephones?|cordless\s+phones?|corded|holders?|mounts?|remote\s+controls?|mouse\s*pads?|desk\s+(?:mats?|pads?)|planners?|paper|coolers?|cooling\s+fans?|fans?|thermal\s+(?:paste|grease|pads?)|backlights?|led\s+strips?|batter(?:y|ies)|replacements?|wall\s+brackets?)\b/i;
 /** Wording only the device itself uses; a cheap feature phone "with charger" is still a phone. */
 export const DESCRIBES_DEVICE = /\b(dual[\s-]?sim|keypad|feature\s+phone|\d+\s?gb\s+ram)\b/i;
 

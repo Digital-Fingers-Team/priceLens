@@ -152,6 +152,34 @@ describe('matching pipeline', () => {
       );
     });
 
+    it('rejects other cheap non-devices that store searches return (prod, 2026-10-09)', () => {
+      for (const [title, price] of [
+        ['Alcatel T16 Digital Corded Landline - Black', 1347],
+        ['Earldom 360° Rotatable Mobile Car Holder, Black - ET-EH45', 163],
+        ['Memo CX15 Magnetic Mobile Phone Cooler - Black', 849],
+        ['OEM Battery RealmeC1 C2 C3 C5 C11 C12 C20', 187],
+      ] as const) {
+        expect(checkCategorySanity({ ...base, title, price }, tools)).toBe('accessory in the Smartphones category');
+      }
+      expect(
+        checkCategorySanity({ categoryName: 'TVs', categoryMedian: 10_000, title: 'Samsung Standard Remote Control for Samsung TVs', price: 712 }, tools),
+      ).toBe('accessory in the TVs category');
+      expect(
+        checkCategorySanity({ categoryName: 'Laptops', categoryMedian: 30_000, title: 'A5 Cornell Grid Notebook - Student Study Planner', price: 1490 }, tools),
+      ).toBe('accessory in the Laptops category');
+    });
+
+    it('keeps a real device that mentions a holder or mount', () => {
+      expect(
+        checkCategorySanity({ categoryName: 'Graphics Cards', categoryMedian: 14_500, title: 'GPU Cooling Fan for GIGABYTE RTX 2060', price: 561 }, tools),
+      ).toBe('accessory in the Graphics Cards category');
+      // A cheap real card is kept: it names no non-device part.
+      expect(
+        checkCategorySanity({ categoryName: 'Graphics Cards', categoryMedian: 14_500, title: 'NVIDIA GeForce GT710 1G DDR3 HDMI Graphics Card', price: 1962 }, tools),
+      ).toBeNull();
+      expect(checkCategorySanity({ categoryName: 'TVs', categoryMedian: 10_000, title: 'Samsung 55 Inch Smart TV with Wall Mount', price: 18_000 }, tools)).toBeNull();
+    });
+
     it('keeps an accessory-worded device when the title describes the device', () => {
       expect(checkCategorySanity({ ...base, title: 'Nokia 105 Dual SIM with charger', price: 510 }, tools)).toBeNull();
     });

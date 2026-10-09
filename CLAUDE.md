@@ -45,7 +45,7 @@ Engineering:
 - Disk is 77% full after the 2026-10-09 cleanup (old build images, Meilisearch, old clones, the pay demo, old `.env` backups). The monitor alerts at 85%. Each `deploy-*.sh` leaves an untagged image of about 2 GB: remove PriceLens ones older than a day with `podman rmi <id>`.
 - Give scheduled jobs their own queue or concurrency so they never wait behind scrapes. Also find what keeps requesting store expansions; they are capped by `STORE_EXPANSION_MAX_WAITING=100`.
 - Matcher: no CPU-model guard (QA-16).
-- Non-devices land in the original device leaves (they never had a price floor): landlines, car phone holders, paper notebooks, TV remotes and mouse pads under Smartphones, Laptops and TVs (seen 2026-10-09). The accessory detector and the 2.5%-of-median check miss them. Fix in the category-sanity step, then run `recategorize-products`, with a characterization run.
+- Non-devices in the original device leaves: since 2026-10-09 step 5 also rejects, under 15% of the median, titles naming a landline, holder, mount, remote, mouse pad, planner, fan/cooler, thermal paste, backlight, battery or replacement part (`NOT_THE_DEVICE`). New listings only: the ones already stored stay until a cleanup (dry run first). AliExpress still sends a long tail of unrelated junk for category words.
 - Category pages render per request (QA-11) because `?page` is read from `searchParams`.
 - On phones a sort change sometimes does nothing (QA-18). Next aborts the RSC request; it predates the overhaul, and CI retries it.
 - Some API error texts and the Deal Hunter reasons are English in the Arabic UI.
@@ -194,7 +194,7 @@ Engineering:
 ## Architecture essentials
 
 - **Data flow:**
-  - Crons, every search (30 s cooldown per query), page views below the store target, and admin triggers all enqueue jobs on the `ingestion` queue.
+  - The full sweep runs every 3 h in prod (`LIVE_INGESTION_CRON`); crons, every search (30 s cooldown per query), page views below the store target, and admin triggers all enqueue jobs on the `ingestion` queue.
   - A job calls `connector.searchListings`, then `ListingProcessor` runs the matching pipeline and writes to Postgres. The tables are `canonical_products`, `source_listings`, `price_history` (one row per *change*, plus the daily rollup `price_daily`) and `match_decisions`.
   - Prices are converted to EGP once, at ingestion. The column is called `priceUsd` for historical reasons; `rawPrice`/`rawCurrency` keep the store's amount.
 - **Sweep size:** a full sweep visits the stores one after another and takes about 2 h for 11 stores (AliExpress ~45 min, Noon ~27, Amazon ~16, small stores ~4). A sweep that starts while one is running is skipped (`sweep_in_flight`).
