@@ -16,6 +16,7 @@ import { organizationJsonLd, websiteJsonLd } from '@/lib/structured-data';
 import { serializeJsonLd } from '@/lib/utils/json-ld';
 import { HeroComparison } from './_components/hero-comparison';
 import { TrendingSection } from './_components/trending-section';
+import { DropsSection } from './_components/drops-section';
 
 // Trending prices come from the live API; without this the page was rendered
 // once at build time and served with those prices forever.
@@ -89,6 +90,10 @@ export default async function HomePage({ params }: Props) {
           </div>
         </div>
       </section>
+
+      <Suspense fallback={null}>
+        <DropsSection locale={locale} />
+      </Suspense>
 
       <section className="mx-auto flex max-w-page flex-col gap-6 px-4 py-12 sm:px-6 lg:py-16">
         {/* Sorted by how many stores sell a product: "most compared", not a

@@ -48,8 +48,18 @@ function safeDecode(part: string): string {
   }
 }
 
-/** Crawlers and headless browsers that run script; they are not visitors. */
-export const BOT_USER_AGENT = /bot|crawl|spider|slurp|headless|lighthouse|pagespeed|preview|facebookexternalhit|embedly|monitor/i;
+/**
+ * Crawlers, headless browsers, AI agents and HTTP libraries; they are not
+ * visitors. Also used for store clicks: on 2026-10-10, 4,708 of 4,822 weekly
+ * clicks came from one crawler (ShapBot) following the store links.
+ */
+export const BOT_USER_AGENT =
+  /bot|crawl|spider|slurp|headless|lighthouse|pagespeed|preview|facebookexternalhit|embedly|monitor|gpt|claude|perplexity|python|curl|wget|go-http|axios|node-fetch|okhttp|java\//i;
+
+/** True for a missing user agent or one that names a bot. */
+export function isBotUserAgent(userAgent: string | undefined | null): boolean {
+  return !userAgent || BOT_USER_AGENT.test(userAgent);
+}
 
 export function deviceOf(userAgent: string | undefined): 'mobile' | 'desktop' {
   return /mobi|android|iphone|ipad/i.test(userAgent ?? '') ? 'mobile' : 'desktop';

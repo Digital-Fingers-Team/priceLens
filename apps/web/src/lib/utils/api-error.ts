@@ -15,6 +15,12 @@ export interface ApiErrorCopy {
   rateLimited: string;
   server: string;
   generic: string;
+  /** The API's English messages in this language, keyed by the exact message. */
+  byMessage?: Record<string, string>;
+  /** Shown for a plan limit (UPGRADE_REQUIRED) when this language has no word for the message itself. */
+  upgradeRequired?: string;
+  /** Shown instead of validation details, which the API writes in English. */
+  invalidInput?: string;
 }
 
 const ENGLISH: ApiErrorCopy = {
@@ -30,8 +36,9 @@ const ENGLISH: ApiErrorCopy = {
  *
  * The API returns a generic `message` ("Validation failed") and puts the part
  * that actually tells you what to fix in `details`, so surface that when present.
- * Those server texts are English in both UIs (handoff → phase 11: map error
- * codes to dictionary messages).
+ * The server writes English; a language's copy can word the known messages
+ * (byMessage), plan limits and validation failures itself. A message it does
+ * not know is shown as the server wrote it.
  */
 export function getApiErrorMessage(err: unknown, fallback?: string, copy: ApiErrorCopy = ENGLISH): string {
   const axiosErr = err as AxiosError<ApiErrorBody>;
@@ -50,6 +57,12 @@ export function getApiErrorMessage(err: unknown, fallback?: string, copy: ApiErr
     return copy.rateLimited;
   }
 
+  const known = apiError?.message ? copy.byMessage?.[apiError.message] : undefined;
+  if (known) return known;
+  if (apiError?.code === 'UPGRADE_REQUIRED' && copy.upgradeRequired) return copy.upgradeRequired;
+
+  const hasDetails = (Array.isArray(details) && details.length > 0) || (typeof details === 'string' && details.trim() !== '');
+  if (hasDetails && copy.invalidInput) return copy.invalidInput;
   if (Array.isArray(details) && details.length > 0) return details.join('. ');
   if (typeof details === 'string' && details.trim()) return details;
   if (apiError?.message) return apiError.message;

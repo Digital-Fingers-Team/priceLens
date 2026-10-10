@@ -29,6 +29,7 @@ export interface SitemapEntry {
 const STATIC_ROUTES: Array<{ path: string; priority: number; changeFrequency: 'daily' | 'weekly' }> = [
   { path: '/', priority: 1, changeFrequency: 'daily' },
   { path: '/search', priority: 0.7, changeFrequency: 'daily' },
+  { path: '/price-drops', priority: 0.8, changeFrequency: 'daily' },
   { path: '/pricing', priority: 0.4, changeFrequency: 'weekly' },
   { path: '/deal-hunter', priority: 0.4, changeFrequency: 'weekly' },
   ...LEGAL_SLUGS.map((slug) => ({ path: `/legal/${slug}`, priority: 0.2, changeFrequency: 'weekly' as const })),

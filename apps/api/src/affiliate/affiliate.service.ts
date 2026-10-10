@@ -12,6 +12,8 @@ export interface CreateRedirectInput {
   userId?: string | null;
   ip: string;
   userAgent?: string | null;
+  /** False for crawlers: they still get the redirect, but no click is stored. */
+  record?: boolean;
 }
 
 /**
@@ -66,6 +68,8 @@ export class AffiliateService {
       this.logger.debug(`No active affiliate config for platform ${listing.platformId}; redirecting bare`);
       affiliateUrl = listing.externalUrl;
     }
+
+    if (input.record === false) return affiliateUrl;
 
     await this.prisma.affiliateClick.create({
       data: {

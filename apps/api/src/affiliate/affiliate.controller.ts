@@ -19,6 +19,7 @@ import { TokenPayload } from '../auth/interfaces/auth.interfaces';
 import { AffiliateConfigService } from './affiliate-config.service';
 import { UpsertAffiliateConfigDto } from './dto/affiliate-config.dto';
 import { AffiliateService } from './affiliate.service';
+import { isBotUserAgent } from '../analytics/page-path';
 
 @ApiTags('affiliate')
 @Controller('affiliate')
@@ -31,7 +32,7 @@ export class AffiliateController {
   ) {}
 
   /**
-   * The only way out to a retailer's site. Always records a click and
+   * The only way out to a retailer's site. Records a click (not for crawlers) and
    * always redirects through the generated affiliate URL -- never the raw
    * SourceListing.externalUrl directly. Public: anonymous visitors can
    * click "Go to Store" too, so auth here is best-effort (see
@@ -51,6 +52,7 @@ export class AffiliateController {
       userId,
       ip: this.extractIp(req),
       userAgent: req.headers['user-agent'],
+      record: !isBotUserAgent(req.headers['user-agent']),
     });
 
     res.redirect(HttpStatus.FOUND, affiliateUrl);

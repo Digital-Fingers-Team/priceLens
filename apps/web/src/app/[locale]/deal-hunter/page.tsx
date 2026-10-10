@@ -15,13 +15,14 @@ import { Link } from '@/lib/i18n/navigation';
 import { useI18n } from '@/lib/i18n/provider';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { cn } from '@/lib/utils/cn';
+import { productTitle } from '@/lib/product-title';
 import { FEATURES } from '@/types/billing.types';
-import type { DealHunterMatch } from '@/types/deal-hunter.types';
+import type { DealHunterMatch, DealHunterReason } from '@/types/deal-hunter.types';
 
 const GRADE_TEXT = { EXCELLENT: 'text-success', GOOD: 'text-info', FAIR: 'text-warning', POOR: 'text-danger' } as const;
 
 export default function DealHunterPage() {
-  const { t, tf, fmt } = useI18n();
+  const { t, tf, fmt, locale } = useI18n();
   const [draft, setDraft] = useState('');
   const [submitted, setSubmitted] = useState('');
 
@@ -137,9 +138,14 @@ export default function DealHunterPage() {
         ) : data ? (
           <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <p className="text-sm text-fg" dir="auto">
-                {data.interpretation}
-              </p>
+              {/* The API words its reading in English; other languages have the chips above. */}
+              {locale === 'en' ? (
+                <p className="text-sm text-fg" dir="auto">
+                  {data.interpretation}
+                </p>
+              ) : (
+                <span />
+              )}
               {data.matches.length > 0 && (
                 <p className="text-xs text-muted">
                   {tf(t.dealHunter.ofCandidates, { shown: data.matches.length, total: data.totalCandidates })}
@@ -147,7 +153,7 @@ export default function DealHunterPage() {
               )}
             </div>
             {data.notice ? (
-              <EmptyState title={data.notice} className="rounded border border-dashed border-border-strong" />
+              <EmptyState title={(data.noticeCode && t.dealHunter.notices[data.noticeCode]) || data.notice} className="rounded border border-dashed border-border-strong" />
             ) : (
               <ol className="flex flex-col gap-3">
                 {data.matches.map((match, index) => (
@@ -163,7 +169,17 @@ export default function DealHunterPage() {
 }
 
 function MatchCard({ match, rank }: { match: DealHunterMatch; rank: number }) {
-  const { t, tf, fmt } = useI18n();
+  const { t, tf, fmt, locale } = useI18n();
+  // Reasons in the page language when the API sent codes; its English sentences otherwise.
+  const word = (reason: DealHunterReason) => {
+    const params = Object.fromEntries(
+      Object.entries(reason.params).map(([key, value]) =>
+        typeof value === 'number' && (key === 'price' || key === 'headroom') ? [key, fmt.currency(value, match.currency)] : [key, value],
+      ),
+    );
+    return tf(t.dealHunter.reasons[reason.code] ?? '', params);
+  };
+  const reasons = match.reasonCodes ? match.reasonCodes.map(word).filter(Boolean) : match.reasons;
   const gradeText = match.dealGrade ? GRADE_TEXT[match.dealGrade as keyof typeof GRADE_TEXT] : 'text-muted';
 
   return (
@@ -177,7 +193,7 @@ function MatchCard({ match, rank }: { match: DealHunterMatch; rank: number }) {
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <Link href={`/products/${match.slug}`} dir="auto" className="text-sm font-medium text-fg hover:text-brand-text">
-            {match.title}
+            {productTitle(match, locale)}
           </Link>
           <div className="flex shrink-0 flex-col items-end gap-1">
             <p className="text-base font-semibold tabular-nums text-fg">{fmt.currency(match.price, match.currency)}</p>
@@ -187,7 +203,7 @@ function MatchCard({ match, rank }: { match: DealHunterMatch; rank: number }) {
           </div>
         </div>
         <div className="flex flex-wrap gap-1">
-          <Badge variant="outline">{match.categoryName}</Badge>
+          <Badge variant="outline">{(locale === 'ar' && match.categoryNameAr) || match.categoryName}</Badge>
           {match.specsMatched.map((spec) => (
             <Badge key={spec.field + spec.value} variant="success">
               <Check className="h-3 w-3" aria-hidden />
@@ -205,7 +221,7 @@ function MatchCard({ match, rank }: { match: DealHunterMatch; rank: number }) {
           {match.inStock === false && <Badge variant="danger">{t.product.outOfStock}</Badge>}
         </div>
         <ul className="flex list-disc flex-col gap-1 ps-4 text-xs text-muted marker:text-border-strong" dir="auto">
-          {match.reasons.map((reason) => (
+          {reasons.map((reason) => (
             <li key={reason}>{reason}</li>
           ))}
         </ul>

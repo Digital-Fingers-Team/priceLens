@@ -35,6 +35,7 @@ import { ProcurementModule } from './procurement/procurement.module';
 import { PublicApiModule } from './public-api/public-api.module';
 import { HealthModule } from './health/health.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { DealsModule } from './deals/deals.module';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
 import redisConfig from './config/redis.config';
@@ -149,6 +150,7 @@ export const ENV_FILES = resolveEnvFiles();
     PublicApiModule,
     HealthModule,
     AnalyticsModule,
+    DealsModule,
   ],
   providers: [
     // ThrottlerModule only supplies configuration — without the guard actually

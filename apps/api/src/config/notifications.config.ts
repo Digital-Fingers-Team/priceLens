@@ -33,6 +33,12 @@ export default registerAs('notifications', () => ({
   webPushPrivateKey: process.env.WEB_PUSH_PRIVATE_KEY ?? '',
   webPushSubject: process.env.WEB_PUSH_SUBJECT ?? '',
 
+  // The daily price-drops post to a public Telegram channel (DealsPostService).
+  // Off while the chat is empty; the bot falls back to the owner alert bot.
+  dealsTelegramChat: process.env.DEALS_TELEGRAM_CHAT ?? '',
+  dealsTelegramBotToken: process.env.DEALS_TELEGRAM_BOT_TOKEN ?? '',
+  dealsPostCron: process.env.DEALS_POST_CRON ?? '0 15 * * *',
+
   // When free plans' held alert emails go out as one digest (UTC).
   alertDigestCron: process.env.ALERT_DIGEST_CRON ?? '0 6 * * *',
 }));

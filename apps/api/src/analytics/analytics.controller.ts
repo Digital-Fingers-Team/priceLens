@@ -7,7 +7,7 @@ import { Public, Roles } from '../common/decorators';
 import { SkipCsrf } from '../common/guards/csrf.guard';
 import { AnalyticsService } from './analytics.service';
 import { AnalyticsSummaryQueryDto, RecordDurationDto, RecordPageViewDto } from './dto/analytics.dto';
-import { BOT_USER_AGENT, deviceOf, parsePagePath, referrerHost } from './page-path';
+import { deviceOf, isBotUserAgent, parsePagePath, referrerHost } from './page-path';
 
 /**
  * Site analytics (owner, 2026-09-29). The web tracker posts a view when a
@@ -28,7 +28,7 @@ export class AnalyticsController {
   @ApiOperation({ summary: 'Record a page view (web tracker)' })
   async recordView(@Body() body: RecordPageViewDto, @Req() req: Request): Promise<void> {
     const userAgent = req.headers['user-agent'];
-    if (!userAgent || BOT_USER_AGENT.test(userAgent)) return;
+    if (isBotUserAgent(userAgent)) return;
     const page = parsePagePath(body.path);
     if (!page) return;
     await this.analytics.recordView({

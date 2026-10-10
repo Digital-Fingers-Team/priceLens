@@ -29,6 +29,7 @@ export const RUN_FX_REFRESH_JOB = 'run-fx-refresh';
 export const RUN_DATA_RETENTION_JOB = 'run-data-retention';
 export const RUN_IMPORT_FINDER_JOB = 'run-import-finder';
 export const RUN_TREND_RADAR_JOB = 'run-trend-radar';
+export const RUN_DEALS_POST_JOB = 'run-deals-post';
 
 /** run-live-ingestion: a category sweep over some or all stores. */
 export interface LiveIngestionJobData {

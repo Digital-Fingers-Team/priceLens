@@ -2,6 +2,14 @@
 export interface AnalyticsSummary {
   days: number;
   since: string;
+  /** Distinct visitors at each step; store clickers are distinct hashed addresses (clicks carry no visitor id). */
+  funnel?: {
+    visitors: number;
+    browsed: number;
+    productViewers: number;
+    storeClickers: number;
+    signups: number;
+  };
   traffic: {
     views: number;
     visitors: number;

@@ -1,4 +1,4 @@
-import { deviceOf, parsePagePath, referrerHost } from './page-path';
+import { deviceOf, isBotUserAgent, parsePagePath, referrerHost } from './page-path';
 
 describe('parsePagePath', () => {
   it('reads Arabic (unprefixed) and English pages', () => {
@@ -49,5 +49,20 @@ describe('deviceOf', () => {
   it('tells phones from desktops', () => {
     expect(deviceOf('Mozilla/5.0 (Linux; Android 14) Mobile Safari')).toBe('mobile');
     expect(deviceOf('Mozilla/5.0 (Windows NT 10.0; Win64; x64)')).toBe('desktop');
+  });
+});
+
+describe('isBotUserAgent', () => {
+  it('flags crawlers, AI agents, scripts and a missing user agent', () => {
+    expect(isBotUserAgent('Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ShapBot/0.1.0')).toBe(true);
+    expect(isBotUserAgent('Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0')).toBe(true);
+    expect(isBotUserAgent('python-requests/2.32')).toBe(true);
+    expect(isBotUserAgent(undefined)).toBe(true);
+    expect(isBotUserAgent('')).toBe(true);
+  });
+
+  it('lets phone and desktop browsers through', () => {
+    expect(isBotUserAgent('Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Mobile Safari/537.36')).toBe(false);
+    expect(isBotUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.7 Mobile/15E148 Safari/604.1')).toBe(false);
   });
 });

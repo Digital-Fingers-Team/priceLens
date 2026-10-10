@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
-import type { PagePath } from './page-path';
+import { BOT_USER_AGENT, type PagePath } from './page-path';
 
 /** A view longer than this counts as this long (a tab left open overnight). */
 const MAX_VIEW_MS = 30 * 60 * 1000;
@@ -19,6 +19,9 @@ export interface NewPageView extends PagePath {
 }
 
 type Row = Record<string, unknown>;
+
+/** Store clicks made by people: crawlers following the store links are left out (rows stored before 2026-10-10 include them). */
+const HUMAN_CLICK = Prisma.sql`c."user_agent" IS NOT NULL AND c."user_agent" !~* ${BOT_USER_AGENT.source}`;
 
 /** bigint and numeric columns come back as bigint/Decimal; the JSON wants numbers. */
 function num(value: unknown): number {
@@ -66,6 +69,7 @@ export class AnalyticsService {
       alerts,
       storeClicks,
       productClicks,
+      funnel,
     ] = await Promise.all([
       this.prisma.$queryRaw<Row[]>(Prisma.sql`
         SELECT count(*) AS views, count(DISTINCT "visitor_id") AS visitors,
@@ -131,13 +135,22 @@ export class AnalyticsService {
       this.prisma.$queryRaw<Row[]>(Prisma.sql`
         SELECT pl."name" AS store, count(*) AS clicks
         FROM "affiliate_clicks" c JOIN "platforms" pl ON pl."id" = c."platform_id"
-        WHERE c."clicked_at" >= ${since} GROUP BY 1 ORDER BY clicks DESC LIMIT 10`),
+        WHERE c."clicked_at" >= ${since} AND ${HUMAN_CLICK} GROUP BY 1 ORDER BY clicks DESC LIMIT 10`),
       // Which products send people to stores: demand data for the seller and
       // business plans, not just a vanity count.
       this.prisma.$queryRaw<Row[]>(Prisma.sql`
         SELECT p."slug", p."title", p."title_ar", count(*) AS count
         FROM "affiliate_clicks" c JOIN "canonical_products" p ON p."id" = c."canonical_product_id"
-        WHERE c."clicked_at" >= ${since} GROUP BY 1, 2, 3 ORDER BY count DESC LIMIT 10`),
+        WHERE c."clicked_at" >= ${since} AND ${HUMAN_CLICK} GROUP BY 1, 2, 3 ORDER BY count DESC LIMIT 10`),
+      // Where visitors drop off. Clicks carry no visitor id, so "went to a
+      // store" counts distinct (hashed) addresses instead.
+      this.prisma.$queryRaw<Row[]>(Prisma.sql`
+        SELECT
+          (SELECT count(DISTINCT "visitor_id") FROM ${views}) AS visitors,
+          (SELECT count(DISTINCT "visitor_id") FROM ${views} AND "route" IN ('search', 'category')) AS browsed,
+          (SELECT count(DISTINCT "visitor_id") FROM ${views} AND "route" = 'product') AS product_viewers,
+          (SELECT count(DISTINCT c."ip_hash") FROM "affiliate_clicks" c WHERE c."clicked_at" >= ${since} AND ${HUMAN_CLICK}) AS clickers,
+          (SELECT count(*) FROM "users" WHERE "created_at" >= ${since} AND "deleted_at" IS NULL) AS signups`),
     ]);
 
     const t = traffic[0] ?? {};
@@ -145,9 +158,17 @@ export class AnalyticsService {
     const alertTotal = await this.prisma.priceAlert.count();
     const clickTotal = storeClicks.reduce((sum, r) => sum + num(r.clicks), 0);
 
+    const f = funnel[0] ?? {};
     return {
       days,
       since: since.toISOString(),
+      funnel: {
+        visitors: num(f.visitors),
+        browsed: num(f.browsed),
+        productViewers: num(f.product_viewers),
+        storeClickers: num(f.clickers),
+        signups: num(f.signups),
+      },
       traffic: {
         views: num(t.views),
         visitors: num(t.visitors),

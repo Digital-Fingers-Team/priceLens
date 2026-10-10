@@ -29,6 +29,7 @@ import type { RetailerListing } from '../interfaces/retailer-listing.interface';
 import { KeyedMutex } from '../../common/keyed-mutex';
 import { IngestionRepository } from './ingestion.repository';
 import { buildRawAttributes, inferTier, toDbDecimal, toJson, toSlug } from './listing-mapping';
+import { pickCategoryForQuery } from './search-queries';
 
 const DEFAULT_MIN_LISTING_PRICE_EGP = 5000;
 
@@ -133,6 +134,10 @@ export class ListingProcessor {
     }
 
     const home = await this.homeCategory(category, listing.title);
+    if (!home) {
+      this.logger.debug(`Skipping "${listing.title}" from ${platform.slug}: not a phone accessory and no category fits its title`);
+      return null;
+    }
     const keys = listingKeys(input);
     const family = [keys.brand ?? '', keys.model ?? input.normalized.normalized].join('|');
     return this.familyLock.run(family, () =>
@@ -146,9 +151,20 @@ export class ListingProcessor {
    * whichever sweep found it (headphone and smart-watch searches return them
    * by the thousand), so every copy of it meets in one place. The sanity and
    * price-floor checks above still use the sweep's category.
+   *
+   * Phone Accessories is never swept (retired); listings only reach it when a
+   * product filed there (a FreeBuds case) is searched at the other stores, and
+   * those searches return the devices themselves. Such a listing goes to the
+   * leaf its title names, or is skipped when none does: on 2026-10-10, 390
+   * earbuds sat in Phone Accessories, 63 of them created that week.
    */
-  private async homeCategory(sweepCategory: Category, title: string): Promise<Category> {
-    if (sweepCategory.slug === PHONE_ACCESSORIES_SLUG || !isPhoneAccessory(title)) return sweepCategory;
+  private async homeCategory(sweepCategory: Category, title: string): Promise<Category | null> {
+    if (sweepCategory.slug === PHONE_ACCESSORIES_SLUG) {
+      if (isPhoneAccessory(title)) return sweepCategory;
+      const leaves = (await this.repository.findLeafCategories()).filter((leaf) => (leaf.rolloutWave ?? 0) >= 0);
+      return pickCategoryForQuery(title, leaves);
+    }
+    if (!isPhoneAccessory(title)) return sweepCategory;
     return (await this.repository.categoryBySlug(PHONE_ACCESSORIES_SLUG)) ?? sweepCategory;
   }
 

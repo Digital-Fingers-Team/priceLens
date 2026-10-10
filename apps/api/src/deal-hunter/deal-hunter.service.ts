@@ -15,9 +15,11 @@ export interface DealHunterMatch {
   productId: string;
   slug: string;
   title: string;
+  titleAr: string | null;
   brand: string | null;
   imageUrl: string | null;
   categoryName: string;
+  categoryNameAr: string | null;
   price: number | null;
   currency: string;
   storeCount: number;
@@ -30,8 +32,27 @@ export interface DealHunterMatch {
   specsMatched: SpecConstraint[];
   /** Specs asked for that we could not confirm either way. */
   specsUnconfirmed: SpecConstraint[];
-  /** Plain-language, data-backed reasons this is being shown. */
+  /** Plain-language, data-backed reasons this is being shown (English, for API clients). */
   reasons: string[];
+  /** The same reasons as codes; the website words them in its language. */
+  reasonCodes: DealHunterReason[];
+}
+
+export type DealHunterReasonCode =
+  | 'UNDER_BUDGET'
+  | 'AT_BUDGET'
+  | 'CHEAPEST'
+  | 'MATCHES'
+  | 'UNCONFIRMED'
+  | 'COMPARED'
+  | 'ONE_STORE'
+  | 'CHEAPER_THAN_HISTORY'
+  | 'NO_HISTORY';
+
+export interface DealHunterReason {
+  code: DealHunterReasonCode;
+  /** price, headroom, stores, pct, days (numbers) and specs (the spec values, joined). */
+  params: Record<string, number | string>;
 }
 
 export interface DealHunterResult {
@@ -44,6 +65,8 @@ export interface DealHunterResult {
   currency: string;
   /** Set when the search could not be run meaningfully. */
   notice: string | null;
+  /** The notice as a code, for the website to word: UNREADABLE (nothing understood) or NO_MATCHES. */
+  noticeCode: 'UNREADABLE' | 'NO_MATCHES' | null;
 }
 
 /**
@@ -82,6 +105,7 @@ export class DealHunterService {
         totalCandidates: 0,
         currency: this.currency,
         notice: 'Try naming a product type and a budget, for example "laptop under 40,000 EGP with RTX 4060".',
+        noticeCode: 'UNREADABLE',
       };
     }
 
@@ -97,6 +121,7 @@ export class DealHunterService {
         currency: this.currency,
         notice:
           'Nothing in the catalogue matches all of that yet. Try widening the budget or dropping a requirement.',
+        noticeCode: 'NO_MATCHES',
       };
     }
 
@@ -120,6 +145,7 @@ export class DealHunterService {
       totalCandidates: candidates.length,
       currency: this.currency,
       notice: null,
+      noticeCode: null,
     };
   }
 
@@ -167,10 +193,11 @@ export class DealHunterService {
         id: true,
         slug: true,
         title: true,
+        titleAr: true,
         brand: true,
         imageUrl: true,
         attributes: true,
-        category: { select: { name: true } },
+        category: { select: { name: true, nameAr: true } },
         sourceListings: {
           // Live offers only: the same rule as the product page (offer-rules).
           where: liveOfferWhere(this.offerPolicy),
@@ -249,9 +276,11 @@ export class DealHunterService {
       productId: product.id,
       slug: product.slug,
       title: product.title,
+      titleAr: product.titleAr,
       brand: product.brand,
       imageUrl: product.imageUrl,
       categoryName: product.category.name,
+      categoryNameAr: product.category.nameAr,
       price: best,
       currency: this.currency,
       storeCount,
@@ -261,7 +290,7 @@ export class DealHunterService {
       matchScore,
       specsMatched: matched,
       specsUnconfirmed: unconfirmed,
-      reasons: this.explain(best, parsed, matched, unconfirmed, deal, stats, storeCount, perStore.size),
+      ...this.explain(best, parsed, matched, unconfirmed, deal, stats, storeCount, perStore.size),
     };
   }
 
@@ -312,46 +341,54 @@ export class DealHunterService {
     stats: ReturnType<typeof computeHistoryStats>,
     storeCount: number,
     competitorCount: number,
-  ): string[] {
+  ): { reasons: string[]; reasonCodes: DealHunterReason[] } {
     const reasons: string[] = [];
+    const reasonCodes: DealHunterReason[] = [];
+    const say = (text: string, code: DealHunterReasonCode, params: DealHunterReason['params'] = {}) => {
+      reasons.push(text);
+      reasonCodes.push({ code, params });
+    };
     const money = (value: number) => `${Math.round(value).toLocaleString('en-US')} ${this.currency}`;
 
     if (price != null && parsed.price.max != null) {
       const headroom = parsed.price.max - price;
-      reasons.push(
-        headroom > 0
-          ? `${money(price)} — ${money(headroom)} under your budget.`
-          : `${money(price)}, right at your budget.`,
-      );
+      if (headroom > 0) {
+        say(`${money(price)} — ${money(headroom)} under your budget.`, 'UNDER_BUDGET', { price: Math.round(price), headroom: Math.round(headroom) });
+      } else {
+        say(`${money(price)}, right at your budget.`, 'AT_BUDGET', { price: Math.round(price) });
+      }
     } else if (price != null) {
-      reasons.push(`Cheapest live price is ${money(price)}.`);
+      say(`Cheapest live price is ${money(price)}.`, 'CHEAPEST', { price: Math.round(price) });
     }
 
     if (matched.length > 0) {
-      reasons.push(`Matches ${matched.map((spec) => spec.value).join(', ')}.`);
+      const specs = matched.map((spec) => spec.value).join(', ');
+      say(`Matches ${specs}.`, 'MATCHES', { specs });
     }
     if (unconfirmed.length > 0) {
       // Said plainly rather than hidden: this is the difference between a
       // recommendation and a guess.
-      reasons.push(
-        `We could not confirm ${unconfirmed.map((spec) => spec.value).join(', ')} from the listing data.`,
-      );
+      const specs = unconfirmed.map((spec) => spec.value).join(', ');
+      say(`We could not confirm ${specs} from the listing data.`, 'UNCONFIRMED', { specs });
     }
 
     if (competitorCount >= 2) {
-      reasons.push(`Compared across ${storeCount} store(s) carrying it.`);
+      say(`Compared across ${storeCount} store(s) carrying it.`, 'COMPARED', { stores: storeCount });
     } else {
-      reasons.push('Only one store currently carries this, so the price is harder to sanity-check.');
+      say('Only one store currently carries this, so the price is harder to sanity-check.', 'ONE_STORE');
     }
 
     if (stats && deal.score != null) {
       const historical = deal.signals.find((signal) => signal.key === 'historicalPosition');
-      if (historical?.available) reasons.push(historical.detail);
+      if (historical?.available && historical.score != null) {
+        // The signal scores 100 - percentile rank: the share of recorded days that were dearer.
+        say(historical.detail, 'CHEAPER_THAN_HISTORY', { pct: Math.round(historical.score), days: stats.dayCount });
+      }
     } else if (!stats) {
-      reasons.push('No recorded price history yet, so we cannot say whether this is a good moment to buy.');
+      say('No recorded price history yet, so we cannot say whether this is a good moment to buy.', 'NO_HISTORY');
     }
 
-    return reasons;
+    return { reasons, reasonCodes };
   }
 
   private describe(parsed: ParsedQuery): string {

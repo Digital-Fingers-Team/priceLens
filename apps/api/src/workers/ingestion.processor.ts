@@ -40,6 +40,7 @@ import {
   RUN_DATA_RETENTION_JOB,
   RUN_IMPORT_FINDER_JOB,
   RUN_TREND_RADAR_JOB,
+  RUN_DEALS_POST_JOB,
   ReconciliationJobData,
   StoreCoverageSweepJobData,
   StoreExpansionJobData,
@@ -59,6 +60,7 @@ import { TrendRadarService } from '../trade/trend-radar.service';
 import { FEATURES } from '../billing/plan-limits';
 import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
 import { DataRetentionService } from '../analytics/data-retention.service';
+import { DealsPostService } from '../deals/deals-post.service';
 
 /** Store expansions allowed to wait for a scrape slot; more would starve the scheduled jobs. */
 export const MAX_PARKED_EXPANSIONS = 4;
@@ -90,6 +92,7 @@ export class IngestionProcessor {
     private readonly trendRadar: TrendRadarService,
     private readonly flags: FeatureFlagsService,
     private readonly dataRetention: DataRetentionService,
+    private readonly dealsPost: DealsPostService,
     @Optional() private readonly titleTranslation?: TitleTranslationService,
   ) {}
 
@@ -207,6 +210,12 @@ export class IngestionProcessor {
   @Process(RUN_DATA_RETENTION_JOB)
   async handleDataRetention() {
     return this.dataRetention.run();
+  }
+
+  /** The daily price-drops post to the public Telegram channel. */
+  @Process(RUN_DEALS_POST_JOB)
+  async handleDealsPost() {
+    return this.dealsPost.postDaily();
   }
 
   /** The trend radar for the week that just finished. */

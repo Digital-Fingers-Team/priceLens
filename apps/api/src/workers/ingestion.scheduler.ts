@@ -25,6 +25,7 @@ import {
   RUN_DATA_RETENTION_JOB,
   RUN_IMPORT_FINDER_JOB,
   RUN_TREND_RADAR_JOB,
+  RUN_DEALS_POST_JOB,
 } from './ingestion.jobs';
 import { retryUntilDone } from '../common/redis-resilience';
 import { JOB_PRIORITY } from './ingestion-queue.service';
@@ -50,6 +51,7 @@ const FX_REFRESH_JOB_ID = 'scheduled-fx-refresh';
 const IMPORT_FINDER_JOB_ID = 'scheduled-import-finder';
 const TREND_RADAR_JOB_ID = 'scheduled-trend-radar';
 const DATA_RETENTION_JOB_ID = 'scheduled-data-retention';
+const DEALS_POST_JOB_ID = 'scheduled-deals-post';
 
 @Injectable()
 export class IngestionScheduler implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -246,8 +248,12 @@ export class IngestionScheduler implements OnApplicationBootstrap, OnApplication
       { jobId: DATA_RETENTION_JOB_ID, priority: JOB_PRIORITY.scheduled, repeat: { cron: retentionCron } },
     );
 
+    // The daily price-drops post (a no-op until DEALS_TELEGRAM_CHAT is set).
+    const dealsCron = this.configService.get<string>('notifications.dealsPostCron', '0 15 * * *');
+    await this.queue.add(RUN_DEALS_POST_JOB, {}, { jobId: DEALS_POST_JOB_ID, priority: JOB_PRIORITY.scheduled, repeat: { cron: dealsCron } });
+
     this.logger.log(
-      `Scheduled data retention (${retentionCron}), FX (${fxCron}), import finder (${importCron}), trend radar (${radarCron}), repricer (${repricerCron}), rank tracking (${rankCron}), used market (${usedCron}), cart watch (${cartCron}), alert digest (${digestCron}), price rollup (${rollupCron}), notification retry (${retryCron}), subscription maintenance (${maintenanceCron}), ` +
+      `Scheduled deals post (${dealsCron}), data retention (${retentionCron}), FX (${fxCron}), import finder (${importCron}), trend radar (${radarCron}), repricer (${repricerCron}), rank tracking (${rankCron}), used market (${usedCron}), cart watch (${cartCron}), alert digest (${digestCron}), price rollup (${rollupCron}), notification retry (${retryCron}), subscription maintenance (${maintenanceCron}), ` +
         `competitor detection (${detectionCron}), MAP sweep (${mapCron}), ` +
         `launch detection (${launchCron}), weekly reports (${reportsCron}) ` +
         `and Arabic titles (${translationCron})`,

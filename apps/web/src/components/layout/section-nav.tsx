@@ -8,6 +8,7 @@ import type { Dictionary } from '@/lib/i18n/dictionaries';
  * these.
  */
 const SECTIONS = [
+  ['/price-drops', 'priceDrops'],
   ['/categories/smartphones', 'smartphones'],
   ['/categories/laptops', 'laptops'],
   ['/categories/televisions', 'televisions'],

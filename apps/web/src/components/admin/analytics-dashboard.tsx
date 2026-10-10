@@ -158,6 +158,35 @@ function ProductLabel({ slug, title, titleAr }: { slug: string; title: string; t
   );
 }
 
+/** Where visitors drop off: each step as a share of all visitors. */
+function Funnel({ funnel }: { funnel: NonNullable<AnalyticsSummary['funnel']> }) {
+  const steps = [
+    { label: 'Visited', value: funnel.visitors },
+    { label: 'Searched or opened a category', value: funnel.browsed },
+    { label: 'Opened a product', value: funnel.productViewers },
+    { label: 'Went to a store', value: funnel.storeClickers },
+    { label: 'Signed up', value: funnel.signups },
+  ];
+  const top = Math.max(1, funnel.visitors);
+  return (
+    <ol className="space-y-3">
+      {steps.map((step) => (
+        <li key={step.label} className="text-sm">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-fg">{step.label}</span>
+            <span className="tabular-nums text-fg font-medium">
+              {formatNumber(step.value)} <span className="text-muted font-normal">· {Math.round((step.value / top) * 100)}%</span>
+            </span>
+          </div>
+          <div className="mt-1 h-2 rounded-full bg-surface-2">
+            <div className="h-2 rounded-full bg-brand" style={{ width: `${Math.min(100, (step.value / top) * 100)}%` }} />
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 function Dashboard({ data }: { data: AnalyticsSummary }) {
   const { traffic, engagement, searches, products, accounts, favorites, storeClicks } = data;
   const mobile = traffic.devices.find((d) => d.device === 'mobile')?.visitors ?? 0;
@@ -197,7 +226,7 @@ function Dashboard({ data }: { data: AnalyticsSummary }) {
           value={formatNumber(traffic.searches)}
           sub={`${formatNumber(searches.noResults.reduce((sum, s) => sum + s.searches, 0))} found nothing`}
         />
-        <Tile icon={MousePointerClick} label="Clicks to stores" value={formatNumber(storeClicks.total)} />
+        <Tile icon={MousePointerClick} label="Clicks to stores" value={formatNumber(storeClicks.total)} sub="people only, crawlers left out" />
         <Tile
           icon={Clock}
           label="Time on site"
@@ -205,6 +234,12 @@ function Dashboard({ data }: { data: AnalyticsSummary }) {
           sub="visible time, all pages"
         />
       </div>
+
+      {data.funnel && (
+        <Panel title="Funnel">
+          <Funnel funnel={data.funnel} />
+        </Panel>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <Panel title="Visitors per day">

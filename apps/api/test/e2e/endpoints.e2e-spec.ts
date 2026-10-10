@@ -414,6 +414,7 @@ describe('Every endpoint (e2e)', () => {
     await call('GET', '/api/v1/deal-hunter', 200, { token: pro.token, query: { q: 'iphone under 45000' } });
     await call('GET', '/api/v1/deal-hunter', 403, { token: free.token, query: { q: 'iphone under 45000' } });
     await call('GET', '/api/v1/deal-hunter/interpret', 200, { query: { q: 'iphone under 45000' } });
+    await call('GET', '/api/v1/deals/price-drops', 200, { query: { limit: 10 } });
     expectNoProblems();
   });
 
