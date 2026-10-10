@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module';
 import { AuthModule } from '../auth/auth.module';
 import { AFFILIATE_CONVERSION_QUEUE, AFFILIATE_PROVIDERS, CONVERSION_PROVIDERS } from './affiliate.constants';
+import { AliexpressAffiliateProvider } from './providers/aliexpress-affiliate.provider';
 import { AmazonAffiliateProvider } from './providers/amazon-affiliate.provider';
 import { JumiaAffiliateProvider } from './providers/jumia-affiliate.provider';
 import { NoonAffiliateProvider } from './providers/noon-affiliate.provider';
@@ -28,6 +29,7 @@ import { AffiliateConversionsController } from './affiliate-conversions.controll
     AmazonAffiliateProvider,
     JumiaAffiliateProvider,
     NoonAffiliateProvider,
+    AliexpressAffiliateProvider,
     // To add a new store: write one AffiliateProvider class, list it here,
     // and add it to the factory below -- AffiliateProviderRegistry,
     // AffiliateService, and AffiliateController never need to change.
@@ -37,8 +39,9 @@ import { AffiliateConversionsController } from './affiliate-conversions.controll
         amazon: AmazonAffiliateProvider,
         jumia: JumiaAffiliateProvider,
         noon: NoonAffiliateProvider,
-      ) => [amazon, jumia, noon],
-      inject: [AmazonAffiliateProvider, JumiaAffiliateProvider, NoonAffiliateProvider],
+        aliexpress: AliexpressAffiliateProvider,
+      ) => [amazon, jumia, noon, aliexpress],
+      inject: [AmazonAffiliateProvider, JumiaAffiliateProvider, NoonAffiliateProvider, AliexpressAffiliateProvider],
     },
     AffiliateProviderRegistry,
     AffiliateConfigService,

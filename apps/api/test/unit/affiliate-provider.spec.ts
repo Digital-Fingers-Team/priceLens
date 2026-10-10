@@ -1,6 +1,7 @@
 // apps/api/test/unit/affiliate-provider.spec.ts
 import { Test } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
+import { AliexpressAffiliateProvider } from '../../src/affiliate/providers/aliexpress-affiliate.provider';
 import { AmazonAffiliateProvider } from '../../src/affiliate/providers/amazon-affiliate.provider';
 import { JumiaAffiliateProvider } from '../../src/affiliate/providers/jumia-affiliate.provider';
 import { NoonAffiliateProvider } from '../../src/affiliate/providers/noon-affiliate.provider';
@@ -124,6 +125,41 @@ describe('JumiaAffiliateProvider', () => {
     );
 
     expect(result.searchParams.get('campaign')).toBe('pricelens-cpa');
+  });
+});
+
+describe('AliexpressAffiliateProvider', () => {
+  const provider = new AliexpressAffiliateProvider();
+  const context: AffiliateLinkContext = {
+    ...baseContext,
+    externalUrl: 'https://ar.aliexpress.com/item/1005003871424701.html?algo_pvid=abc&pdp_npi=6%40dis%21EGP',
+    affiliateId: '_c30KmT8l',
+  };
+
+  it('has the aliexpress store key', () => {
+    expect(provider.storeKey).toBe('aliexpress');
+  });
+
+  it('wraps the product in a Portals deep link with the short key', () => {
+    const result = new URL(provider.buildAffiliateUrl(context));
+
+    expect(result.origin + result.pathname).toBe('https://s.click.aliexpress.com/deep_link.htm');
+    expect(result.searchParams.get('aff_short_key')).toBe('_c30KmT8l');
+  });
+
+  it('drops the scraped search-session params from the product URL', () => {
+    const result = new URL(provider.buildAffiliateUrl(context));
+
+    expect(result.searchParams.get('dl_target_url')).toBe('https://ar.aliexpress.com/item/1005003871424701.html');
+  });
+
+  it('never lets a colliding tracking param override the short key or target', () => {
+    const result = new URL(
+      provider.buildAffiliateUrl({ ...context, trackingParams: { aff_short_key: 'x', dl_target_url: 'https://evil.example' } }),
+    );
+
+    expect(result.searchParams.get('aff_short_key')).toBe('_c30KmT8l');
+    expect(result.searchParams.get('dl_target_url')).toBe('https://ar.aliexpress.com/item/1005003871424701.html');
   });
 });
 
