@@ -4,6 +4,7 @@ import axios from 'axios';
 import { RetailerConnector } from '../interfaces/retailer-connector.interface';
 import { RetailerListing } from '../interfaces/retailer-listing.interface';
 import { firstJsonArray, streamedText } from '../utils/next-flight';
+import { readResultPages, withPageParam } from '../utils/result-pages';
 
 /** One search result, as Sigma's search page embeds it (the fields we read). */
 export interface SigmaItem {
@@ -62,7 +63,7 @@ export function mapSigmaItem(item: SigmaItem, siteUrl: string): RetailerListing 
 /**
  * Sigma Computer (sigma-computer.com), a Cairo PC-parts and laptop store.
  * Plain HTTP: its store API wants a session, but the search page
- * (`/en/search?q=`) carries the first page of results as embedded data.
+ * (`/en/search?q=`) carries one page of results as embedded data.
  */
 @Injectable()
 export class SigmaConnector implements RetailerConnector {
@@ -79,7 +80,15 @@ export class SigmaConnector implements RetailerConnector {
   }
 
   async searchListings(query: string, limit: number): Promise<RetailerListing[]> {
-    const response = await axios.get<string>(sigmaSearchUrl(this.siteUrl, query), {
+    return readResultPages(
+      { limit, maxPages: this.configService.get<number>('retailers.searchMaxPages', 3) },
+      (pageNumber) => this.readPage(withPageParam(sigmaSearchUrl(this.siteUrl, query), pageNumber)),
+    );
+  }
+
+  /** One results page (16 items); `?page=2` gives the next 16 (checked 2026-10-10). */
+  private async readPage(url: string): Promise<RetailerListing[]> {
+    const response = await axios.get<string>(url, {
       timeout: TIMEOUT_MS,
       responseType: 'text',
       headers: {
@@ -89,7 +98,6 @@ export class SigmaConnector implements RetailerConnector {
     });
     return parseSigmaSearchItems(response.data)
       .map((item) => mapSigmaItem(item, this.siteUrl))
-      .filter((listing) => listing.title.length > 0 && listing.externalId.length > 0)
-      .slice(0, Math.max(1, limit));
+      .filter((listing) => listing.title.length > 0 && listing.externalId.length > 0);
   }
 }

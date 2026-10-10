@@ -3,6 +3,9 @@ import { registerAs } from '@nestjs/config';
 
 export default registerAs('retailers', () => ({
   liveIngestionLimit: parseInt(process.env.LIVE_INGESTION_LIMIT ?? '25', 10),
+  // Result pages a search reads ("Next" in the store) while it has fewer than
+  // the limit; see readResultPages. 1 reads page 1 only, as before 2026-10-10.
+  searchMaxPages: parseInt(process.env.SEARCH_MAX_PAGES ?? '3', 10),
   // Listings priced under this (EGP, after currency conversion) are dropped
   // before matching. A category's own min_price_egp overrides it; the original
   // electronics categories are seeded with 0 (no floor).

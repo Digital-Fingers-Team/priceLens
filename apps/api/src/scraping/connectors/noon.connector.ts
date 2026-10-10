@@ -1,8 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { Page } from 'patchright';
 import { BrowserSessionService } from '../browser/browser-session.service';
 import { RetailerConnector } from '../interfaces/retailer-connector.interface';
 import { RetailerListing } from '../interfaces/retailer-listing.interface';
+import { readResultPages, scrollToLoadAll, withPageParam } from '../utils/result-pages';
 
 interface RawNoonCard {
   href: string;
@@ -46,82 +48,14 @@ export class NoonConnector implements RetailerConnector {
 
     const page = await this.browserSession.getPage(this.slug);
     try {
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await page.waitForSelector('[class*="sellingPrice"]', { timeout: 15000 }).catch(() => undefined);
-      // Card titles hydrate in per-card, not all at once -- confirmed live that
-      // a fixed sleep (tried up to 9s) still sometimes catches every single
-      // card mid-hydration, with its <img alt> still the literal placeholder
-      // string "placeholder". Poll instead of guessing a duration: wait until
-      // real titles have actually landed on enough cards, capped at 15s so a
-      // stuck straggler can't hang the whole search (whatever hasn't hydrated
-      // by then is filtered out downstream anyway, same as a missing title).
-      //
-      // Every card now carries a loading-placeholder <img alt="placeholder">
-      // *before* the real product image, permanently, so "the first img's alt"
-      // is always "placeholder". Reading that dropped every single card as
-      // untitled -- Noon returned zero listings for weeks. The title is read
-      // from the card's name heading instead, and only real (non-placeholder)
-      // images are considered as a fallback.
-      await page
-        .waitForFunction(
-          () => {
-            const anchors = Array.from(document.querySelectorAll('a[class*="productBoxLink"]'));
-            if (anchors.length === 0) return false;
-            const hydrated = anchors.filter((anchor) => {
-              if (anchor.querySelector('[data-qa="plp-product-box-name"]')?.textContent?.trim()) return true;
-              return Array.from(anchor.querySelectorAll('img')).some((img) => {
-                const alt = img.getAttribute('alt')?.trim().toLowerCase();
-                return !!alt && alt !== 'placeholder';
-              });
-            });
-            return hydrated.length >= Math.min(anchors.length, 5);
-          },
-          { timeout: 15000 },
-        )
-        .catch(() => undefined);
-
-      const cards = await page.evaluate(() => {
-        const anchors = Array.from(document.querySelectorAll('a[class*="productBoxLink"]'));
-        const seen = new Set<string>();
-        const out: RawNoonCard[] = [];
-        for (const anchor of anchors) {
-          const href = (anchor as HTMLAnchorElement).href;
-          if (!href || seen.has(href)) continue;
-          seen.add(href);
-
-          const priceEl = anchor.querySelector('[class*="sellingPrice"]');
-          const img = Array.from(anchor.querySelectorAll('img')).find((candidate) => {
-            const alt = candidate.getAttribute('alt')?.trim().toLowerCase();
-            return !!alt && alt !== 'placeholder' && !/^(wishlist|add-to-cart|nudge icon|noon-[\w-]+)$/.test(alt);
-          });
-          const nameEl = anchor.querySelector('[data-qa="plp-product-box-name"]');
-          const name = nameEl?.getAttribute('title')?.trim() || nameEl?.textContent?.trim() || null;
-          // Noon renders the struck-through was-price in its own element,
-          // separate from sellingPrice.
-          const wasPriceEl = anchor.querySelector('[class*="preReductionPrice"], [class*="oldPrice"], del');
-
-          // Noon marks sold-out cards with an overlay badge. As with Amazon,
-          // only explicit wording counts -- an unrecognised state leaves stock
-          // unknown rather than assuming it is buyable.
-          const bodyText = anchor.textContent?.toLowerCase() ?? '';
-          const soldOut = bodyText.includes('out of stock') || bodyText.includes('sold out');
-
-          out.push({
-            href,
-            price: priceEl ? priceEl.textContent?.trim() ?? null : null,
-            wasPrice: wasPriceEl ? wasPriceEl.textContent?.trim() ?? null : null,
-            soldOut,
-            title: name ?? img?.getAttribute('alt') ?? null,
-            imageUrl: img?.getAttribute('src') ?? null,
-          });
-        }
-        return out;
-      });
-
-      return cards
-        .slice(0, limit)
-        .map((card) => this.mapCard(card))
-        .filter((listing): listing is RetailerListing => listing !== null);
+      return await readResultPages(
+        {
+          limit,
+          maxPages: this.configService.get<number>('retailers.searchMaxPages', 3),
+          onLaterPageError: (n, error) => this.logger.warn(`Page ${n} of "${query}" failed (${this.slug}): ${String(error)}`),
+        },
+        (pageNumber) => this.readPage(page, withPageParam(url, pageNumber)),
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(`Search failed for "${query}" (${this.slug}): ${message}`);
@@ -133,6 +67,87 @@ export class NoonConnector implements RetailerConnector {
       // other in-flight call for the same store.
       await page.close().catch(() => undefined);
     }
+  }
+
+  /** One results page, read in the search's own tab. */
+  private async readPage(page: Page, url: string): Promise<RetailerListing[]> {
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForSelector('[class*="sellingPrice"]', { timeout: 15000 }).catch(() => undefined);
+    // Cards further down render as the page is scrolled.
+    await scrollToLoadAll(page);
+    // Card titles hydrate in per-card, not all at once -- confirmed live that
+    // a fixed sleep (tried up to 9s) still sometimes catches every single
+    // card mid-hydration, with its <img alt> still the literal placeholder
+    // string "placeholder". Poll instead of guessing a duration: wait until
+    // real titles have actually landed on enough cards, capped at 15s so a
+    // stuck straggler can't hang the whole search (whatever hasn't hydrated
+    // by then is filtered out downstream anyway, same as a missing title).
+    //
+    // Every card now carries a loading-placeholder <img alt="placeholder">
+    // *before* the real product image, permanently, so "the first img's alt"
+    // is always "placeholder". Reading that dropped every single card as
+    // untitled -- Noon returned zero listings for weeks. The title is read
+    // from the card's name heading instead, and only real (non-placeholder)
+    // images are considered as a fallback.
+    await page
+      .waitForFunction(
+        () => {
+          const anchors = Array.from(document.querySelectorAll('a[class*="productBoxLink"]'));
+          if (anchors.length === 0) return false;
+          const hydrated = anchors.filter((anchor) => {
+            if (anchor.querySelector('[data-qa="plp-product-box-name"]')?.textContent?.trim()) return true;
+            return Array.from(anchor.querySelectorAll('img')).some((img) => {
+              const alt = img.getAttribute('alt')?.trim().toLowerCase();
+              return !!alt && alt !== 'placeholder';
+            });
+          });
+          return hydrated.length >= Math.min(anchors.length, 5);
+        },
+        { timeout: 15000 },
+      )
+      .catch(() => undefined);
+
+    const cards = await page.evaluate(() => {
+      const anchors = Array.from(document.querySelectorAll('a[class*="productBoxLink"]'));
+      const seen = new Set<string>();
+      const out: RawNoonCard[] = [];
+      for (const anchor of anchors) {
+        const href = (anchor as HTMLAnchorElement).href;
+        if (!href || seen.has(href)) continue;
+        seen.add(href);
+
+        const priceEl = anchor.querySelector('[class*="sellingPrice"]');
+        const img = Array.from(anchor.querySelectorAll('img')).find((candidate) => {
+          const alt = candidate.getAttribute('alt')?.trim().toLowerCase();
+          return !!alt && alt !== 'placeholder' && !/^(wishlist|add-to-cart|nudge icon|noon-[\w-]+)$/.test(alt);
+        });
+        const nameEl = anchor.querySelector('[data-qa="plp-product-box-name"]');
+        const name = nameEl?.getAttribute('title')?.trim() || nameEl?.textContent?.trim() || null;
+        // Noon renders the struck-through was-price in its own element,
+        // separate from sellingPrice.
+        const wasPriceEl = anchor.querySelector('[class*="preReductionPrice"], [class*="oldPrice"], del');
+
+        // Noon marks sold-out cards with an overlay badge. As with Amazon,
+        // only explicit wording counts -- an unrecognised state leaves stock
+        // unknown rather than assuming it is buyable.
+        const bodyText = anchor.textContent?.toLowerCase() ?? '';
+        const soldOut = bodyText.includes('out of stock') || bodyText.includes('sold out');
+
+        out.push({
+          href,
+          price: priceEl ? priceEl.textContent?.trim() ?? null : null,
+          wasPrice: wasPriceEl ? wasPriceEl.textContent?.trim() ?? null : null,
+          soldOut,
+          title: name ?? img?.getAttribute('alt') ?? null,
+          imageUrl: img?.getAttribute('src') ?? null,
+        });
+      }
+      return out;
+    });
+
+    return cards
+      .map((card) => this.mapCard(card))
+      .filter((listing): listing is RetailerListing => listing !== null);
   }
 
   private mapCard(card: RawNoonCard): RetailerListing | null {

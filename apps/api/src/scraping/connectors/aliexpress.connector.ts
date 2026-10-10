@@ -1,8 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { Page } from 'patchright';
 import { BrowserSessionService } from '../browser/browser-session.service';
 import { RetailerConnector } from '../interfaces/retailer-connector.interface';
 import { RetailerListing } from '../interfaces/retailer-listing.interface';
+import { readResultPages, scrollToLoadAll, withPageParam } from '../utils/result-pages';
 
 interface RawAliExpressCard {
   href: string;
@@ -54,49 +56,14 @@ export class AliExpressConnector implements RetailerConnector {
         { name: 'intl_locale', value: 'en_US', domain: '.aliexpress.com', path: '/' },
         { name: 'xman_us_f', value: 'x_locale=en_US&x_l=1&x_c_chg=1&intl_locale=en_US', domain: '.aliexpress.com', path: '/' },
       ]);
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await page.waitForSelector('a.search-card-item', { timeout: 15000 }).catch(() => undefined);
-      await page.waitForTimeout(3000);
-
-      const cards = await page.evaluate(() => {
-        const anchors = Array.from(document.querySelectorAll('a.search-card-item'));
-        const seen = new Set<string>();
-        const out: RawAliExpressCard[] = [];
-        for (const anchor of anchors) {
-          const rawHref = (anchor as HTMLAnchorElement).getAttribute('href') ?? '';
-          const href = rawHref.startsWith('//') ? `https:${rawHref}` : rawHref;
-          if (!href || seen.has(href)) continue;
-          seen.add(href);
-
-          const titleEl = anchor.querySelector('h3');
-          // Since about 2026-10 most cards show a photo carousel of
-          // img.images--item--<hash> (the first is the main photo); only a
-          // few still use img.product-img. Badge images carry width/height.
-          const img =
-            anchor.querySelector('img.product-img') ??
-            anchor.querySelector('img[class*="images--item"]') ??
-            Array.from(anchor.querySelectorAll('img')).find(
-              (el) => /\/kf\//.test(el.getAttribute('src') ?? '') && !el.hasAttribute('width'),
-            );
-          const priceEl = Array.from(anchor.querySelectorAll<HTMLElement>('[aria-label]')).find((el) =>
-            /^[A-Za-z]{2,4}[\d,]+(\.\d+)?$/.test(el.getAttribute('aria-label') ?? ''),
-          );
-          const rawImg = img?.getAttribute('src') ?? null;
-
-          out.push({
-            href,
-            title: titleEl?.textContent?.trim() ?? null,
-            priceLabel: priceEl?.getAttribute('aria-label') ?? null,
-            imageUrl: rawImg?.startsWith('//') ? `https:${rawImg}` : rawImg,
-          });
-        }
-        return out;
-      });
-
-      return cards
-        .slice(0, limit)
-        .map((card) => this.mapCard(card))
-        .filter((listing): listing is RetailerListing => listing !== null);
+      return await readResultPages(
+        {
+          limit,
+          maxPages: this.configService.get<number>('retailers.searchMaxPages', 3),
+          onLaterPageError: (n, error) => this.logger.warn(`Page ${n} of "${query}" failed (${this.slug}): ${String(error)}`),
+        },
+        (pageNumber) => this.readPage(page, withPageParam(url, pageNumber)),
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(`Search failed for "${query}" (${this.slug}): ${message}`);
@@ -108,6 +75,54 @@ export class AliExpressConnector implements RetailerConnector {
       // other in-flight call for the same store.
       await page.close().catch(() => undefined);
     }
+  }
+
+  /** One results page, read in the search's own tab. */
+  private async readPage(page: Page, url: string): Promise<RetailerListing[]> {
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForSelector('a.search-card-item', { timeout: 15000 }).catch(() => undefined);
+    // A page holds 60 cards but renders about a third until it is scrolled.
+    await scrollToLoadAll(page);
+    await page.waitForTimeout(1500);
+
+    const cards = await page.evaluate(() => {
+      const anchors = Array.from(document.querySelectorAll('a.search-card-item'));
+      const seen = new Set<string>();
+      const out: RawAliExpressCard[] = [];
+      for (const anchor of anchors) {
+        const rawHref = (anchor as HTMLAnchorElement).getAttribute('href') ?? '';
+        const href = rawHref.startsWith('//') ? `https:${rawHref}` : rawHref;
+        if (!href || seen.has(href)) continue;
+        seen.add(href);
+
+        const titleEl = anchor.querySelector('h3');
+        // Since about 2026-10 most cards show a photo carousel of
+        // img.images--item--<hash> (the first is the main photo); only a
+        // few still use img.product-img. Badge images carry width/height.
+        const img =
+          anchor.querySelector('img.product-img') ??
+          anchor.querySelector('img[class*="images--item"]') ??
+          Array.from(anchor.querySelectorAll('img')).find(
+            (el) => /\/kf\//.test(el.getAttribute('src') ?? '') && !el.hasAttribute('width'),
+          );
+        const priceEl = Array.from(anchor.querySelectorAll<HTMLElement>('[aria-label]')).find((el) =>
+          /^[A-Za-z]{2,4}[\d,]+(\.\d+)?$/.test(el.getAttribute('aria-label') ?? ''),
+        );
+        const rawImg = img?.getAttribute('src') ?? null;
+
+        out.push({
+          href,
+          title: titleEl?.textContent?.trim() ?? null,
+          priceLabel: priceEl?.getAttribute('aria-label') ?? null,
+          imageUrl: rawImg?.startsWith('//') ? `https:${rawImg}` : rawImg,
+        });
+      }
+      return out;
+    });
+
+    return cards
+      .map((card) => this.mapCard(card))
+      .filter((listing): listing is RetailerListing => listing !== null);
   }
 
   private mapCard(card: RawAliExpressCard): RetailerListing | null {

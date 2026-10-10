@@ -1,8 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { Page } from 'patchright';
 import { BrowserSessionService } from '../browser/browser-session.service';
 import { RetailerConnector } from '../interfaces/retailer-connector.interface';
 import { RetailerListing } from '../interfaces/retailer-listing.interface';
+import { readResultPages, withPageParam } from '../utils/result-pages';
 
 interface RawAmazonCard {
   asin: string | null;
@@ -49,54 +51,14 @@ export class AmazonConnector implements RetailerConnector {
 
     const page = await this.browserSession.getPage(this.slug);
     try {
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await page.waitForSelector('div[data-component-type="s-search-result"]', { timeout: 15000 }).catch(() => undefined);
-      await page.waitForTimeout(2000);
-
-      const cards = await page.evaluate(() => {
-        const items = Array.from(document.querySelectorAll('div[data-component-type="s-search-result"]'));
-        return items.map((item): RawAmazonCard => {
-          // Cards with a color/pattern swatch selector (very common for phones)
-          // put only the bare brand name in `h2 span` ("OPPO") -- the real full
-          // title lives in the product image's alt text instead, confirmed live
-          // against amazon.eg. h2 text is kept only as a fallback for cards
-          // without that swatch structure.
-          const img = item.querySelector('img.s-image');
-          const h2 = item.querySelector('h2');
-          const title = img?.getAttribute('alt')?.trim() || h2?.textContent?.trim() || null;
-          // The live price and the struck-through one are both .a-price, and
-          // are told apart by a-text-price, which Amazon puts only on the
-          // "List:" price. Selecting .a-price blindly would pick whichever
-          // came first in the DOM and could report the was-price as the price.
-          const priceEl = item.querySelector('.a-price:not(.a-text-price) .a-offscreen');
-          const listPriceEl = item.querySelector('.a-price.a-text-price .a-offscreen');
-
-          // Amazon marks unavailable results in the card body rather than with
-          // a stable class, so match the wording. Kept narrow on purpose: a
-          // phrase we do not recognise leaves stock unknown rather than
-          // guessing "available".
-          const bodyText = item.textContent?.toLowerCase() ?? '';
-          const unavailablePhrase = [
-            'currently unavailable',
-            'temporarily out of stock',
-            'out of stock',
-          ].find((phrase) => bodyText.includes(phrase));
-
-          return {
-            asin: item.getAttribute('data-asin'),
-            title,
-            priceLabel: priceEl?.textContent?.trim() ?? null,
-            listPriceLabel: listPriceEl?.textContent?.trim() ?? null,
-            unavailableLabel: unavailablePhrase ?? null,
-            imageUrl: img?.getAttribute('src') ?? null,
-          };
-        });
-      });
-
-      return cards
-        .slice(0, limit)
-        .map((card) => this.mapCard(card, baseUrl))
-        .filter((listing): listing is RetailerListing => listing !== null);
+      return await readResultPages(
+        {
+          limit,
+          maxPages: this.configService.get<number>('retailers.searchMaxPages', 3),
+          onLaterPageError: (n, error) => this.logger.warn(`Page ${n} of "${query}" failed (${this.slug}): ${String(error)}`),
+        },
+        (pageNumber) => this.readPage(page, withPageParam(url, pageNumber), baseUrl),
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(`Search failed for "${query}" (${this.slug}): ${message}`);
@@ -108,6 +70,57 @@ export class AmazonConnector implements RetailerConnector {
       // other in-flight call for the same store.
       await page.close().catch(() => undefined);
     }
+  }
+
+  /** One results page, read in the search's own tab. */
+  private async readPage(page: Page, url: string, baseUrl: string): Promise<RetailerListing[]> {
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForSelector('div[data-component-type="s-search-result"]', { timeout: 15000 }).catch(() => undefined);
+    await page.waitForTimeout(2000);
+
+    const cards = await page.evaluate(() => {
+      const items = Array.from(document.querySelectorAll('div[data-component-type="s-search-result"]'));
+      return items.map((item): RawAmazonCard => {
+        // Cards with a color/pattern swatch selector (very common for phones)
+        // put only the bare brand name in `h2 span` ("OPPO") -- the real full
+        // title lives in the product image's alt text instead, confirmed live
+        // against amazon.eg. h2 text is kept only as a fallback for cards
+        // without that swatch structure.
+        const img = item.querySelector('img.s-image');
+        const h2 = item.querySelector('h2');
+        const title = img?.getAttribute('alt')?.trim() || h2?.textContent?.trim() || null;
+        // The live price and the struck-through one are both .a-price, and
+        // are told apart by a-text-price, which Amazon puts only on the
+        // "List:" price. Selecting .a-price blindly would pick whichever
+        // came first in the DOM and could report the was-price as the price.
+        const priceEl = item.querySelector('.a-price:not(.a-text-price) .a-offscreen');
+        const listPriceEl = item.querySelector('.a-price.a-text-price .a-offscreen');
+
+        // Amazon marks unavailable results in the card body rather than with
+        // a stable class, so match the wording. Kept narrow on purpose: a
+        // phrase we do not recognise leaves stock unknown rather than
+        // guessing "available".
+        const bodyText = item.textContent?.toLowerCase() ?? '';
+        const unavailablePhrase = [
+          'currently unavailable',
+          'temporarily out of stock',
+          'out of stock',
+        ].find((phrase) => bodyText.includes(phrase));
+
+        return {
+          asin: item.getAttribute('data-asin'),
+          title,
+          priceLabel: priceEl?.textContent?.trim() ?? null,
+          listPriceLabel: listPriceEl?.textContent?.trim() ?? null,
+          unavailableLabel: unavailablePhrase ?? null,
+          imageUrl: img?.getAttribute('src') ?? null,
+        };
+      });
+    });
+
+    return cards
+      .map((card) => this.mapCard(card, baseUrl))
+      .filter((listing): listing is RetailerListing => listing !== null);
   }
 
   private mapCard(card: RawAmazonCard, baseUrl: string): RetailerListing | null {

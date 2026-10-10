@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { RetailerListing } from '../interfaces/retailer-listing.interface';
 import { parseJsonLdListings } from '../utils/jsonld-listing-parser';
+import { readResultPages, withPageParam } from '../utils/result-pages';
 import { BrowserSessionService } from '../browser/browser-session.service';
 import { isBotWallRefusal, openThroughBotWall } from '../browser/bot-wall';
 
@@ -28,8 +29,17 @@ export abstract class JsonLdSearchConnector {
 
     const url = this.buildSearchUrl(trimmed);
     try {
-      const html = await this.fetchPage(url);
-      return parseJsonLdListings(html, url, this.defaultCurrency, this.slug, limit);
+      return await readResultPages(
+        {
+          limit,
+          maxPages: this.configService.get<number>('retailers.searchMaxPages', 3),
+          onLaterPageError: (n, error) => this.logger.warn(`Page ${n} of "${query}" failed (${this.slug}): ${String(error)}`),
+        },
+        async (pageNumber) => {
+          const pageUrl = withPageParam(url, pageNumber);
+          return parseJsonLdListings(await this.fetchPage(pageUrl), pageUrl, this.defaultCurrency, this.slug, limit);
+        },
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(`Search failed for "${query}" (${this.slug}): ${message}`);
