@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { Providers } from '@/components/layout/providers';
 import { PageTracker } from '@/components/analytics/page-tracker';
 import { Navbar } from '@/components/layout/navbar';
+import { SectionNav } from '@/components/layout/section-nav';
 import { Footer } from '@/components/layout/footer';
 import { locales, localeDir } from '@/lib/i18n/config';
 import { getI18n, resolveLocale } from '@/lib/i18n/server';
@@ -109,6 +110,7 @@ export default async function LocaleLayout({
               {t.nav.skipToContent}
             </a>
             <Navbar />
+            <SectionNav t={t} />
             <main id="main" className="flex-1">
               {children}
             </main>
