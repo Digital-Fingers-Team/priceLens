@@ -1827,6 +1827,9 @@ model PlatformFeeTable {
   id            String   @id @default(uuid())
   platformId    String   @map("platform_id")
   categoryKey   String   @default("") @map("category_key") @db.VarChar(64)
+  /// Lower-case brand this row applies to, '' for every brand. Noon charges
+  /// some brands less (Apple phones 3.5%, branded headphones 8%).
+  brand         String   @default("") @db.VarChar(64)
   commissionPct Float    @map("commission_pct")
   fixedFee      Decimal  @default(0) @map("fixed_fee") @db.Decimal(12, 2)
   shippingFee   Decimal  @default(0) @map("shipping_fee") @db.Decimal(12, 2)
@@ -1848,7 +1851,7 @@ model PlatformFeeTable {
 
   platform Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
 
-  @@unique([platformId, categoryKey])
+  @@unique([platformId, categoryKey, brand])
   @@map("platform_fee_tables")
 }
 

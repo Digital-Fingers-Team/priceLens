@@ -6037,6 +6037,10 @@
             "description": "A category slug, or empty for the platform default.",
             "maxLength": 64
           },
+          "brand": {
+            "type": "string",
+            "maxLength": 64
+          },
           "commissionPct": {
             "type": "number",
             "minimum": 0,

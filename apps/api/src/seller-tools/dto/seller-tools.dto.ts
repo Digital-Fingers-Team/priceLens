@@ -93,6 +93,11 @@ export class UpsertFeeTableDto {
   @MaxLength(64)
   categoryKey?: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  brand?: string;
+
   @IsNumber()
   @Min(0)
   @Max(100)

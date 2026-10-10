@@ -49,10 +49,24 @@ export class SellerToolsService {
 
   // ── Fees and profit ─────────────────────────────────────────────────
 
-  /** The fee table that applies: the product's category if one exists, else the platform default. */
-  private pickFees<T extends { platformId: string; categoryKey: string }>(tables: T[], platformId: string, categorySlug: string | null): T | null {
+  /**
+   * The fee table that applies: the product's category and brand, else the
+   * category for every brand, else the platform default.
+   */
+  private pickFees<T extends { platformId: string; categoryKey: string; brand: string }>(
+    tables: T[],
+    platformId: string,
+    categorySlug: string | null,
+    brand: string | null,
+  ): T | null {
     const forPlatform = tables.filter((t) => t.platformId === platformId);
-    return forPlatform.find((t) => categorySlug && t.categoryKey === categorySlug) ?? forPlatform.find((t) => t.categoryKey === '') ?? null;
+    const key = brand?.trim().toLowerCase() ?? '';
+    return (
+      forPlatform.find((t) => categorySlug && t.categoryKey === categorySlug && key && t.brand === key) ??
+      forPlatform.find((t) => categorySlug && t.categoryKey === categorySlug && t.brand === '') ??
+      forPlatform.find((t) => t.categoryKey === '' && t.brand === '') ??
+      null
+    );
   }
 
   /**
@@ -60,9 +74,13 @@ export class SellerToolsService {
    * tables are per category with no platform default, so a platform without
    * this category is left out; it used to crash both tools (2026-10-09).
    */
-  private applicableFees<T extends { platformId: string; categoryKey: string }>(tables: T[], categorySlug: string | null): T[] {
+  private applicableFees<T extends { platformId: string; categoryKey: string; brand: string }>(
+    tables: T[],
+    categorySlug: string | null,
+    brand: string | null,
+  ): T[] {
     return [...new Set(tables.map((t) => t.platformId))]
-      .map((platformId) => this.pickFees(tables, platformId, categorySlug))
+      .map((platformId) => this.pickFees(tables, platformId, categorySlug, brand))
       .filter((table): table is T => table !== null);
   }
 
@@ -94,7 +112,7 @@ export class SellerToolsService {
     const { organization } = await this.organizations.requireMembership(userId, orgId, role);
     const product = await this.prisma.sellerProduct.findFirst({
       where: { id: productId, orgId },
-      include: { canonicalProduct: { select: { id: true, title: true, category: { select: { slug: true } } } } },
+      include: { canonicalProduct: { select: { id: true, title: true, brand: true, category: { select: { slug: true } } } } },
     });
     if (!product) throw new NotFoundException('Product not found in this workspace');
     return { organization, product };
@@ -110,7 +128,7 @@ export class SellerToolsService {
     const cost = money(product.cost);
     const tables = await this.prisma.platformFeeTable.findMany({ include: { platform: { select: { id: true, name: true } } } });
     const category = product.canonicalProduct?.category.slug ?? null;
-    const rows = this.applicableFees(tables, category)
+    const rows = this.applicableFees(tables, category, product.canonicalProduct?.brand ?? null)
       .map((table) => ({
         platform: table.platform,
         feesUpdatedAt: table.updatedAt.toISOString(),
@@ -139,7 +157,7 @@ export class SellerToolsService {
     const tables = await this.prisma.platformFeeTable.findMany({ include: { platform: { select: { id: true, name: true } } } });
     const category = product.canonicalProduct?.category.slug ?? null;
 
-    const rows = this.applicableFees(tables, category).map((table) => {
+    const rows = this.applicableFees(tables, category, product.canonicalProduct?.brand ?? null).map((table) => {
       const offer = market.find((m) => m.platformId === table.platformId) ?? null;
       const price = offer?.price ?? own;
       return {
@@ -477,7 +495,7 @@ export class SellerToolsService {
 
   listFeeTables() {
     return this.prisma.platformFeeTable
-      .findMany({ include: { platform: { select: { id: true, name: true, slug: true } } }, orderBy: [{ platformId: 'asc' }, { categoryKey: 'asc' }] })
+      .findMany({ include: { platform: { select: { id: true, name: true, slug: true } } }, orderBy: [{ platformId: 'asc' }, { categoryKey: 'asc' }, { brand: 'asc' }] })
       .then((rows) => rows.map((r) => ({ ...r, ...this.feeNumbers(r) })));
   }
 
@@ -494,6 +512,7 @@ export class SellerToolsService {
   async upsertFeeTable(input: {
     platformId: string;
     categoryKey?: string;
+    brand?: string;
     commissionPct: number;
     fixedFee?: number;
     shippingFee?: number;
@@ -508,6 +527,7 @@ export class SellerToolsService {
     const platform = await this.prisma.platform.findUnique({ where: { id: input.platformId }, select: { id: true } });
     if (!platform) throw new BadRequestException('Unknown platform');
     const categoryKey = input.categoryKey?.trim().toLowerCase() ?? '';
+    const brand = input.brand?.trim().toLowerCase() ?? '';
     const data = {
       commissionPct: input.commissionPct,
       fixedFee: decimal(input.fixedFee ?? 0)!,
@@ -522,8 +542,8 @@ export class SellerToolsService {
       notes: input.notes ?? null,
     };
     const row = await this.prisma.platformFeeTable.upsert({
-      where: { platformId_categoryKey: { platformId: input.platformId, categoryKey } },
-      create: { platformId: input.platformId, categoryKey, ...data },
+      where: { platformId_categoryKey_brand: { platformId: input.platformId, categoryKey, brand } },
+      create: { platformId: input.platformId, categoryKey, brand, ...data },
       update: data,
     });
     return { ...row, ...this.feeNumbers(row) };

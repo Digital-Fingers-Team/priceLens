@@ -20,6 +20,7 @@ interface FeeTable {
   platformId: string;
   platform: { id: string; name: string; slug: string };
   categoryKey: string;
+  brand: string;
   commissionPct: number;
   fixedFee: number;
   shippingFee: number;
@@ -92,6 +93,7 @@ export function FeeTables() {
   });
   const [newPlatform, setNewPlatform] = useState('');
   const [newCategory, setNewCategory] = useState('');
+  const [newBrand, setNewBrand] = useState('');
 
   if (isLoading || !rows) return <Skeleton className="h-96 w-full" />;
 
@@ -115,10 +117,11 @@ export function FeeTables() {
             wrapperClassName="flex-1"
           />
           <Input label="Category slug (optional)" dir="ltr" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} wrapperClassName="flex-1" />
+          <Input label="Brand (optional)" dir="ltr" value={newBrand} onChange={(e) => setNewBrand(e.target.value)} wrapperClassName="flex-1" />
           <Button
             disabled={!newPlatform}
             loading={save.isPending}
-            onClick={() => save.mutate({ platformId: newPlatform, categoryKey: newCategory.trim(), commissionPct: 0 })}
+            onClick={() => save.mutate({ platformId: newPlatform, categoryKey: newCategory.trim(), brand: newBrand.trim(), commissionPct: 0 })}
           >
             Add
           </Button>
@@ -137,6 +140,7 @@ function FeeCard({ row, saving, onSave, onDelete }: { row: FeeTable; saving: boo
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-base font-semibold text-fg">{row.platform.name}</h2>
           <Badge variant="outline">{row.categoryKey || 'Store default'}</Badge>
+          {row.brand && <Badge variant="outline">{row.brand}</Badge>}
           <span className="text-xs text-muted">Updated {new Date(row.updatedAt).toLocaleDateString('en-GB')}</span>
         </div>
       </CardHeader>
@@ -158,6 +162,7 @@ function FeeCard({ row, saving, onSave, onDelete }: { row: FeeTable; saving: boo
               onSave({
                 platformId: row.platformId,
                 categoryKey: row.categoryKey,
+                brand: row.brand,
                 commissionPct: Number(draft.commissionPct) || 0,
                 fixedFee: Number(draft.fixedFee) || 0,
                 shippingFee: Number(draft.shippingFee) || 0,
