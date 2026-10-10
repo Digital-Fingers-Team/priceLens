@@ -103,7 +103,7 @@ export const en = {
   },
   home: {
     metaTitle: 'Compare prices in Egypt: the cheapest price today',
-    metaDescription: 'Pricelens: compare mobile, laptop and appliance prices in Egypt across Amazon, Noon, Jumia, B.TECH and more, updated every day. One search, every price.',
+    metaDescription: 'Compare mobile, laptop and appliance prices in Egypt across Amazon, Noon, Jumia, B.TECH and more, updated every day. One search, every price.',
     eyebrow: 'Price comparison',
     headline: 'One search.',
     headlineAccent: 'Every price.',

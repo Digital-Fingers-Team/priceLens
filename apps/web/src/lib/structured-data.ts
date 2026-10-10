@@ -26,7 +26,9 @@ export function websiteJsonLd({ name, homePath, searchPath }: { name: string; ho
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     name,
-    alternateName: ['PriceLens', 'برايس لينس', 'pricelens.store'],
+    // No domain here: Google already fell back to showing the domain as the
+    // site name, and listing it as a name only encourages that.
+    alternateName: ['Pricelens', 'PriceLens', 'برايس لينس'].filter((alt) => alt !== name),
     url: absoluteUrl(homePath),
     potentialAction: {
       '@type': 'SearchAction',

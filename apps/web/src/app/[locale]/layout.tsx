@@ -52,10 +52,14 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     ...baseMetadata,
     title: { default: t.meta.siteTitle, template: `%s | ${t.meta.siteName}` },
     description: t.meta.description,
-    openGraph: { ...baseMetadata.openGraph, title: t.meta.siteTitle, description: t.meta.shortDescription },
+    openGraph: { ...baseMetadata.openGraph, siteName: t.meta.siteName, title: t.meta.siteTitle, description: t.meta.shortDescription },
     twitter: { ...baseMetadata.twitter, title: t.meta.siteTitle, description: t.meta.shortDescription },
     icons: {
+      // The 48 and 96 px icons are what Google shows beside a search result;
+      // their glyph fills the square so it stays legible at that size.
       icon: [
+        { url: '/icon-48.png', sizes: '48x48', type: 'image/png' },
+        { url: '/icon-96.png', sizes: '96x96', type: 'image/png' },
         { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
         { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
       ],

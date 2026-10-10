@@ -11,7 +11,7 @@ import { CategoryLinks } from '@/components/seo/category-links';
 import { categoriesApi } from '@/lib/api/categories.api';
 import { groupCategories } from '@/lib/categories';
 import type { Locale } from '@/lib/i18n/config';
-import { absoluteUrl, localizedAlternates } from '@/lib/seo';
+import { absoluteUrl, baseMetadata, localizedAlternates } from '@/lib/seo';
 import { organizationJsonLd, websiteJsonLd } from '@/lib/structured-data';
 import { serializeJsonLd } from '@/lib/utils/json-ld';
 import { HeroComparison } from './_components/hero-comparison';
@@ -32,8 +32,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: { absolute: `${t.meta.siteName} | ${t.home.metaTitle}` },
     description: t.home.metaDescription,
     alternates: localizedAlternates(locale, '/'),
-    openGraph: { title: t.meta.siteName, description: t.home.metaDescription, url: absoluteUrl(href('/')) },
-    twitter: { title: t.meta.siteName, description: t.home.metaDescription },
+    // Spread the base so the share image is kept: a page-level openGraph
+    // replaces the layout one whole.
+    openGraph: { ...baseMetadata.openGraph, siteName: t.meta.siteName, title: t.meta.siteName, description: t.home.metaDescription, url: absoluteUrl(href('/')) },
+    twitter: { ...baseMetadata.twitter, title: t.meta.siteName, description: t.home.metaDescription },
   };
 }
 
