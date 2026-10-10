@@ -11,6 +11,11 @@ services:
     image: docker.io/pgvector/pgvector:pg16
     container_name: pricelens-postgres
     restart: always
+    # The default 64 MB /dev/shm ran out under concurrent searches ("could not
+    # resize shared memory segment", 2026-10-10). Applies when the container is
+    # next recreated; until then max_parallel_workers_per_gather=0 (ALTER SYSTEM)
+    # keeps queries out of shared memory.
+    shm_size: 256mb
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}

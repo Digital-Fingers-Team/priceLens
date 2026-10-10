@@ -93,13 +93,19 @@ export async function productFileCount(): Promise<number> {
 }
 
 async function productPage(page: number) {
-  try {
-    return (await searchApi.search({ q: '', page, limit: PAGE_SIZE })).hits ?? [];
-  } catch {
-    // An error ends the file like an empty page: Google drops a whole file
-    // that answers with an error.
-    return null;
+  // A failed page used to end the file at once; on 2026-10-10 the files held
+  // 0-800 of their 5,000 URLs because search sometimes answered 500 (Postgres
+  // shared memory). A retry or two rides those out.
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return (await searchApi.search({ q: '', page, limit: PAGE_SIZE })).hits ?? [];
+    } catch {
+      if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+    }
   }
+  // Still failing: end the file like an empty page. Google drops a whole
+  // file that answers with an error.
+  return null;
 }
 
 /** The products of file `file` (1-based), in the browse order. */
