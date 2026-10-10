@@ -50,7 +50,7 @@ Owner only:
   - Real customs rates; 15% and 14% VAT are placeholders (`/admin/landed-cost`).
 
 Engineering:
-- Disk is 77% full after the 2026-10-09 cleanup (old build images, Meilisearch, old clones, the pay demo, old `.env` backups). The monitor alerts at 85%. Each `deploy-*.sh` leaves an untagged image of about 2 GB: remove PriceLens ones older than a day with `podman rmi <id>`.
+- Disk is 74% full after removing 44 untagged PriceLens build images on 2026-10-10 (23 GB; it had reached 87%). The rest: image layers, /usr 20 GB, volumes 16 GB (browser profiles 6.2), ~/sli-work 14, ~/quran-live 8.9, /var/log 7.3, ~/.cache 6.4, old PriceLens checkouts ~/connectors, ~/pricelens-phase03, ~/pricelens-p3 about 5 GB. The monitor alerts at 85%. Each `deploy-*.sh` leaves an untagged image of about 2 GB: remove PriceLens ones older than a day with `podman rmi <id>`.
 - Scheduled jobs vs scrapes: Bull has one worker loop per handler (23). A scrape waiting for one of the 2 scrape slots still holds a loop; on 2026-10-09, 21 parked store expansions starved reconciliation, price alerts and title translation for hours. Since then an expansion is skipped (re-queued on the next page view) once `MAX_PARKED_EXPANSIONS` (4) jobs wait for a slot. Still open: what keeps requesting expansions (capped by `STORE_EXPANSION_MAX_WAITING=100`).
 - Matcher: no CPU-model guard (QA-16).
 - Earbuds in the wrong category (seen 2026-10-10): of products titled FreeBuds/AirPods/earbuds, 904 are in headphones but 291 in phone-accessories (and a few in smart-watches, smartphones, even processors), while cases for them sit in headphones. Brand fees for headphones only reach the ones filed correctly.
